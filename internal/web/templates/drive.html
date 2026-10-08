@@ -35,7 +35,7 @@
 <thead><tr><th>SCAN</th><th>SCANNED</th><th>INGESTED</th><th class="num">FILES</th><th class="num">CLIPS</th><th class="num">BYTES</th><th class="num">ADDED</th><th class="num">REMOVED</th><th class="num">CHANGED</th><th>SCANNER</th><th></th></tr></thead>
 <tbody>
 {{range .Scans}}<tr tabindex="0">
-  <td><a href="/scans/{{.ID}}" class="value">#{{.ID}}</a>{{if .IsLatest}} <span class="badge badge-xs badge-accent">LATEST</span>{{end}}</td>
+  <td><a href="/scans/{{.ID}}" class="value">#{{.ID}}</a>{{if .IsLatest}} <span class="badge badge-xs badge-accent">LATEST</span>{{end}}{{if .IsPartial}} <span class="badge badge-xs badge-warning" title="{{.Root}}">PARTIAL</span>{{end}}</td>
   <td>{{datetime .ScannedAt}}</td><td class="info">{{datetime .IngestedAt}}</td>
   <td class="num">{{n .FileCount}}</td><td class="num">{{n .ClipCount}}</td><td class="num">{{bytes .TotalBytes}}</td>
   <td class="num text-success">+{{n .Added}}</td><td class="num text-error">-{{n .Removed}}</td><td class="num text-warning">~{{n .Changed}}</td>

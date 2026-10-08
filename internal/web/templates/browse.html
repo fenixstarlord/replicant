@@ -1,6 +1,6 @@
 {{define "content"}}
 <h1><a href="/drives/{{.Drive.ID}}">{{.Drive.Name}}</a></h1>
-<p class="info">SCAN #{{.Scan.ID}} · {{datetime .Scan.ScannedAt}}{{if .Scan.IsLatest}} · LATEST{{else}} · <span class="text-warning">OLD SCAN</span>{{end}} · {{if .Drive.Location}}{{.Drive.Location}}{{else}}LOCATION NOT SET{{end}}</p>
+<p class="info">SCAN #{{.Scan.ID}} · {{datetime .Scan.ScannedAt}}{{if .Scan.IsLatest}} · LATEST{{else}} · <span class="text-warning">OLD SCAN</span>{{end}}{{if .Scan.IsPartial}} · <span class="text-warning">PARTIAL: {{.Scan.Root}}</span>{{end}} · {{if .Drive.Location}}{{.Drive.Location}}{{else}}LOCATION NOT SET{{end}}</p>
 <div class="breadcrumbs text-sm"><ul>
   <li><a href="/browse/{{.Drive.ID}}?scan={{.Scan.ID}}">/</a></li>
   {{$d := .Drive.ID}}{{$s := .Scan.ID}}{{range .Crumbs}}<li><a href="/browse/{{$d}}/{{.Path}}?scan={{$s}}">{{.Name}}</a></li>{{end}}

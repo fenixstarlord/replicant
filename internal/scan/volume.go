@@ -1,9 +1,5 @@
 package scan
 
-import (
-	"golang.org/x/sys/unix"
-)
-
 // Volume identifies the filesystem that contains a scanned path.
 type Volume struct {
 	MountPoint string `json:"mount_point"`
@@ -17,20 +13,14 @@ type Volume struct {
 	Protocol   string `json:"protocol,omitempty"`
 }
 
-// VolumeInfo describes the volume containing path. Mount point, filesystem
-// type, and capacity come from statfs and are always filled. On macOS the
-// UUID, volume name, and device details come from diskutil; if diskutil is
-// unavailable those fields stay empty and no error is returned.
+// VolumeInfo describes the volume containing path. Mount point,
+// filesystem type, and capacity come from the OS; on macOS the UUID,
+// volume name, and device details come from diskutil. Missing details
+// are left empty rather than failing.
 func VolumeInfo(path string) (Volume, error) {
-	var st unix.Statfs_t
-	if err := unix.Statfs(path, &st); err != nil {
+	v, err := statVolume(path)
+	if err != nil {
 		return Volume{}, err
-	}
-	v := Volume{
-		MountPoint: cstr(st.Mntonname[:]),
-		FSType:     cstr(st.Fstypename[:]),
-		TotalBytes: int64(st.Blocks) * int64(st.Bsize),
-		FreeBytes:  int64(st.Bavail) * int64(st.Bsize),
 	}
 	fillVolumeDetails(&v)
 	return v, nil

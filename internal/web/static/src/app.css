@@ -105,4 +105,14 @@
   .info                            { color: var(--color-m8-info); }
   .table tbody tr:focus-within::before { content: ">"; color: var(--color-primary); animation: m8blink 1s steps(1) infinite !important; }
   @keyframes m8blink { 50% { opacity: 0; } }
+  .table :where(td, th)            { white-space: nowrap; }
+  /* Key/value groups on detail pages: label column, value column. */
+  .kv                              { display: grid; grid-template-columns: max-content 1fr; gap: 2px 16px; }
+  .kv dt                           { color: var(--color-m8-info); text-transform: uppercase; }
+  .kv dd                           { margin: 0; color: var(--color-m8-value); }
+  /* Filter grid on the search page. */
+  .filters                         { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 4px 8px; }
+  .filters label                   { display: flex; flex-direction: column; font-size: 12px; color: var(--color-m8-info); }
+  .filters .input, .filters .select { width: 100%; }
+  @media (max-width: 640px) { .filters { grid-template-columns: repeat(2, 1fr); } .stats { flex-wrap: wrap; } }
 }

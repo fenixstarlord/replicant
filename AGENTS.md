@@ -46,24 +46,19 @@ Track progress here. Update this section at the end of each phase, and commit.
   **Open:** `redline` and `art-cmd` parsers are written against documented names but unverified;
   capture golden output and pin the parsers once the user installs REDCINE-X PRO and ART. The
   Sony XML and BRAW sidecar parsers are tested on synthetic samples only (none on this drive).
-- [~] Phase 5 — Search + browse UI (2026-10-08, **code done, CSS build pending downloads**).
-  `internal/store/query.go` (clip search with every plan filter, file search, browse listing,
-  detail, history, copies, facets), `internal/web` pages: login, drives (inline label/location),
-  drive (scan history, diff picker, exports), search (clips/files, filters, htmx live results),
-  browse, clip detail (grouped fields with source tags, raw output), file detail, scan detail,
-  settings (tokens, upload, backup). Verified in the browser with the hand-written fallback
-  `static/app.css`. **Pending:** run `./build-css.sh` (downloads Tailwind CLI + daisyUI), vendor
-  `htmx.min.js` and the stealth57 woff2 under `internal/web/static/`. Each is a download: ask.
+- [x] Phase 5 — Search + browse UI (2026-10-08). `internal/store/query.go` (clip search with every
+  plan filter, file search, browse listing, detail, history, copies, facets), `internal/web` pages:
+  login, drives (inline label/location), drive (scan history, diff picker, exports), search
+  (clips/files, filters, htmx live results), browse, clip detail (grouped fields with source tags,
+  raw output), file detail, scan detail, settings (tokens, upload, backup). Real stylesheet built
+  with `./build-css.sh` (Tailwind v4.3.3 + daisyUI 5.7.47, cached in `.tools/`), htmx 2.0.11 and
+  stealth57 vendored under `internal/web/static/`. Verified in the browser pane.
 - [x] Phase 6 — History + duplicates (2026-10-08). Diffs at ingest (`scan_changes`), scan page,
   any-two-scans diff (`/scans/{a}/diff/{b}`, FULL OUTER JOIN by path), duplicates page by
   fingerprint or name+size with wasted bytes, other copies on clip and file pages.
-- [~] Phase 7 — Polish. Done: `shelf login` + direct push, CSV and ALE export (search results or
-  whole drive), `shelf-server backup` + Settings button, label/location editing, README.
-  Open: mobile pass once the real CSS is built; Docker image (deferred by decision).
-- [ ] Phase 4 — Extractors
-- [ ] Phase 5 — Search + browse UI
-- [ ] Phase 6 — History + duplicates
-- [ ] Phase 7 — Polish
+- [x] Phase 7 — Polish (2026-10-08). `shelf login` + direct push, CSV and ALE export, backup
+  command + Settings button, label/location editing, README, `make dist` (static linux/amd64 and
+  arm64 server binaries + `deploy/shelf-server.service`). Docker image still deferred by decision.
 
 Each phase ends with something runnable and a commit. Do not start the next phase's work in the
 same change unless asked.
@@ -184,6 +179,8 @@ go test -run Integration -tags integration ./...   # slow, needs hdiutil / real 
 go run ./cmd/shelf dump /Volumes/<drive> | head
 go run ./cmd/shelf doctor
 ./start.sh                                          # run shelf-server locally (dev)
+./build-css.sh                                      # rebuild internal/web/static/app.css after CSS/template edits
+make dist                                           # linux server binaries + systemd unit in dist/
 docker compose up --build                           # later, once the server is proven
 ```
 
@@ -271,12 +268,14 @@ Extractor order suggested by this drive: ffprobe (mov/mxf/mp4/mts) → Sony XML 
 R3D → BRAW → ARRI, with Canon CRM added to the format table. Re-survey when real camera drives
 are attached; this RAID is not representative of the shelf drives.
 
-## Open questions (ask the user, don't guess)
+## Decisions, continued
 
-- **Partial scans.** `shelf scan /Volumes/X/subfolder` is stored as a scan of drive X whose
-  entries are only the subfolder, and it becomes the drive's latest scan, so the previous full
-  scan's files count as "removed". Options: refuse non-mount-point roots, or track `root` per scan
-  and compute latest/diff per root. Decide before real use; the manifest already records `root`.
+- **Partial scans (decided 2026-10-08):** a scan whose root is not the mount point is `is_partial`;
+  latest and diffs are tracked per (drive, root); drive aggregates and default browsing prefer the
+  latest full scan (`store.LatestScan`). Migration `0002_partial_scans.sql`.
+- **Home server:** cross-compiled static binary + systemd unit (`make dist`), not Docker, for now.
+
+## Open questions (ask the user, don't guess)
 
 - NetBird hostname format for the server, for the README and `shelf login` examples.
 - Which camera formats are actually present on the user's drives (drives the Phase 4 build order).

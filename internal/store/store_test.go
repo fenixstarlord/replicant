@@ -35,7 +35,7 @@ func TestMigrateIsIdempotentAndUsesWAL(t *testing.T) {
 		t.Fatal(err)
 	}
 	var n int
-	if err := s.DB.QueryRow(`SELECT count(*) FROM schema_migrations`).Scan(&n); err != nil || n != 1 {
+	if err := s.DB.QueryRow(`SELECT count(*) FROM schema_migrations`).Scan(&n); err != nil || n != 2 {
 		t.Fatalf("schema_migrations rows = %d, err %v", n, err)
 	}
 	var mode string
@@ -276,5 +276,57 @@ func TestIngestStoresMetadataAndRaw(t *testing.T) {
 	}
 	if err := s.DB.QueryRow(`SELECT count(*) FROM clips_fts WHERE clips_fts MATCH 'alexa' AND scan_id = ?`, r.ScanID).Scan(&n); err != nil || n != 1 {
 		t.Errorf("clips_fts camera match = %d (%v), want 1", n, err)
+	}
+}
+
+func TestPartialScansTrackedPerRoot(t *testing.T) {
+	ctx := context.Background()
+	s, err := Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	root := t.TempDir()
+	write(t, root, "A001/a.mov", "a")
+	write(t, root, "B001/b.mov", "b")
+	t0 := time.Date(2026, 10, 8, 10, 0, 0, 0, time.UTC)
+	full, err := s.Ingest(ctx, makeBundle(t, root, t0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Partial scan of A001 only, later; mount point stays the drive root.
+	pb := makeBundle(t, filepath.Join(root, "A001"), t0.Add(time.Hour))
+	pb.Manifest.Volume.MountPoint = root
+	part, err := s.Ingest(ctx, pb)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !part.IsPartial || !part.IsLatest || !part.FirstScan || part.Removed != 0 || full.IsPartial {
+		t.Errorf("partial ingest wrong: %+v", part)
+	}
+	// The full scan is still latest for its root and still what the drive reports.
+	fs, err := s.LatestScan(ctx, full.DriveID)
+	if err != nil || fs.ID != full.ScanID || fs.IsPartial {
+		t.Errorf("latest scan = %+v (%v), want full scan %d", fs, err, full.ScanID)
+	}
+	drives, _ := s.ListDrives(ctx)
+	if drives[0].FileCount != 2 || drives[0].ScanCount != 2 {
+		t.Errorf("drive aggregates wrong: %+v", drives[0])
+	}
+	// A second partial scan diffs against the first partial, not the full scan.
+	write(t, filepath.Join(root, "A001"), "a2.mov", "aa")
+	pb2 := makeBundle(t, filepath.Join(root, "A001"), t0.Add(2*time.Hour))
+	pb2.Manifest.Volume.MountPoint = root
+	part2, err := s.Ingest(ctx, pb2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if part2.FirstScan || part2.Added != 1 || part2.Removed != 0 {
+		t.Errorf("second partial wrong: %+v", part2)
+	}
+	var n int
+	s.DB.QueryRow(`SELECT count(*) FROM scans WHERE is_latest = 1`).Scan(&n)
+	if n != 2 {
+		t.Errorf("latest scans = %d, want 2 (one per root)", n)
 	}
 }

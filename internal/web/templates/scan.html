@@ -1,6 +1,6 @@
 {{define "content"}}
 {{$s := .Scan}}
-<h1>SCAN #{{$s.ID}} <span class="info">/ <a href="/drives/{{$s.DriveID}}">{{$s.DriveName}}</a></span>{{if $s.IsLatest}} <span class="badge badge-accent">LATEST</span>{{end}}</h1>
+<h1>SCAN #{{$s.ID}} <span class="info">/ <a href="/drives/{{$s.DriveID}}">{{$s.DriveName}}</a></span>{{if $s.IsLatest}} <span class="badge badge-accent">LATEST</span>{{end}}{{if $s.IsPartial}} <span class="badge badge-warning">PARTIAL SCAN OF {{$s.Root}}</span>{{end}}</h1>
 <div class="stats stats-horizontal mb-2">
   <div class="stat"><div class="stat-title">FILES</div><div class="stat-value">{{n $s.FileCount}}</div><div class="stat-desc">{{n $s.DirCount}} DIRS</div></div>
   <div class="stat"><div class="stat-title">CLIPS</div><div class="stat-value">{{n $s.ClipCount}}</div></div>

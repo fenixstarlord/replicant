@@ -25,6 +25,8 @@ type IngestResult struct {
 	Removed   int    `json:"removed"`
 	Changed   int    `json:"changed"`
 	IsLatest  bool   `json:"is_latest"`
+	IsPartial bool   `json:"is_partial"`
+	Root      string `json:"root"`
 	FirstScan bool   `json:"first_scan"`
 }
 
@@ -81,11 +83,15 @@ func (s *Store) Ingest(ctx context.Context, b *bundle.Bundle) (res IngestResult,
 		return res, fmt.Errorf("drive upsert: %w", err)
 	}
 
-	// Previous latest scan, for the diff.
+	// A scan of a subfolder is partial: latest and diffs are per root.
+	root := m.Root
+	partial := vol.MountPoint != "" && root != "" && strings.TrimRight(root, "/") != strings.TrimRight(vol.MountPoint, "/")
+
+	// Previous latest scan of the same root, for the diff.
 	var prevID sql.NullInt64
 	var prevScannedAt sql.NullString
 	if err = tx.QueryRowContext(ctx,
-		`SELECT id, scanned_at FROM scans WHERE drive_id = ? AND is_latest = 1`, driveID,
+		`SELECT id, scanned_at FROM scans WHERE drive_id = ? AND root = ? AND is_latest = 1`, driveID, root,
 	).Scan(&prevID, &prevScannedAt); err != nil && err != sql.ErrNoRows {
 		return res, err
 	}
@@ -98,9 +104,9 @@ func (s *Store) Ingest(ctx context.Context, b *bundle.Bundle) (res IngestResult,
 	}
 	var scanID int64
 	err = tx.QueryRowContext(ctx, `
-		INSERT INTO scans(drive_id, scanned_at, ingested_at, scanner_version, root, options_json, extractors_json)
-		VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id`,
-		driveID, m.ScannedAt.UTC().Format(time.RFC3339Nano), now, m.ScannerVersion, m.Root, string(optsJSON), string(extJSON),
+		INSERT INTO scans(drive_id, scanned_at, ingested_at, scanner_version, root, is_partial, options_json, extractors_json)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+		driveID, m.ScannedAt.UTC().Format(time.RFC3339Nano), now, m.ScannerVersion, root, boolInt(partial), string(optsJSON), string(extJSON),
 	).Scan(&scanID)
 	if err != nil {
 		return res, fmt.Errorf("scan insert: %w", err)
@@ -309,8 +315,8 @@ func (s *Store) Ingest(ctx context.Context, b *bundle.Bundle) (res IngestResult,
 		return res, err
 	}
 	if isLatest {
-		if _, err = tx.ExecContext(ctx, `UPDATE scans SET is_latest = CASE WHEN id = ? THEN 1 ELSE 0 END WHERE drive_id = ?`,
-			scanID, driveID); err != nil {
+		if _, err = tx.ExecContext(ctx, `UPDATE scans SET is_latest = CASE WHEN id = ? THEN 1 ELSE 0 END WHERE drive_id = ? AND root = ?`,
+			scanID, driveID, root); err != nil {
 			return res, err
 		}
 	}
@@ -321,7 +327,7 @@ func (s *Store) Ingest(ctx context.Context, b *bundle.Bundle) (res IngestResult,
 		ScanID: scanID, DriveID: driveID, DriveName: name,
 		Entries: len(b.Entries), Files: files, Clips: len(b.Clips),
 		Added: added, Removed: removed, Changed: changed,
-		IsLatest: isLatest, FirstScan: !prevID.Valid,
+		IsLatest: isLatest, IsPartial: partial, Root: root, FirstScan: !prevID.Valid,
 	}, nil
 }
 

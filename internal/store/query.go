@@ -555,23 +555,25 @@ type Scan struct {
 	Removed        int       `json:"removed"`
 	Changed        int       `json:"changed"`
 	IsLatest       bool      `json:"is_latest"`
+	IsPartial      bool      `json:"is_partial"`
 	Extractors     string    `json:"extractors_json"`
 }
 
 const scanColumns = `s.id, s.drive_id, d.name, s.scanned_at, s.ingested_at, s.scanner_version, s.root, s.file_count, s.dir_count,
-	s.clip_count, s.total_bytes, s.added, s.removed, s.changed, s.is_latest, s.extractors_json FROM scans s JOIN drives d ON d.id = s.drive_id`
+	s.clip_count, s.total_bytes, s.added, s.removed, s.changed, s.is_latest, s.is_partial, s.extractors_json FROM scans s JOIN drives d ON d.id = s.drive_id`
 
 func scanScan(sc interface{ Scan(...any) error }) (Scan, error) {
 	var r Scan
 	var scanned, ingested string
-	var latest int
+	var latest, partial int
 	if err := sc.Scan(&r.ID, &r.DriveID, &r.DriveName, &scanned, &ingested, &r.ScannerVersion, &r.Root, &r.FileCount, &r.DirCount,
-		&r.ClipCount, &r.TotalBytes, &r.Added, &r.Removed, &r.Changed, &latest, &r.Extractors); err != nil {
+		&r.ClipCount, &r.TotalBytes, &r.Added, &r.Removed, &r.Changed, &latest, &partial, &r.Extractors); err != nil {
 		return r, err
 	}
 	r.ScannedAt, _ = time.Parse(time.RFC3339Nano, scanned)
 	r.IngestedAt, _ = time.Parse(time.RFC3339, ingested)
 	r.IsLatest = latest == 1
+	r.IsPartial = partial == 1
 	return r, nil
 }
 
@@ -598,9 +600,11 @@ func (s *Store) GetScan(ctx context.Context, id int64) (Scan, error) {
 	return scanScan(s.DB.QueryRowContext(ctx, "SELECT "+scanColumns+" WHERE s.id = ?", id))
 }
 
-// LatestScan returns a drive's latest scan.
+// LatestScan returns a drive's latest full scan, or the newest latest
+// partial scan when the drive has never been scanned whole.
 func (s *Store) LatestScan(ctx context.Context, driveID int64) (Scan, error) {
-	return scanScan(s.DB.QueryRowContext(ctx, "SELECT "+scanColumns+" WHERE s.drive_id = ? AND s.is_latest = 1", driveID))
+	return scanScan(s.DB.QueryRowContext(ctx, "SELECT "+scanColumns+
+		" WHERE s.drive_id = ? AND s.is_latest = 1 ORDER BY s.is_partial ASC, s.scanned_at DESC LIMIT 1", driveID))
 }
 
 // GetDrive returns one drive with aggregates.

@@ -4,8 +4,8 @@
 # build step whose output is committed. Pinned versions below.
 set -euo pipefail
 cd "$(dirname "$0")"
-TAILWIND_VERSION="${TAILWIND_VERSION:-v4.1.14}"
-DAISYUI_VERSION="${DAISYUI_VERSION:-5.1.29}"
+TAILWIND_VERSION="${TAILWIND_VERSION:-v4.3.3}"
+DAISYUI_VERSION="${DAISYUI_VERSION:-5.7.47}"
 TOOLS=.tools; mkdir -p "$TOOLS"
 case "$(uname -s)-$(uname -m)" in
   Darwin-arm64) BIN=tailwindcss-macos-arm64 ;;

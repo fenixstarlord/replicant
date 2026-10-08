@@ -33,11 +33,11 @@ func (s *Store) ListDrives(ctx context.Context) ([]Drive, error) {
 		SELECT d.id, d.volume_uuid, d.name, d.label, d.location, d.notes, d.fs_type,
 		       d.capacity_bytes, d.free_bytes, d.media_name, d.first_seen, d.last_seen,
 		       (SELECT count(*) FROM scans s WHERE s.drive_id = d.id),
-		       coalesce((SELECT s.file_count FROM scans s WHERE s.drive_id = d.id AND s.is_latest = 1), 0),
-		       coalesce((SELECT s.clip_count FROM scans s WHERE s.drive_id = d.id AND s.is_latest = 1), 0),
-		       coalesce((SELECT s.total_bytes FROM scans s WHERE s.drive_id = d.id AND s.is_latest = 1), 0),
-		       (SELECT s.scanned_at FROM scans s WHERE s.drive_id = d.id AND s.is_latest = 1)
-		FROM drives d ORDER BY d.name`)
+		       coalesce(ls.file_count, 0), coalesce(ls.clip_count, 0), coalesce(ls.total_bytes, 0), ls.scanned_at
+		FROM drives d
+		LEFT JOIN scans ls ON ls.id = (SELECT s.id FROM scans s WHERE s.drive_id = d.id AND s.is_latest = 1
+		                               ORDER BY s.is_partial ASC, s.scanned_at DESC LIMIT 1)
+		ORDER BY d.name`)
 	if err != nil {
 		return nil, err
 	}

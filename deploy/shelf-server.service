@@ -1,0 +1,29 @@
+# systemd unit for shelf-server on the home server.
+# Install: sudo cp shelf-server /usr/local/bin/ && sudo cp shelf-server.service /etc/systemd/system/
+#          sudo mkdir -p /var/lib/shelf && sudo useradd -r -s /usr/sbin/nologin shelf && sudo chown shelf /var/lib/shelf
+#          sudo systemctl daemon-reload && sudo systemctl enable --now shelf-server
+[Unit]
+Description=Shelf drive catalog server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=shelf
+Group=shelf
+ExecStart=/usr/local/bin/shelf-server
+Restart=on-failure
+RestartSec=3
+# Bind to the NetBird or LAN address only; never a public interface.
+Environment=SHELF_LISTEN=0.0.0.0:8080
+Environment=SHELF_DATA_DIR=/var/lib/shelf
+# Set the password in an env file not readable by others:
+#   echo 'SHELF_PASSWORD=change-me' | sudo tee /etc/shelf.env && sudo chmod 600 /etc/shelf.env
+EnvironmentFile=/etc/shelf.env
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/shelf
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

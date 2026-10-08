@@ -8,8 +8,22 @@ import (
 	"os/exec"
 	"time"
 
+	"golang.org/x/sys/unix"
 	"howett.net/plist"
 )
+
+func statVolume(path string) (Volume, error) {
+	var st unix.Statfs_t
+	if err := unix.Statfs(path, &st); err != nil {
+		return Volume{}, err
+	}
+	return Volume{
+		MountPoint: cstr(st.Mntonname[:]),
+		FSType:     cstr(st.Fstypename[:]),
+		TotalBytes: int64(st.Blocks) * int64(st.Bsize),
+		FreeBytes:  int64(st.Bavail) * int64(st.Bsize),
+	}, nil
+}
 
 // diskutilInfo is the subset of `diskutil info -plist` we use.
 type diskutilInfo struct {
