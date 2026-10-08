@@ -188,6 +188,25 @@ Add a skill with `npx skills add <owner/repo> -s <skill> -a claude-code -y` and 
 - **Vendor tools:** the user installs `art-cmd` and REDCINE-X PRO before Phase 4. Build the
   ffprobe, ALE, Sony XML, BRAW sidecar and BWF extractors first; ARRI and RED extractors last.
 
+## Drive survey (Phase 1, 2026-10-08)
+
+`shelf dump --no-fingerprint` on `/Volumes/SSD_RAID` (16 TB HFS+ RAID, mixed work drive, not a
+pure camera drive): 614k entries, 13.6 TB, walked in 8.6 s. Counts that matter for Phases 2 and 4:
+
+- Video by extension: mov 5252, mxf 3814, mp4 2542, mts 1978, **crm 108** (Canon Cinema RAW
+  Light, not in the plan's format table yet), r3d 4, braw 2.
+- 798 `.RDC` directories but only 4 `.r3d` files: most RDC folders hold no R3D segments (likely
+  offloaded or sidecar-only). Clip grouping must cope with RDC dirs that have no media.
+- 6 Sony card roots (`XDROOT` / `M4ROOT`).
+- Audio: wav 2420 (plus music formats). Sidecars: json 2033, xml 1718, cdl 1626, cube 279,
+  mhl 20, ale 3.
+- Walk speed: roughly 70k entries/s on this volume; fingerprinting ran about 2.8 GB/s on the
+  internal SSD. Scans of multi-TB drives are I/O bound on the head+tail reads, not the walk.
+
+Extractor order suggested by this drive: ffprobe (mov/mxf/mp4/mts) → Sony XML → ALE/CDL →
+R3D → BRAW → ARRI, with Canon CRM added to the format table. Re-survey when real camera drives
+are attached; this RAID is not representative of the shelf drives.
+
 ## Open questions (ask the user, don't guess)
 
 - NetBird hostname format for the server, for the README and `shelf login` examples.
