@@ -41,6 +41,21 @@ type Entry struct {
 	Fingerprint string     `json:"fingerprint,omitempty"`
 	FullHash    string     `json:"full_hash,omitempty"`
 	Error       string     `json:"error,omitempty"`
+	// ClipID links the entry to a clip after grouping (see package clips).
+	ClipID string `json:"clip_id,omitempty"`
+}
+
+// Dir returns the parent directory of the entry's path ("" at the root).
+func (e Entry) Dir() string {
+	if i := strings.LastIndexByte(e.Path, '/'); i >= 0 {
+		return e.Path[:i]
+	}
+	return ""
+}
+
+// Stem returns the file name without its extension.
+func (e Entry) Stem() string {
+	return strings.TrimSuffix(e.Name, filepath.Ext(e.Name))
 }
 
 var kindByExt = map[string]Kind{
