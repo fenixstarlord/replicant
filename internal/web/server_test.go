@@ -293,3 +293,47 @@ func TestPagesRender(t *testing.T) {
 		t.Errorf("static css = %d", code)
 	}
 }
+
+func TestHistoryPagesAndExports(t *testing.T) {
+	s, c, res := seedPages(t)
+	for _, tc := range []struct {
+		path string
+		want []string
+	}{
+		{"/duplicates", []string{"DUPLICATES", "NO DUPLICATES FOUND"}},
+		{fmt.Sprintf("/scans/%d/diff/%d", res.ScanID, res.ScanID), []string{"DIFF", "ADDED", "NONE"}},
+		{"/export.csv?q=c001", []string{"drive,label,location,path,clip", "A001C001", "ARRICORE"}},
+		{"/export.ale?q=c001", []string{"Heading", "Column", "A001C001.mxf", "ALEXA 35"}},
+	} {
+		code, body := get(t, s, c, tc.path)
+		if code != 200 {
+			t.Errorf("%s: %d %.200s", tc.path, code, body)
+			continue
+		}
+		for _, w := range tc.want {
+			if !strings.Contains(body, w) {
+				t.Errorf("%s: missing %q", tc.path, w)
+			}
+		}
+	}
+	req := httptest.NewRequest("POST", "/settings/backup", nil)
+	req.AddCookie(c)
+	rec := httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+	if rec.Code != 303 || !strings.Contains(rec.Header().Get("Location"), "backup+written") {
+		t.Fatalf("backup = %d %s", rec.Code, rec.Header().Get("Location"))
+	}
+	names := s.listBackups()
+	if len(names) != 1 {
+		t.Fatalf("backups = %v", names)
+	}
+	if code, body := get(t, s, c, "/settings"); code != 200 || !strings.Contains(body, names[0]) {
+		t.Errorf("settings should list the backup")
+	}
+	if code, body := get(t, s, c, "/settings/backup/"+names[0]); code != 200 || !strings.HasPrefix(body, "SQLite format 3") {
+		t.Errorf("backup download = %d", code)
+	}
+	if code, _ := get(t, s, c, "/settings/backup/..%2F..%2Fetc%2Fpasswd"); code != 404 {
+		t.Errorf("path traversal = %d", code)
+	}
+}

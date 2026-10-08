@@ -70,6 +70,7 @@ func newRootCmd() *cobra.Command {
 	})
 	root.AddCommand(newTokenCmd())
 	root.AddCommand(newIngestCmd())
+	root.AddCommand(newBackupCmd())
 	return root
 }
 
@@ -228,6 +229,31 @@ func newIngestCmd() *cobra.Command {
 			fmt.Fprintf(cmd.OutOrStdout(), "scan %d stored for drive %q: %d files, %d clips, +%d -%d ~%d (latest=%v) in %s\n",
 				res.ScanID, res.DriveName, res.Files, res.Clips, res.Added, res.Removed, res.Changed, res.IsLatest,
 				time.Since(start).Round(time.Millisecond))
+			return nil
+		},
+	}
+}
+
+func newBackupCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "backup <path>",
+		Short: "Write a consistent copy of the database (SQLite VACUUM INTO)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			st, err := openStore()
+			if err != nil {
+				return err
+			}
+			defer st.Close()
+			p := args[0]
+			if fi, err := os.Stat(p); err == nil && fi.IsDir() {
+				p = filepath.Join(p, store.BackupName(time.Now()))
+			}
+			if err := st.Backup(cmd.Context(), p); err != nil {
+				return err
+			}
+			fi, _ := os.Stat(p)
+			fmt.Fprintf(cmd.OutOrStdout(), "backup written: %s (%d bytes)\n", p, fi.Size())
 			return nil
 		},
 	}

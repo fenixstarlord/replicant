@@ -307,7 +307,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err, "tokens")
 		return
 	}
-	s.render(w, r, "settings", map[string]any{"Title": "SETTINGS", "Tokens": toks,
+	s.render(w, r, "settings", map[string]any{"Title": "SETTINGS", "Tokens": toks, "Backups": s.listBackups(),
 		"NewToken": r.URL.Query().Get("token"), "Message": r.URL.Query().Get("msg"), "Error": r.URL.Query().Get("err")})
 }
 
@@ -322,7 +322,7 @@ func (s *Server) handleTokenCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	toks, _ := s.store.ListTokens(r.Context())
-	s.render(w, r, "settings", map[string]any{"Title": "SETTINGS", "Tokens": toks, "NewToken": plain, "NewTokenName": name})
+	s.render(w, r, "settings", map[string]any{"Title": "SETTINGS", "Tokens": toks, "Backups": s.listBackups(), "NewToken": plain, "NewTokenName": name})
 }
 
 func (s *Server) handleTokenRevoke(w http.ResponseWriter, r *http.Request) {

@@ -18,7 +18,7 @@
 {{template "kv" (dict "k" "TC END" "v" (str $m.TCEnd) "src" (source $s "tc_end"))}}
 {{template "kv" (dict "k" "DURATION" "v" (durp $m.DurationS) "src" (source $s "duration_s"))}}
 {{template "kv" (dict "k" "FRAMES" "v" (int $m.FrameCount) "src" (source $s "frame_count"))}}
-</dl>
+<dd class="empty only-child">--</dd></dl>
 <h2>FORMAT</h2><dl class="kv">
 {{template "kv" (dict "k" "CONTAINER" "v" (str $m.Container) "src" (source $s "container"))}}
 {{template "kv" (dict "k" "CODEC" "v" (str $m.Codec) "src" (source $s "codec"))}}
@@ -30,7 +30,7 @@
 {{template "kv" (dict "k" "BIT DEPTH" "v" (int $m.BitDepth) "src" (source $s "bit_depth"))}}
 {{template "kv" (dict "k" "COLOR / GAMMA" "v" (str $m.ColorGamma) "src" (source $s "color_gamma"))}}
 {{template "kv" (dict "k" "SQUEEZE" "v" (flt $m.Squeeze) "src" (source $s "squeeze"))}}
-</dl>
+<dd class="empty only-child">--</dd></dl>
 </div>
 <div>
 <h2>CAMERA</h2><dl class="kv">
@@ -38,7 +38,7 @@
 {{template "kv" (dict "k" "MODEL" "v" (str $m.CameraModel) "src" (source $s "camera_model"))}}
 {{template "kv" (dict "k" "SERIAL" "v" (str $m.CameraSerial) "src" (source $s "camera_serial"))}}
 {{template "kv" (dict "k" "FIRMWARE" "v" (str $m.Firmware) "src" (source $s "firmware"))}}
-</dl>
+<dd class="empty only-child">--</dd></dl>
 <h2>EXPOSURE</h2><dl class="kv">
 {{template "kv" (dict "k" "ISO / EI" "v" (int $m.ISO) "src" (source $s "iso"))}}
 {{template "kv" (dict "k" "WHITE BALANCE" "v" (int $m.WBKelvin) "src" (source $s "wb_kelvin"))}}
@@ -46,21 +46,21 @@
 {{template "kv" (dict "k" "SHUTTER ANGLE" "v" (flt $m.ShutterAngle) "src" (source $s "shutter_angle"))}}
 {{template "kv" (dict "k" "SHUTTER" "v" (str $m.ShutterSpeed) "src" (source $s "shutter_speed"))}}
 {{template "kv" (dict "k" "ND" "v" (str $m.ND) "src" (source $s "nd"))}}
-</dl>
+<dd class="empty only-child">--</dd></dl>
 <h2>LENS</h2><dl class="kv">
 {{template "kv" (dict "k" "LENS" "v" (str $m.Lens) "src" (source $s "lens"))}}
 {{template "kv" (dict "k" "FOCAL MM" "v" (flt $m.FocalMM) "src" (source $s "focal_mm"))}}
 {{template "kv" (dict "k" "T-STOP" "v" (flt $m.TStop) "src" (source $s "t_stop"))}}
 {{template "kv" (dict "k" "FOCUS" "v" (str $m.FocusDistance) "src" (source $s "focus_distance"))}}
-</dl>
+<dd class="empty only-child">--</dd></dl>
 <h2>AUDIO</h2><dl class="kv">
 {{template "kv" (dict "k" "CHANNELS" "v" (int $m.AudioChannels) "src" (source $s "audio_channels"))}}
 {{template "kv" (dict "k" "SAMPLE RATE" "v" (int $m.SampleRate) "src" (source $s "sample_rate"))}}
 {{template "kv" (dict "k" "BIT DEPTH" "v" (int $m.AudioBitDepth) "src" (source $s "audio_bit_depth"))}}
-</dl>
+<dd class="empty only-child">--</dd></dl>
 <h2>LOOK</h2><dl class="kv">
 {{template "kv" (dict "k" "LOOK / LUT" "v" (str $m.Look) "src" (source $s "look"))}}
-</dl>
+<dd class="empty only-child">--</dd></dl>
 </div>
 </div>
 <h2>FILES</h2>

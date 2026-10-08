@@ -17,4 +17,7 @@
   <button class="btn btn-sm btn-primary">UPLOAD .SHELF</button>
 </form>
 <p class="info mt-2">BUNDLES COME FROM: shelf scan /Volumes/NAME -o name.shelf</p>
+<h2>BACKUP</h2>
+<form method="post" action="/settings/backup"><button class="btn btn-sm btn-primary">WRITE BACKUP NOW</button> <span class="info">USES SQLITE VACUUM INTO; FILES LAND IN THE DATA DIR UNDER backups/</span></form>
+<ul class="mt-2">{{range .Backups}}<li><a href="/settings/backup/{{.}}">{{.}}</a></li>{{else}}<li class="empty">-- NO BACKUPS YET --</li>{{end}}</ul>
 {{end}}

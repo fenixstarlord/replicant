@@ -71,6 +71,7 @@ func (s *Server) routes() {
 	m.Handle("GET "+api.PathMe, s.requireAuth(http.HandlerFunc(s.handleMe)))
 	m.Handle("GET /{$}", s.requireAuth(http.HandlerFunc(s.handleHome)))
 	s.pageRoutes()
+	s.historyRoutes()
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

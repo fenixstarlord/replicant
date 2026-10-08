@@ -46,9 +46,20 @@ Track progress here. Update this section at the end of each phase, and commit.
   **Open:** `redline` and `art-cmd` parsers are written against documented names but unverified;
   capture golden output and pin the parsers once the user installs REDCINE-X PRO and ART. The
   Sony XML and BRAW sidecar parsers are tested on synthetic samples only (none on this drive).
-- [ ] **Phase 5 — Search + browse UI.** Drives, search with filters, tree browser, clip/file
-  detail, in the M8 look (`docs/design/m8-theme.md`). Needs the standalone Tailwind CLI, DaisyUI,
-  and the stealth57 font (downloads: ask first).
+- [~] Phase 5 — Search + browse UI (2026-10-08, **code done, CSS build pending downloads**).
+  `internal/store/query.go` (clip search with every plan filter, file search, browse listing,
+  detail, history, copies, facets), `internal/web` pages: login, drives (inline label/location),
+  drive (scan history, diff picker, exports), search (clips/files, filters, htmx live results),
+  browse, clip detail (grouped fields with source tags, raw output), file detail, scan detail,
+  settings (tokens, upload, backup). Verified in the browser with the hand-written fallback
+  `static/app.css`. **Pending:** run `./build-css.sh` (downloads Tailwind CLI + daisyUI), vendor
+  `htmx.min.js` and the stealth57 woff2 under `internal/web/static/`. Each is a download: ask.
+- [x] Phase 6 — History + duplicates (2026-10-08). Diffs at ingest (`scan_changes`), scan page,
+  any-two-scans diff (`/scans/{a}/diff/{b}`, FULL OUTER JOIN by path), duplicates page by
+  fingerprint or name+size with wasted bytes, other copies on clip and file pages.
+- [~] Phase 7 — Polish. Done: `shelf login` + direct push, CSV and ALE export (search results or
+  whole drive), `shelf-server backup` + Settings button, label/location editing, README.
+  Open: mobile pass once the real CSS is built; Docker image (deferred by decision).
 - [ ] Phase 4 — Extractors
 - [ ] Phase 5 — Search + browse UI
 - [ ] Phase 6 — History + duplicates
@@ -261,6 +272,11 @@ R3D → BRAW → ARRI, with Canon CRM added to the format table. Re-survey when 
 are attached; this RAID is not representative of the shelf drives.
 
 ## Open questions (ask the user, don't guess)
+
+- **Partial scans.** `shelf scan /Volumes/X/subfolder` is stored as a scan of drive X whose
+  entries are only the subfolder, and it becomes the drive's latest scan, so the previous full
+  scan's files count as "removed". Options: refuse non-mount-point roots, or track `root` per scan
+  and compute latest/diff per root. Decide before real use; the manifest already records `root`.
 
 - NetBird hostname format for the server, for the README and `shelf login` examples.
 - Which camera formats are actually present on the user's drives (drives the Phase 4 build order).

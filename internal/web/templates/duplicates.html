@@ -1,0 +1,14 @@
+{{define "content"}}
+<h1>DUPLICATES</h1>
+<form method="get" class="flex gap-2 items-center mb-2">
+  <label class="flex gap-2 items-center">MIN SIZE GB <input class="input input-sm w-24" name="min_gb" type="number" step="0.1" value="{{.MinGB}}"></label>
+  <button class="btn btn-sm">FILTER</button>
+</form>
+<p class="info">{{len .Groups}} GROUPS · {{bytes .Wasted}} WASTED (LATEST SCANS ONLY, BY FINGERPRINT OR NAME+SIZE)</p>
+{{range .Groups}}
+<h2>{{.Name}} <span class="info">{{bytes .Size}} × {{.Count}} · {{bytes .WastedBytes}} WASTED</span></h2>
+<div class="overflow-x-auto"><table class="table table-xs"><thead><tr><th>DRIVE</th><th>LOCATION</th><th>PATH</th><th>MODIFIED</th></tr></thead><tbody>
+{{range .Copies}}<tr><td><a href="/drives/{{.DriveID}}">{{.DriveName}}</a></td><td class="info"></td><td><a href="/files/{{.ID}}">{{.Path}}</a></td><td>{{datetime .ModTime}}</td></tr>{{end}}
+</tbody></table></div>
+{{else}}<p class="empty">-- NO DUPLICATES FOUND --</p>{{end}}
+{{end}}

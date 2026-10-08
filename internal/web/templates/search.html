@@ -9,6 +9,8 @@
     <label class="flex gap-2 items-center"><input type="checkbox" name="old" value="1" class="toggle toggle-sm" {{if .Q.IncludeOld}}checked{{end}}> INCLUDE OLD SCANS</label>
     <button class="btn btn-primary btn-sm">GO</button>
     <a href="/search" class="btn btn-sm">CLEAR</a>
+    <a href="/export.csv?{{.Form.Encode}}" class="btn btn-sm">CSV</a>
+    <a href="/export.ale?{{.Form.Encode}}" class="btn btn-sm">ALE</a>
   </div>
   <details class="collapse mt-2" {{if gt (len .Form) 2}}open{{end}}>
     <summary class="collapse-title">FILTERS</summary>

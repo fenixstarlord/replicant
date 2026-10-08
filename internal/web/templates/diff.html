@@ -1,0 +1,16 @@
+{{define "content"}}
+{{$d := .Diff}}
+<h1>DIFF <a href="/scans/{{$d.A.ID}}">#{{$d.A.ID}}</a> → <a href="/scans/{{$d.B.ID}}">#{{$d.B.ID}}</a> <span class="info">/ <a href="/drives/{{$d.A.DriveID}}">{{$d.A.DriveName}}</a></span></h1>
+<p class="info">{{datetime $d.A.ScannedAt}} → {{datetime $d.B.ScannedAt}}</p>
+<div class="stats stats-horizontal mb-2">
+  <div class="stat"><div class="stat-title">ADDED</div><div class="stat-value text-success">+{{n (len $d.Added)}}</div></div>
+  <div class="stat"><div class="stat-title">REMOVED</div><div class="stat-value text-error">-{{n (len $d.Removed)}}</div></div>
+  <div class="stat"><div class="stat-title">CHANGED</div><div class="stat-value text-warning">~{{n (len $d.Changed)}}</div></div>
+</div>
+{{range $name, $list := (dict "ADDED" $d.Added "REMOVED" $d.Removed "CHANGED" $d.Changed)}}
+<h2>{{$name}}</h2>
+<div class="overflow-x-auto"><table class="table table-xs"><thead><tr><th>PATH</th><th class="num">OLD</th><th class="num">NEW</th></tr></thead><tbody>
+{{range $list}}<tr><td>{{.Path}}</td><td class="num">{{if .OldSize}}{{bytes .OldSize}}{{else}}--{{end}}</td><td class="num">{{if .NewSize}}{{bytes .NewSize}}{{else}}--{{end}}</td></tr>{{else}}<tr><td colspan="3" class="empty">-- NONE --</td></tr>{{end}}
+</tbody></table></div>
+{{end}}
+{{end}}

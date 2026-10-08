@@ -24,6 +24,12 @@
   <dt>LAST SEEN</dt><dd>{{datetime .Drive.LastSeen}}</dd>
 </dl>
 <h2>SCAN HISTORY</h2>
+{{if gt (len .Scans) 1}}<form method="get" class="flex gap-2 items-center mb-2" onsubmit="location.href='/scans/'+this.a.value+'/diff/'+this.b.value;return false">
+  <label>FROM <select name="a" class="select select-sm">{{range .Scans}}<option value="{{.ID}}">#{{.ID}} {{datetime .ScannedAt}}</option>{{end}}</select></label>
+  <label>TO <select name="b" class="select select-sm">{{range $i, $s := .Scans}}<option value="{{$s.ID}}" {{if eq $i 0}}selected{{end}}>#{{$s.ID}} {{datetime $s.ScannedAt}}</option>{{end}}</select></label>
+  <button class="btn btn-sm">COMPARE</button>
+</form>{{end}}
+<p><a href="/export.csv?drive={{.Drive.ID}}" class="btn btn-xs">EXPORT DRIVE CSV</a> <a href="/export.ale?drive={{.Drive.ID}}" class="btn btn-xs">EXPORT DRIVE ALE</a></p>
 <div class="overflow-x-auto">
 <table class="table table-xs">
 <thead><tr><th>SCAN</th><th>SCANNED</th><th>INGESTED</th><th class="num">FILES</th><th class="num">CLIPS</th><th class="num">BYTES</th><th class="num">ADDED</th><th class="num">REMOVED</th><th class="num">CHANGED</th><th>SCANNER</th><th></th></tr></thead>

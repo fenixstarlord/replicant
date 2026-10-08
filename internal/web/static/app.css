@@ -73,3 +73,5 @@ pre{margin:0;font:inherit;white-space:pre-wrap;word-break:break-all;color:var(--
 .kv dt{color:var(--color-m8-info);text-transform:uppercase}
 .kv dd{margin:0;color:var(--color-m8-value)}
 @media (max-width:640px){.navbar{flex-wrap:wrap;gap:8px}.filters{grid-template-columns:repeat(2,1fr)}}
+
+.kv dd.only-child:not(:only-child){display:none}

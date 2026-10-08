@@ -100,6 +100,7 @@
   .table :where(th, td)            { padding-top: 2px; padding-bottom: 2px; border-color: var(--color-base-200); }
   .table td.num, .table th.num     { text-align: right; }
   .empty                           { color: var(--color-m8-empty); }
+  .kv dd.only-child:not(:only-child) { display: none; }
   .value                           { color: var(--color-m8-value); }
   .info                            { color: var(--color-m8-info); }
   .table tbody tr:focus-within::before { content: ">"; color: var(--color-primary); animation: m8blink 1s steps(1) infinite !important; }
