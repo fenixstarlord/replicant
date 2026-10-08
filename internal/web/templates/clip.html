@@ -4,7 +4,7 @@
 <p><a href="/drives/{{$c.DriveID}}">{{$c.DriveName}}</a>{{if .Drive.Label}} · {{.Drive.Label}}{{end}} · <span class="value">{{if .Drive.Location}}{{.Drive.Location}}{{else}}LOCATION NOT SET{{end}}</span> · <a href="/browse/{{$c.DriveID}}/{{$c.Dir}}?scan={{$c.ScanID}}" class="info">{{$c.RootPath}}</a></p>
 <p class="info">{{n $c.FileCount}} FILES · {{bytes $c.TotalSize}} · MODIFIED {{datetime $c.ModTime}} · SCAN #{{$c.ScanID}} {{datetime $c.ScannedAt}}{{if $c.SeqFrames}} · {{n $c.SeqFrames}} FRAMES{{end}}</p>
 {{range $c.Errors}}<div role="alert" class="alert alert-warning">{{.}}</div>{{end}}
-<div class="grid grid-cols-2 gap-4">
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 <div>
 <h2>CLIP</h2><dl class="kv">
 {{template "kv" (dict "k" "NAME" "v" (str $m.ClipName) "src" (source $s "clip_name"))}}

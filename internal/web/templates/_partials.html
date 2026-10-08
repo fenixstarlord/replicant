@@ -1,4 +1,4 @@
-{{define "kv"}}{{if .v}}<dt>{{.k}}</dt><dd class="value" {{if .src}}title="source: {{.src}}"{{end}}>{{.v}}{{if .src}} <span class="info text-xs">[{{.src}}]</span>{{end}}</dd>{{end}}{{end}}
+{{define "kv"}}{{if .v}}<dt>{{.k}}</dt><dd class="value" {{if .src}}title="source: {{.src}}"{{end}}>{{.v}}{{if .src}} <span class="info text-xs hidden sm:inline">[{{.src}}]</span>{{end}}</dd>{{end}}{{end}}
 
 {{define "pager"}}{{if gt .Pages 1}}
 <div class="flex gap-2 items-center mt-2">

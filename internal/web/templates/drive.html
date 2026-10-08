@@ -1,6 +1,6 @@
 {{define "content"}}
 <h1>{{.Drive.Name}}{{if .Drive.Label}} <span class="info">/ {{.Drive.Label}}</span>{{end}}</h1>
-<div class="stats stats-horizontal mb-2">
+<div class="stats stats-vertical sm:stats-horizontal mb-2 w-full sm:w-auto">
   <div class="stat"><div class="stat-title">CAPACITY</div><div class="stat-value">{{bytes .Drive.CapacityBytes}}</div><div class="stat-desc">{{bytes .Drive.FreeBytes}} FREE · {{.Drive.FSType}}</div></div>
   <div class="stat"><div class="stat-title">FILES</div><div class="stat-value">{{n .Drive.FileCount}}</div><div class="stat-desc">{{bytes .Drive.TotalBytes}}</div></div>
   <div class="stat"><div class="stat-title">CLIPS</div><div class="stat-value">{{n .Drive.ClipCount}}</div></div>

@@ -2,7 +2,7 @@
 {{$d := .Diff}}
 <h1>DIFF <a href="/scans/{{$d.A.ID}}">#{{$d.A.ID}}</a> → <a href="/scans/{{$d.B.ID}}">#{{$d.B.ID}}</a> <span class="info">/ <a href="/drives/{{$d.A.DriveID}}">{{$d.A.DriveName}}</a></span></h1>
 <p class="info">{{datetime $d.A.ScannedAt}} → {{datetime $d.B.ScannedAt}}</p>
-<div class="stats stats-horizontal mb-2">
+<div class="stats stats-vertical sm:stats-horizontal mb-2 w-full sm:w-auto">
   <div class="stat"><div class="stat-title">ADDED</div><div class="stat-value text-success">+{{n (len $d.Added)}}</div></div>
   <div class="stat"><div class="stat-title">REMOVED</div><div class="stat-value text-error">-{{n (len $d.Removed)}}</div></div>
   <div class="stat"><div class="stat-title">CHANGED</div><div class="stat-value text-warning">~{{n (len $d.Changed)}}</div></div>
