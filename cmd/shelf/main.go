@@ -27,5 +27,8 @@ func newRootCmd() *cobra.Command {
 	}
 	root.AddCommand(newDumpCmd())
 	root.AddCommand(newScanCmd())
+	root.AddCommand(newLoginCmd())
+	root.AddCommand(newUploadCmd())
+	root.AddCommand(newDrivesCmd())
 	return root
 }

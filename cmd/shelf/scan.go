@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -12,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/fenixstarlord/indexserver/internal/bundle"
+	"github.com/fenixstarlord/indexserver/internal/client"
 	"github.com/fenixstarlord/indexserver/internal/clips"
 	"github.com/fenixstarlord/indexserver/internal/scan"
 )
@@ -110,12 +110,16 @@ func newScanCmd() *cobra.Command {
 		Use:   "scan <path>",
 		Short: "Scan a mounted drive and write a .shelf bundle",
 		Long: `Walk a mounted volume read-only, fingerprint files, group them into clips,
-and write the result as a .shelf bundle. Direct push to a server arrives in
-a later phase; for now -o is required.`,
+and write the result as a .shelf bundle. With -o the bundle is written to a file; without it the
+bundle is pushed to the server configured by 'shelf login'.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			var c *client.Client
 			if output == "" {
-				return errors.New("direct push is not built yet: pass -o <file.shelf>")
+				var err error
+				if c, err = loadClient(); err != nil {
+					return fmt.Errorf("%w (or pass -o <file.shelf> to write a bundle instead)", err)
+				}
 			}
 			if !fast {
 				fmt.Fprintln(cmd.ErrOrStderr(), "note: metadata extraction arrives in Phase 4; scanning filesystem only")
@@ -141,11 +145,24 @@ a later phase; for now -o is required.`,
 				Summary:    scan.Summarize(res.entries),
 				DurationMS: time.Since(res.started).Milliseconds(),
 			}
+			if c != nil {
+				// Direct push: same bundle, written to a temp file and streamed up.
+				tmp, err := os.CreateTemp("", "shelf-push-*.shelf")
+				if err != nil {
+					return err
+				}
+				tmp.Close()
+				defer os.Remove(tmp.Name())
+				output = tmp.Name()
+			}
 			if err := writeBundleFile(output, m, res.entries, res.clips); err != nil {
 				return err
 			}
 			st, _ := os.Stat(output)
 			fmt.Fprintf(cmd.ErrOrStderr(), "wrote %s (%d bytes) in %s\n", output, st.Size(), time.Since(res.started).Round(time.Millisecond))
+			if c != nil {
+				return uploadBundle(cmd, c, output)
+			}
 			return nil
 		},
 	}

@@ -23,9 +23,21 @@ Track progress here. Update this section at the end of each phase, and commit.
 - [x] Phase 1 — Skeleton (2026-10-08). Module, `internal/scan` (walk, skip rules, packages,
   xxHash64 fingerprint), `shelf dump`, `internal/store` with the FTS5 trigram check (passes on
   `modernc.org/sqlite`, no cgo needed), `shelf-server` stub with `/healthz`, `./start.sh`, Makefile.
-- [ ] **Phase 2 — Clip grouping + bundle.** R3D/ARRIRAW/Sony card detection, sidecar attachment,
-  volume identity via `diskutil`, bundle writer, `shelf scan -o --fast`.
-- [ ] Phase 3 — Server core (local `./start.sh`; Docker image deferred, see below)
+- [x] Phase 2 — Clip grouping + bundle (2026-10-08). `internal/clips` (R3D `.RDC`, ARRIRAW
+  frame sequences, Sony `XDROOT/Clip` + `M4ROOT/CLIP`, BRAW `.sidecar`, same-stem sidecars),
+  `internal/scan.VolumeInfo` (statfs + `diskutil info -plist`), `internal/bundle` zip writer and
+  reader, `shelf scan -o x.shelf --fast`, `shelf dump --clips`. Verified on SSD_RAID: 614k
+  entries → 19.9k clips in 10 s, 9 MB bundle. Real camera cards still unverified (none on that
+  drive); re-check grouping when one is attached.
+- [x] Phase 3 — Server core (2026-10-08). `internal/store`: embedded SQL migrations, one-
+  transaction ingest with per-directory totals, path diff against the previous latest scan
+  (`scan_changes`), API tokens (sha256 of `shelf_…`), settings. `internal/web`: bearer-token or
+  HMAC session-cookie auth, `POST /api/scans`, `GET /api/drives`, `GET /api/me`, placeholder
+  login page. CLI: `shelf login`, `upload`, `drives`, and `scan` without `-o` pushes directly.
+  `shelf-server token create|list|revoke`, `shelf-server ingest <file>`. Verified end to end
+  against `./start.sh`: the 614k-entry RAID bundle ingests in 16 s. Docker still deferred.
+- [ ] **Phase 4 — Extractors.** Extractor framework, `shelf doctor`, then ffprobe → Sony XML →
+  ALE → BRAW sidecar → BWF/iXML → R3D → ARRI (user installs art-cmd and REDCINE-X first).
 - [ ] Phase 4 — Extractors
 - [ ] Phase 5 — Search + browse UI
 - [ ] Phase 6 — History + duplicates
@@ -50,7 +62,10 @@ same change unless asked.
 6. **No multi-user auth.** One password for the UI, API tokens for the CLI. Do not add roles.
 7. **Pure Go.** `modernc.org/sqlite` (no cgo) so the Docker build is a plain static binary.
    Phase 1 verified FTS5 with the trigram tokenizer works on it (`internal/store.CheckFTS5Trigram`).
-8. **Extractors are per format/vendor, never per camera body.** Field mappings are data-driven
+8. **Clips are media.** Only video and audio files (and the multi-file structures) become
+   clips; images, projects, stray sidecars, and symlinks stay plain entries. Clip IDs are a hash
+   of kind + root path, so a clip keeps its ID across rescans of the same drive.
+9. **Extractors are per format/vendor, never per camera body.** Field mappings are data-driven
    tables, so a new camera's field names are a mapping change, not new code.
 
 ## Repo layout
@@ -188,6 +203,17 @@ Add a skill with `npx skills add <owner/repo> -s <skill> -a claude-code -y` and 
 - **Vendor tools:** the user installs `art-cmd` and REDCINE-X PRO before Phase 4. Build the
   ffprobe, ALE, Sony XML, BRAW sidecar and BWF extractors first; ARRI and RED extractors last.
 
+## Performance notes
+
+- Walk: ~70k entries/s. Fingerprint: ~2.8 GB/s on internal SSD, I/O bound on external drives.
+- Ingest of 614k entries: 16 s and ~600 MB of database per scan on `modernc.org/sqlite`. Typical
+  shelf drives (a few thousand files) ingest in well under a second.
+- **Do not trigram-index full paths.** It cost 35 s and ~2 GB per 600k-entry scan because every
+  path repeats its parent prefix. `entries_fts` indexes names only (external-content table over
+  `entries.id`); a search term containing `/` falls back to `LIKE` on `entries.path` (~0.1 s over
+  600k rows). `clips_fts` is small and indexes the clip root path.
+- Multi-row batched inserts (`batchInserter`) are used for entries, clips and changes.
+
 ## Drive survey (Phase 1, 2026-10-08)
 
 `shelf dump --no-fingerprint` on `/Volumes/SSD_RAID` (16 TB HFS+ RAID, mixed work drive, not a
@@ -195,9 +221,13 @@ pure camera drive): 614k entries, 13.6 TB, walked in 8.6 s. Counts that matter f
 
 - Video by extension: mov 5252, mxf 3814, mp4 2542, mts 1978, **crm 108** (Canon Cinema RAW
   Light, not in the plan's format table yet), r3d 4, braw 2.
-- 798 `.RDC` directories but only 4 `.r3d` files: most RDC folders hold no R3D segments (likely
-  offloaded or sidecar-only). Clip grouping must cope with RDC dirs that have no media.
-- 6 Sony card roots (`XDROOT` / `M4ROOT`).
+- 798 `.RDC` directories but only 4 real `.r3d` files. The rest are DaVinci Resolve cache
+  stubs (`Resolve Cloud/`, `Scratch/`) holding a single `.rtn` file, or `.RDC` folders whose R3D
+  segments are **symlinks** into other volumes. Grouping ignores both on purpose: an RDC folder
+  with no regular R3D file is not a clip, and symlinks never join clips. That drive has 3457
+  symlinks; a future option could record symlink targets.
+- 6 Sony card roots (`XDROOT` / `M4ROOT`), all under `Scratch/CacheClip/audio/` (Resolve audio
+  cache mirroring card paths), not real cards.
 - Audio: wav 2420 (plus music formats). Sidecars: json 2033, xml 1718, cdl 1626, cube 279,
   mhl 20, ale 3.
 - Walk speed: roughly 70k entries/s on this volume; fingerprinting ran about 2.8 GB/s on the
