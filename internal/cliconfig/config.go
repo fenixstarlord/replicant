@@ -20,9 +20,10 @@ type Config struct {
 
 // Tools holds explicit paths to external metadata tools (Phase 4).
 type Tools struct {
-	FFprobe string `toml:"ffprobe"`
-	ArtCmd  string `toml:"art_cmd"`
-	REDline string `toml:"redline"`
+	FFprobe    string   `toml:"ffprobe"`
+	ArtCmd     string   `toml:"art_cmd"`
+	ArtCmdArgs []string `toml:"art_cmd_args"` // {input} and {outdir} are substituted
+	REDline    string   `toml:"redline"`
 }
 
 // Path returns the config file path, honouring SHELF_CONFIG.

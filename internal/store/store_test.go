@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/fenixstarlord/indexserver/internal/bundle"
 	"github.com/fenixstarlord/indexserver/internal/clips"
+	"github.com/fenixstarlord/indexserver/internal/meta"
 	"github.com/fenixstarlord/indexserver/internal/scan"
 )
 
@@ -226,5 +228,53 @@ func TestTokens(t *testing.T) {
 	}
 	if _, ok, _ := s.VerifyToken(ctx, plain); ok {
 		t.Error("revoked token still verifies")
+	}
+}
+
+func TestIngestStoresMetadataAndRaw(t *testing.T) {
+	ctx := context.Background()
+	s, err := Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	root := t.TempDir()
+	write(t, root, "A001C001.mxf", "x")
+	b := makeBundle(t, root, time.Now())
+	if len(b.Clips) != 1 {
+		t.Fatalf("want 1 clip, got %d", len(b.Clips))
+	}
+	c := &b.Clips[0]
+	c.Meta = &meta.Fields{
+		Codec: meta.Str("ARRICORE"), Width: meta.Int(4608), Height: meta.Int(3164), FPS: meta.Float(24),
+		TCStart: meta.Str("00:00:00:00"), CameraModel: meta.Str("ALEXA 35"), ISO: meta.Int(800),
+		WBKelvin: meta.Int(5000), Lens: meta.Str("Angenieux"), Circled: meta.Bool(true), Scene: meta.Str("12A"),
+	}
+	c.Sources = map[string]string{"codec": "ale", "width": "ale", "camera_model": "ale"}
+	c.Raw = map[string]json.RawMessage{"ale": json.RawMessage(`{"Name":"A001C001"}`), "ffprobe": json.RawMessage(`{"streams":[]}`)}
+	c.Errors = []string{"art-cmd: not available"}
+	r, err := s.Ingest(ctx, b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var codec, model, scene, sources, errs string
+	var w, iso, circled int64
+	var fps float64
+	if err := s.DB.QueryRow(`SELECT codec, camera_model, scene, width, iso, circled, fps, field_sources_json, errors_json FROM clips WHERE scan_id = ?`, r.ScanID).
+		Scan(&codec, &model, &scene, &w, &iso, &circled, &fps, &sources, &errs); err != nil {
+		t.Fatal(err)
+	}
+	if codec != "ARRICORE" || model != "ALEXA 35" || scene != "12A" || w != 4608 || iso != 800 || circled != 1 || fps != 24 {
+		t.Errorf("columns wrong: %s %s %s %d %d %d %v", codec, model, scene, w, iso, circled, fps)
+	}
+	if sources != `{"camera_model":"ale","codec":"ale","width":"ale"}` || errs != `["art-cmd: not available"]` {
+		t.Errorf("json columns wrong: %s %s", sources, errs)
+	}
+	var n int
+	if err := s.DB.QueryRow(`SELECT count(*) FROM clip_raw r JOIN clips c ON c.id = r.clip_id WHERE c.scan_id = ?`, r.ScanID).Scan(&n); err != nil || n != 2 {
+		t.Errorf("clip_raw rows = %d (%v), want 2", n, err)
+	}
+	if err := s.DB.QueryRow(`SELECT count(*) FROM clips_fts WHERE clips_fts MATCH 'alexa' AND scan_id = ?`, r.ScanID).Scan(&n); err != nil || n != 1 {
+		t.Errorf("clips_fts camera match = %d (%v), want 1", n, err)
 	}
 }

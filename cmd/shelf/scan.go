@@ -5,14 +5,18 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/fenixstarlord/indexserver/internal/bundle"
+	"github.com/fenixstarlord/indexserver/internal/cliconfig"
 	"github.com/fenixstarlord/indexserver/internal/client"
 	"github.com/fenixstarlord/indexserver/internal/clips"
+	"github.com/fenixstarlord/indexserver/internal/extract"
+	"github.com/fenixstarlord/indexserver/internal/extract/registry"
 	"github.com/fenixstarlord/indexserver/internal/scan"
 )
 
@@ -24,6 +28,9 @@ type scanFlags struct {
 	keepFrames      bool
 	skip            []string
 	workers         int
+	fast            bool
+	extractWorkers  int
+	clipTimeout     time.Duration
 }
 
 func (f *scanFlags) bind(cmd *cobra.Command) {
@@ -34,6 +41,9 @@ func (f *scanFlags) bind(cmd *cobra.Command) {
 	fl.BoolVar(&f.keepFrames, "keep-frames", false, "keep individual ARRIRAW frame entries instead of only the clip")
 	fl.StringArrayVar(&f.skip, "skip", nil, "extra name or glob to skip (repeatable)")
 	fl.IntVar(&f.workers, "workers", 0, "concurrent hashing workers (default: CPU count)")
+	fl.BoolVar(&f.fast, "fast", false, "filesystem only, no metadata extraction")
+	fl.IntVar(&f.extractWorkers, "extract-workers", 0, "concurrent clips during extraction (default: CPUs, max 8)")
+	fl.DurationVar(&f.clipTimeout, "clip-timeout", 60*time.Second, "per-extractor timeout for one clip")
 }
 
 func (f *scanFlags) scanOptions() scan.Options {
@@ -48,13 +58,14 @@ func (f *scanFlags) scanOptions() scan.Options {
 
 // scanResult is everything a scan produces before extraction.
 type scanResult struct {
-	root     string
-	volume   scan.Volume
-	entries  []scan.Entry
-	clips    []clips.Clip
-	started  time.Time
-	walkTime time.Duration
-	hashTime time.Duration
+	root       string
+	volume     scan.Volume
+	entries    []scan.Entry
+	clips      []clips.Clip
+	started    time.Time
+	walkTime   time.Duration
+	hashTime   time.Duration
+	extractors []extract.Status
 }
 
 // runScan walks, hashes, and groups. It is the one code path behind
@@ -97,6 +108,41 @@ func runScan(cmd *cobra.Command, root string, f *scanFlags) (*scanResult, error)
 
 	res.entries, res.clips = clips.Group(entries, clips.Options{KeepFrames: f.keepFrames})
 	fmt.Fprintf(stderr, "grouped %d clips: %v\n", len(res.clips), clips.Summary(res.clips))
+
+	if !f.fast {
+		cfg, err := cliconfig.Load()
+		if err != nil {
+			return nil, err
+		}
+		runner := extract.NewRunner(ctx, registry.All(abs, res.entries, cfg.Tools))
+		res.extractors = runner.Statuses()
+		var names []string
+		for _, s := range res.extractors {
+			if s.Available {
+				names = append(names, s.Name)
+			}
+		}
+		fmt.Fprintf(stderr, "extractors available: %s\n", strings.Join(names, ", "))
+		t2 := time.Now()
+		progress := func(done, total int) {
+			if done%25 == 0 || done == total {
+				fmt.Fprintf(stderr, "extracted %d/%d\n", done, total)
+			}
+		}
+		if err := runner.Run(ctx, abs, res.clips, extract.Options{Workers: f.extractWorkers, ClipTimeout: f.clipTimeout}, progress); err != nil {
+			return nil, fmt.Errorf("extract: %w", err)
+		}
+		var withMeta, withErr int
+		for _, c := range res.clips {
+			if c.Meta != nil && len(c.Sources) > 0 {
+				withMeta++
+			}
+			if len(c.Errors) > 0 {
+				withErr++
+			}
+		}
+		fmt.Fprintf(stderr, "extracted metadata for %d/%d clips (%d with errors) in %s\n", withMeta, len(res.clips), withErr, time.Since(t2).Round(time.Millisecond))
+	}
 	return res, nil
 }
 
@@ -104,7 +150,6 @@ func newScanCmd() *cobra.Command {
 	var (
 		f      scanFlags
 		output string
-		fast   bool
 	)
 	cmd := &cobra.Command{
 		Use:   "scan <path>",
@@ -121,9 +166,6 @@ bundle is pushed to the server configured by 'shelf login'.`,
 					return fmt.Errorf("%w (or pass -o <file.shelf> to write a bundle instead)", err)
 				}
 			}
-			if !fast {
-				fmt.Fprintln(cmd.ErrOrStderr(), "note: metadata extraction arrives in Phase 4; scanning filesystem only")
-			}
 			res, err := runScan(cmd, args[0], &f)
 			if err != nil {
 				return err
@@ -134,14 +176,14 @@ bundle is pushed to the server configured by 'shelf login'.`,
 				Root:           res.root,
 				Volume:         res.volume,
 				Options: bundle.Options{
-					Fast:            true,
+					Fast:            f.fast,
 					Fingerprint:     !f.noFingerprint,
 					FullHash:        f.fullHash,
 					DescendPackages: f.descendPackages,
 					KeepFrames:      f.keepFrames,
 					Skip:            f.scanOptions().Skip,
 				},
-				Extractors: []bundle.ExtractorInfo{},
+				Extractors: extractorInfos(res.extractors),
 				Summary:    scan.Summarize(res.entries),
 				DurationMS: time.Since(res.started).Milliseconds(),
 			}
@@ -168,8 +210,15 @@ bundle is pushed to the server configured by 'shelf login'.`,
 	}
 	f.bind(cmd)
 	cmd.Flags().StringVarP(&output, "output", "o", "", "write the bundle to this file instead of pushing")
-	cmd.Flags().BoolVar(&fast, "fast", false, "filesystem only, no metadata extraction")
 	return cmd
+}
+
+func extractorInfos(st []extract.Status) []bundle.ExtractorInfo {
+	out := make([]bundle.ExtractorInfo, 0, len(st))
+	for _, s := range st {
+		out = append(out, bundle.ExtractorInfo{Name: s.Name, Version: s.Version, Available: s.Available})
+	}
+	return out
 }
 
 // writeBundleFile writes to a temp file next to path and renames it into

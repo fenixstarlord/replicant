@@ -5,6 +5,7 @@
 package clips
 
 import (
+	"encoding/json"
 	"fmt"
 	"path"
 	"regexp"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/cespare/xxhash/v2"
 
+	"github.com/fenixstarlord/indexserver/internal/meta"
 	"github.com/fenixstarlord/indexserver/internal/scan"
 )
 
@@ -46,6 +48,35 @@ type Clip struct {
 	FirstFrame int    `json:"first_frame,omitempty"`
 	LastFrame  int    `json:"last_frame,omitempty"`
 	FramePath  string `json:"frame_path,omitempty"` // path of the first frame
+	// Metadata, filled by package extract.
+	Meta    *meta.Fields               `json:"meta,omitempty"`
+	Sources map[string]string          `json:"sources,omitempty"` // field -> extractor
+	Raw     map[string]json.RawMessage `json:"raw,omitempty"`     // extractor -> verbatim output
+	Errors  []string                   `json:"errors,omitempty"`
+}
+
+// PrimaryFile is the file extractors should probe: the first media
+// member, or the first frame of a sequence.
+func (c *Clip) PrimaryFile() string {
+	if len(c.Files) > 0 {
+		return c.Files[0]
+	}
+	if c.FramePath != "" {
+		return c.FramePath
+	}
+	return c.RootPath
+}
+
+// SidecarsWithExt returns the clip's sidecars that have the given
+// lowercase extension (without dot).
+func (c *Clip) SidecarsWithExt(ext string) []string {
+	var out []string
+	for _, p := range c.Sidecars {
+		if strings.EqualFold(strings.TrimPrefix(path.Ext(p), "."), ext) {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 // Options controls grouping.

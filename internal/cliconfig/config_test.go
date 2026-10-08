@@ -3,6 +3,7 @@ package cliconfig
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -21,7 +22,7 @@ func TestLoadSaveRoundTrip(t *testing.T) {
 		t.Errorf("perm = %o, want 600", fi.Mode().Perm())
 	}
 	got, err := Load()
-	if err != nil || got != want {
+	if err != nil || !reflect.DeepEqual(got, want) {
 		t.Errorf("got %+v (%v), want %+v", got, err, want)
 	}
 }

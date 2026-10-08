@@ -1,0 +1,66 @@
+{
+    "streams": [
+        {
+            "index": 0,
+            "codec_name": "pcm_s24le",
+            "codec_long_name": "PCM signed 24-bit little-endian",
+            "codec_type": "audio",
+            "codec_tag_string": "[1][0][0][0]",
+            "codec_tag": "0x0001",
+            "sample_fmt": "s32",
+            "sample_rate": "48000",
+            "channels": 8,
+            "bits_per_sample": 24,
+            "initial_padding": 0,
+            "r_frame_rate": "0/0",
+            "avg_frame_rate": "0/0",
+            "time_base": "1/48000",
+            "duration_ts": 5855999,
+            "duration": "121.999979",
+            "bit_rate": "9216000",
+            "bits_per_raw_sample": "24",
+            "disposition": {
+                "default": 0,
+                "dub": 0,
+                "original": 0,
+                "comment": 0,
+                "lyrics": 0,
+                "karaoke": 0,
+                "forced": 0,
+                "hearing_impaired": 0,
+                "visual_impaired": 0,
+                "clean_effects": 0,
+                "attached_pic": 0,
+                "timed_thumbnails": 0,
+                "non_diegetic": 0,
+                "captions": 0,
+                "descriptions": 0,
+                "metadata": 0,
+                "dependent": 0,
+                "still_image": 0,
+                "multilayer": 0
+            }
+        }
+    ],
+    "format": {
+        "filename": "DIT/NinaX_OCN/2026-09-30/AUDIO/SR01/SR01/FALSETAKES/36AT01.WAV",
+        "nb_streams": 1,
+        "nb_programs": 0,
+        "nb_stream_groups": 0,
+        "format_name": "wav",
+        "format_long_name": "WAV / WAVE (Waveform Audio)",
+        "duration": "121.999979",
+        "size": "140550120",
+        "bit_rate": "9216402",
+        "probe_score": 99,
+        "tags": {
+            "comment": "sSPEED=024.000-ND\r\nsTAKE=01\r\nsUBITS=$09302600\r\nsSWVER=4.70.15\r\nsSCENE=36A\r\nsFILENAME=36AT01.WAV\r\nsTAPE=260930\r\nsCIRCLED=FALSE\r\nsTRK1=MixL\r\nsTRK2=MixR\r\nsTRK3=RUTH\r\nsTRK4=NINA\r\nsTRK5=UMA\r\nsTRK6=SHANE\r\nsTRK8=ELI\r\nsTRK14=BOOM\r\nsNOTE=\r\n",
+            "encoded_by": "Sound Dev: Mix688 S#NR0316141002",
+            "originator_reference": "USSDVNR0316141002260930LjT2MT 11",
+            "date": "2026-09-30",
+            "creation_time": "21:45:58",
+            "time_reference": "3420144001",
+            "coding_history": "A=PCM,F=48000,W=24,M=multi,R=48000,T=8 Ch\r\n"
+        }
+    }
+}

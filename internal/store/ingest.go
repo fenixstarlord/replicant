@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/fenixstarlord/indexserver/internal/bundle"
+	"github.com/fenixstarlord/indexserver/internal/meta"
 	"github.com/fenixstarlord/indexserver/internal/scan"
 )
 
@@ -170,7 +171,12 @@ func (s *Store) Ingest(ctx context.Context, b *bundle.Bundle) (res IngestResult,
 	}
 
 	clipIns := newBatchInserter(tx, `INSERT INTO clips(scan_id, clip_key, root_path, name, kind, file_count, total_size, mtime,
-		files_json, sidecars_json, seq_frame_count, seq_first_frame, seq_last_frame) VALUES `, 13)
+		files_json, sidecars_json, seq_frame_count, seq_first_frame, seq_last_frame,
+		clip_name, reel, camera_index, scene, take, circled, recorded_at, tc_start, tc_end, duration_s, frame_count,
+		container, codec, codec_detail, width, height, sensor_mode, fps, capture_fps, bit_depth, color_gamma, squeeze,
+		camera_make, camera_model, camera_serial, firmware, iso, wb_kelvin, tint, shutter_angle, shutter_speed, nd,
+		lens, focal_mm, t_stop, focus_distance, audio_channels, sample_rate, audio_bit_depth, look,
+		field_sources_json, errors_json) VALUES `, 55)
 	for i := range b.Clips {
 		c := &b.Clips[i]
 		filesJSON, _ := json.Marshal(c.Files)
@@ -185,15 +191,51 @@ func (s *Store) Ingest(ctx context.Context, b *bundle.Bundle) (res IngestResult,
 		if c.FrameCount > 0 {
 			fc, ff, lf = c.FrameCount, c.FirstFrame, c.LastFrame
 		}
+		m := c.Meta
+		if m == nil {
+			m = &meta.Fields{}
+		}
+		sourcesJSON, _ := json.Marshal(c.Sources)
+		if c.Sources == nil {
+			sourcesJSON = []byte("{}")
+		}
+		errorsJSON, _ := json.Marshal(c.Errors)
+		if c.Errors == nil {
+			errorsJSON = []byte("[]")
+		}
 		if err = clipIns.add(ctx,
 			scanID, c.ID, c.RootPath, c.Name, string(c.Kind), c.FileCount, c.TotalSize, fmtTime(c.ModTime),
 			string(filesJSON), string(sidecarsJSON), fc, ff, lf,
+			ptrStr(m.ClipName), ptrStr(m.Reel), ptrStr(m.CameraIndex), ptrStr(m.Scene), ptrStr(m.Take), ptrBool(m.Circled),
+			fmtTimePtr(m.RecordedAt), ptrStr(m.TCStart), ptrStr(m.TCEnd), ptrFloat(m.DurationS), ptrInt(m.FrameCount),
+			ptrStr(m.Container), ptrStr(m.Codec), ptrStr(m.CodecDetail), ptrInt(m.Width), ptrInt(m.Height), ptrStr(m.SensorMode),
+			ptrFloat(m.FPS), ptrFloat(m.CaptureFPS), ptrInt(m.BitDepth), ptrStr(m.ColorGamma), ptrFloat(m.Squeeze),
+			ptrStr(m.CameraMake), ptrStr(m.CameraModel), ptrStr(m.CameraSerial), ptrStr(m.Firmware),
+			ptrInt(m.ISO), ptrInt(m.WBKelvin), ptrFloat(m.Tint), ptrFloat(m.ShutterAngle), ptrStr(m.ShutterSpeed), ptrStr(m.ND),
+			ptrStr(m.Lens), ptrFloat(m.FocalMM), ptrFloat(m.TStop), ptrStr(m.FocusDistance),
+			ptrInt(m.AudioChannels), ptrInt(m.SampleRate), ptrInt(m.AudioBitDepth), ptrStr(m.Look),
+			string(sourcesJSON), string(errorsJSON),
 		); err != nil {
 			return res, fmt.Errorf("clip %q: %w", c.RootPath, err)
 		}
 	}
 	if err = clipIns.flush(ctx); err != nil {
 		return res, fmt.Errorf("clips: %w", err)
+	}
+
+	// Verbatim extractor output per clip. Keyed by the bundle's clip key
+	// since clip ids are assigned by SQLite.
+	for i := range b.Clips {
+		c := &b.Clips[i]
+		for source, raw := range c.Raw {
+			if len(raw) == 0 {
+				continue
+			}
+			if _, err = tx.ExecContext(ctx, `INSERT INTO clip_raw(clip_id, source, raw_json)
+				SELECT id, ?, ? FROM clips WHERE scan_id = ? AND clip_key = ?`, source, string(raw), scanID, c.ID); err != nil {
+				return res, fmt.Errorf("clip_raw %q/%s: %w", c.RootPath, source, err)
+			}
+		}
 	}
 	if _, err = tx.ExecContext(ctx, `
 		INSERT INTO clips_fts(clip_id, scan_id, name, reel, scene, take, camera, lens, look, path)
@@ -349,4 +391,32 @@ func (b *batchInserter) flush(ctx context.Context) error {
 	b.args = b.args[:0]
 	b.rows = 0
 	return err
+}
+
+func ptrStr(p *string) any {
+	if p == nil || *p == "" {
+		return nil
+	}
+	return *p
+}
+
+func ptrInt(p *int64) any {
+	if p == nil {
+		return nil
+	}
+	return *p
+}
+
+func ptrFloat(p *float64) any {
+	if p == nil {
+		return nil
+	}
+	return *p
+}
+
+func ptrBool(p *bool) any {
+	if p == nil {
+		return nil
+	}
+	return boolInt(*p)
 }

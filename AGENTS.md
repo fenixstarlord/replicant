@@ -36,8 +36,19 @@ Track progress here. Update this section at the end of each phase, and commit.
   login page. CLI: `shelf login`, `upload`, `drives`, and `scan` without `-o` pushes directly.
   `shelf-server token create|list|revoke`, `shelf-server ingest <file>`. Verified end to end
   against `./start.sh`: the 614k-entry RAID bundle ingests in 16 s. Docker still deferred.
-- [ ] **Phase 4 — Extractors.** Extractor framework, `shelf doctor`, then ffprobe → Sony XML →
-  ALE → BRAW sidecar → BWF/iXML → R3D → ARRI (user installs art-cmd and REDCINE-X first).
+- [~] Phase 4 — Extractors (2026-10-08, **blocked on vendor tools for completion**).
+  `internal/meta` (normalized fields, priority merge with weak fields), `internal/extract` (runner,
+  worker pool, per-clip timeouts, missing tools never fatal), extractors: `ffprobe`, `ale`, `bwf`
+  (bext + iXML), `sony-xml`, `braw-sidecar`, `redline` (REDline), `art-cmd` (ARRI). `shelf doctor`,
+  `shelf scan` extracts unless `--fast`; ingest stores fields, sources, errors, `clip_raw`.
+  Verified on a real ALEXA 35 card day: ARRICORE clips get codec, 4608x3164, fps, timecode, camera,
+  ISO, WB, lens, LogC from the ALE; Sound Devices WAVs get scene/take/tape/timecode from BWF.
+  **Open:** `redline` and `art-cmd` parsers are written against documented names but unverified;
+  capture golden output and pin the parsers once the user installs REDCINE-X PRO and ART. The
+  Sony XML and BRAW sidecar parsers are tested on synthetic samples only (none on this drive).
+- [ ] **Phase 5 — Search + browse UI.** Drives, search with filters, tree browser, clip/file
+  detail, in the M8 look (`docs/design/m8-theme.md`). Needs the standalone Tailwind CLI, DaisyUI,
+  and the stealth57 font (downloads: ask first).
 - [ ] Phase 4 — Extractors
 - [ ] Phase 5 — Search + browse UI
 - [ ] Phase 6 — History + duplicates
@@ -202,6 +213,18 @@ Add a skill with `npx skills add <owner/repo> -s <skill> -a claude-code -y` and 
   `docs/decisions/ADR-001-web-ui-stack.md`.
 - **Vendor tools:** the user installs `art-cmd` and REDCINE-X PRO before Phase 4. Build the
   ffprobe, ALE, Sony XML, BRAW sidecar and BWF extractors first; ARRI and RED extractors last.
+
+## Phase 4 findings (real media)
+
+- ffprobe reads BRAW (`brhq` tag: resolution, fps, timecode in the tmcd stream, audio) and Canon
+  CRM (`CRAW`: resolution, fps, format-level timecode) container basics. It cannot resolve the
+  ARRICORE/ARRIRAW MXF video descriptor (no codec/size), but does return the MXF timecode and audio.
+- ARRI ALEs (ALEXA 35, SUP 6) carry 58 columns; the mapping lives in `internal/extract/ale`.
+  Audio_sr is in kHz. Start/End matched the embedded timecode on this card, but are marked weak.
+- Sound Devices 688 WAVs: bext description holds `sSCENE=`/`sTAKE=` lines and iXML holds the same
+  plus track names; `time_reference` at 48 kHz converts to timecode with the iXML rate.
+- Resolve Cloud mirrors are symlink farms; `.d.mts` TypeScript files are classified as video by
+  extension and fail ffprobe harmlessly (error recorded on the clip).
 
 ## Performance notes
 
