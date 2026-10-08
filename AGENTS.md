@@ -1,0 +1,183 @@
+# AGENTS.md — Shelf (drive catalog)
+
+Instructions for AI coding agents working in this repo. `CLAUDE.md` imports this file.
+The authoritative design is **[plan.md](plan.md)**. Read it before any non-trivial task. This file
+adds working conventions, environment facts, and the current phase; it does not restate the plan.
+
+## What this is
+
+A self-hosted catalog of offline drives full of camera media. Two Go binaries from one module:
+
+- `shelf` — macOS CLI. Walks a mounted drive, groups files into clips, runs metadata extractors
+  (ffprobe, ARRI `art-cmd`, REDline, sidecar parsers), and writes a `.shelf` scan bundle or pushes
+  it to the server.
+- `shelf-server` — Dockerized Go server on a home server. SQLite + FTS5, REST ingest, embedded
+  htmx web UI. Never touches media and needs no vendor tools.
+
+Working name is **Shelf**; it may be renamed. Grep for the name before hardcoding it anywhere new.
+
+## Current phase
+
+Track progress here. Update this section at the end of each phase, and commit.
+
+- [ ] **Phase 1 — Skeleton.** Go module, repo layout, `shelf dump`, FTS5 trigram check.
+- [ ] Phase 2 — Clip grouping + bundle
+- [ ] Phase 3 — Server core (local `./start.sh`; Docker image deferred, see below)
+- [ ] Phase 4 — Extractors
+- [ ] Phase 5 — Search + browse UI
+- [ ] Phase 6 — History + duplicates
+- [ ] Phase 7 — Polish
+
+Each phase ends with something runnable and a commit. Do not start the next phase's work in the
+same change unless asked.
+
+## Hard rules
+
+1. **Scanning is strictly read-only.** `shelf` must never write to a scanned volume: no temp
+   files, no tool output, no sidecars, no `.DS_Store`-style side effects. Vendor tools get a temp
+   dir on the Mac (`os.MkdirTemp`), never a path under the mount. A test asserts the volume is
+   unchanged after a scan. Treat any violation as a bug, not a config issue.
+2. **A missing tool is never fatal.** Extractors report `Available()`; a clip missing one source
+   is still recorded with what the other extractors produced plus a note of what was unavailable.
+3. **Keep raw extractor output verbatim.** Every extractor's output is stored per source as JSON
+   (text wrapped in JSON if needed) so fields can be mapped later without rescanning.
+4. **Ingest is one transaction.** A scan lands fully or not at all.
+5. **Metadata only.** No thumbnails, no frame decoding, no transcoding, no moving or deleting
+   media. These are explicit v1 non-goals; do not add them "while you're there".
+6. **No multi-user auth.** One password for the UI, API tokens for the CLI. Do not add roles.
+7. **Pure Go.** Prefer `modernc.org/sqlite` (no cgo) so the Docker build is a plain static
+   binary. Only fall back to `mattn/go-sqlite3` if Phase 1 proves FTS5 trigram does not work.
+8. **Extractors are per format/vendor, never per camera body.** Field mappings are data-driven
+   tables, so a new camera's field names are a mapping change, not new code.
+
+## Repo layout
+
+Follow the layout in `plan.md` exactly:
+
+```
+cmd/shelf, cmd/shelf-server
+internal/{bundle,scan,clips,extract/{ffprobe,arri,red,braw,sony,ale,bwf},meta,store,web}
+testdata/
+```
+
+Shared code between CLI and server lives in `internal/bundle` and `internal/meta`. The server
+must not import anything under `internal/extract`.
+
+## Conventions
+
+- **Go:** standard library first. Use `log/slog` for logging, `context.Context` on every I/O
+  path, `errors.Is/As` with `%w` wrapping. CLI via `spf13/cobra`. Config in
+  `~/.config/shelf/config.toml`.
+- **Formatting and lint:** `gofmt` and `go vet` must pass. If `golangci-lint` is added, commit
+  its config and keep it passing.
+- **Tests:** table-driven, `testing` + `testify` is fine. Each extractor parser is unit-tested
+  against captured golden output under `testdata/golden/<extractor>/`. Real sidecars (ALE,
+  `.sidecar`, Sony XML, RMD, BWF headers) live under `testdata/sidecars/`. Clip grouping is tested
+  against synthetic directory trees with zero-byte placeholder files. Never commit real media.
+- **Golden fixtures:** when a new extractor is built in Phase 4, capture its real output from the
+  user's drives first, commit it, then write the parser against it. Ask the user to attach a
+  drive; do not fabricate vendor-tool output.
+- **Bounded concurrency:** extractor work goes through a worker pool with per-file timeouts. One
+  bad file must not hang a scan.
+- **Schema changes:** add a numbered migration under `internal/store/migrations/`; never edit a
+  shipped migration.
+- **Web UI:** Go `html/template` + htmx, embedded with `embed`. Handlers return HTML fragments
+  for htmx requests (`HX-Request` header), full pages otherwise.
+- **Component library: DaisyUI on Tailwind CSS.** Use DaisyUI components (`table`, `modal`,
+  `drawer`, `badge`, `stats`, `card`, `tabs`, form controls, `navbar`) rather than hand-rolled
+  CSS; reach for raw Tailwind utilities only for spacing and layout. CSS is built once with the
+  **standalone Tailwind CLI binary** (no npm, no Node at runtime) from
+  `internal/web/static/src/app.css` into `internal/web/static/app.css`, which is committed and
+  embedded. A `make css` (or `./build-css.sh`) target wraps the command and documents the pinned
+  Tailwind/DaisyUI versions. htmx and DaisyUI's JS-free design mean no bundler; vendor `htmx.min.js`
+  under `internal/web/static/`. The only theme is the custom `m8` DaisyUI theme (see next item).
+- **Visual design: faithful Dirtywave M8 look.** Read `docs/design/m8-theme.md` before writing any
+  template or CSS. In short: dark only, M8 stock palette mapped to DaisyUI tokens, stealth57 pixel
+  font at integer scales, uppercase headings/labels/buttons, 1px flat borders, zero radius, no
+  shadows, no motion except the blinking focus cursor, semantic `m8-*` colours (`text-m8-value`
+  for the thing the user is looking for, `m8-info` for hints, `--` in `m8-empty` for empty cells),
+  hover row = cyan, selected row = magenta. Colour carries meaning; never decorate with it.
+- **Running the server locally:** `./start.sh` at the repo root builds and runs `shelf-server`
+  against a local data dir (`./data`, gitignored) with dev-friendly env defaults
+  (`SHELF_PASSWORD`, `SHELF_DATA_DIR=./data`, `SHELF_LISTEN=:8080`). This is the primary way to
+  run the server during development and testing. **Docker comes later**: the Dockerfile and
+  compose file are built only after the server has been proven to work via `./start.sh`. Do not
+  make `start.sh` depend on Docker.
+- **Commits:** at the end of each phase at minimum. Conventional short subject, body explains why.
+  Don't commit `.shelf` bundles, databases, or anything under `data/`.
+- **Decisions:** record non-obvious architectural decisions as ADRs under `docs/decisions/`
+  (`ADR-NNN-title.md`; the `documentation-and-adrs` skill covers the format). ADR-001 covers the
+  web UI stack.
+
+## Environment (this Mac, verified 2026-10-07)
+
+| Tool | Status | Notes |
+|---|---|---|
+| Go | 1.27.x via Homebrew (`/opt/homebrew/bin/go`) | Installed 2026-10-08. |
+| ffprobe / ffmpeg | 8.0.1 at `/opt/homebrew/bin` | Used for the ffprobe extractor and for generating test fixtures. |
+| Docker | 29.x at `/opt/homebrew/bin/docker` | For the server image and the end-to-end suite. |
+| xxhsum | present | Handy for cross-checking fingerprints in tests. |
+| sqlite3 CLI | present (miniconda) | Ad-hoc DB inspection only. |
+| ARRI Reference Tool (`art-cmd`) | **not installed yet** | User will install before Phase 4 (free from ARRI, needs an account). Re-check with `shelf doctor`. |
+| REDCINE-X PRO / REDline | **not installed yet** | User will install before Phase 4. Default path once installed: inside the REDCINE-X PRO app bundle. |
+| Blackmagic RAW SDK | not installed | Only needed if the Phase 5 decision says the `.sidecar` + ffprobe path is too thin. |
+| Arch | Apple Silicon (arm64) | Verify `art-cmd` runs natively; note if it needs Rosetta. |
+
+Shell is zsh. There is no GNU `timeout`; use `go test -timeout` or `context.WithTimeout` instead.
+
+## Common commands
+
+Once the module exists:
+
+```bash
+go build ./... && go vet ./...
+go test ./...
+go test -run Integration -tags integration ./...   # slow, needs hdiutil / real tools
+go run ./cmd/shelf dump /Volumes/<drive> | head
+go run ./cmd/shelf doctor
+./start.sh                                          # run shelf-server locally (dev)
+docker compose up --build                           # later, once the server is proven
+```
+
+## Skills installed in `.claude/skills/`
+
+Installed via skills.sh (`npx skills add …`). Use them when the task matches:
+
+- `golang-how-to` — meta-router; start here for any Go question.
+- `golang-cli`, `golang-spf13-cobra` — the `shelf` CLI: commands, flags, exit codes, signals.
+- `golang-project-layout`, `golang-naming`, `golang-code-style`, `golang-structs-interfaces`,
+  `golang-design-patterns` — structure and idiom.
+- `golang-concurrency`, `golang-context`, `golang-safety` — the extractor worker pool, timeouts,
+  cancellation.
+- `golang-error-handling` — wrapping, `slog`, recording per-clip errors without aborting.
+- `golang-database` — `database/sql` with SQLite, transactions, NULL handling.
+- `golang-testing`, `golang-lint` — table tests, fixtures, vet/lint setup.
+- `sqlite-expert` — WAL, PRAGMAs, FTS5, `VACUUM INTO` backups.
+- `htmx` — hx-* attributes, swap strategies, fragment responses.
+- `daisyui` — official daisyUI 5 component reference (class names, variants, theming). Use for
+  every template that renders UI.
+- `multi-stage-dockerfile` — the server image.
+- `documentation-and-adrs` (user-level) — ADR format.
+
+Add a skill with `npx skills add <owner/repo> -s <skill> -a claude-code -y` and list it here.
+
+## Decisions so far (2026-10-08)
+
+- **Name:** Shelf. Binaries `shelf` and `shelf-server`.
+- **Module path:** `github.com/fenixstarlord/indexserver` (the GitHub repo). Binaries and the
+  product are still called Shelf; imports look like `github.com/fenixstarlord/indexserver/internal/scan`.
+- **Home server:** amd64 (x86_64). Still build the image multi-arch (amd64 + arm64) so it also
+  runs locally on this Apple Silicon Mac for the end-to-end suite.
+- **UI component library:** DaisyUI on Tailwind, built with the standalone Tailwind CLI, output
+  committed. Chosen over templUI, Shoelace, and Pico to keep html/template and the no-runtime-build
+  design.
+- **Look:** faithful Dirtywave M8 emulation. Dark only, stock M8 palette, stealth57 font (CC BY-SA,
+  vendored in Phase 5 with attribution). Spec: `docs/design/m8-theme.md`, decision:
+  `docs/decisions/ADR-001-web-ui-stack.md`.
+- **Vendor tools:** the user installs `art-cmd` and REDCINE-X PRO before Phase 4. Build the
+  ffprobe, ALE, Sony XML, BRAW sidecar and BWF extractors first; ARRI and RED extractors last.
+
+## Open questions (ask the user, don't guess)
+
+- NetBird hostname format for the server, for the README and `shelf login` examples.
+- Which camera formats are actually present on the user's drives (drives the Phase 4 build order).
