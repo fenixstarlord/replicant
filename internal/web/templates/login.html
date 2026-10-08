@@ -1,0 +1,12 @@
+{{define "content"}}
+<div class="max-w-sm mx-auto mt-8">
+<h1>SHELF</h1>
+<p class="info">CATALOG OF OFFLINE DRIVES</p>
+{{if .Failed}}<div role="alert" class="alert alert-error">WRONG PASSWORD</div>{{end}}
+<form method="post" action="/login" class="flex flex-col gap-2 mt-2">
+  <input type="hidden" name="next" value="{{.Next}}">
+  <label class="flex flex-col">PASSWORD<input type="password" name="password" class="input" autofocus autocomplete="current-password"></label>
+  <button class="btn btn-primary">LOGIN</button>
+</form>
+</div>
+{{end}}

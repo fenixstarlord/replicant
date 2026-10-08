@@ -1,0 +1,42 @@
+{{define "content"}}
+<h1>{{.Drive.Name}}{{if .Drive.Label}} <span class="info">/ {{.Drive.Label}}</span>{{end}}</h1>
+<div class="stats stats-horizontal mb-2">
+  <div class="stat"><div class="stat-title">CAPACITY</div><div class="stat-value">{{bytes .Drive.CapacityBytes}}</div><div class="stat-desc">{{bytes .Drive.FreeBytes}} FREE · {{.Drive.FSType}}</div></div>
+  <div class="stat"><div class="stat-title">FILES</div><div class="stat-value">{{n .Drive.FileCount}}</div><div class="stat-desc">{{bytes .Drive.TotalBytes}}</div></div>
+  <div class="stat"><div class="stat-title">CLIPS</div><div class="stat-value">{{n .Drive.ClipCount}}</div></div>
+  <div class="stat"><div class="stat-title">SCANS</div><div class="stat-value">{{.Drive.ScanCount}}</div><div class="stat-desc">LAST {{datetime .Drive.LastScannedAt}}</div></div>
+</div>
+<div class="flex gap-2 mb-2">
+  <a href="/browse/{{.Drive.ID}}" class="btn btn-primary btn-sm">BROWSE</a>
+  <a href="/search?drive={{.Drive.ID}}" class="btn btn-sm">SEARCH THIS DRIVE</a>
+</div>
+<h2>WHERE IS IT</h2>
+<form method="post" action="/drives/{{.Drive.ID}}" class="filters">
+  <label>LABEL<input class="input input-sm" name="label" value="{{.Drive.Label}}" placeholder="e.g. 2TB SILVER LACIE"></label>
+  <label>LOCATION<input class="input input-sm" name="location" value="{{.Drive.Location}}" placeholder="e.g. SHELF B, BOX 3"></label>
+  <label>NOTES<input class="input input-sm" name="notes" value="{{.Drive.Notes}}"></label>
+  <label>&nbsp;<button class="btn btn-sm">SAVE</button></label>
+</form>
+<dl class="kv mt-2">
+  <dt>UUID</dt><dd class="info">{{.Drive.VolumeUUID}}</dd>
+  {{if .Drive.MediaName}}<dt>MEDIA</dt><dd>{{.Drive.MediaName}}</dd>{{end}}
+  <dt>FIRST SEEN</dt><dd>{{datetime .Drive.FirstSeen}}</dd>
+  <dt>LAST SEEN</dt><dd>{{datetime .Drive.LastSeen}}</dd>
+</dl>
+<h2>SCAN HISTORY</h2>
+<div class="overflow-x-auto">
+<table class="table table-xs">
+<thead><tr><th>SCAN</th><th>SCANNED</th><th>INGESTED</th><th class="num">FILES</th><th class="num">CLIPS</th><th class="num">BYTES</th><th class="num">ADDED</th><th class="num">REMOVED</th><th class="num">CHANGED</th><th>SCANNER</th><th></th></tr></thead>
+<tbody>
+{{range .Scans}}<tr tabindex="0">
+  <td><a href="/scans/{{.ID}}" class="value">#{{.ID}}</a>{{if .IsLatest}} <span class="badge badge-xs badge-accent">LATEST</span>{{end}}</td>
+  <td>{{datetime .ScannedAt}}</td><td class="info">{{datetime .IngestedAt}}</td>
+  <td class="num">{{n .FileCount}}</td><td class="num">{{n .ClipCount}}</td><td class="num">{{bytes .TotalBytes}}</td>
+  <td class="num text-success">+{{n .Added}}</td><td class="num text-error">-{{n .Removed}}</td><td class="num text-warning">~{{n .Changed}}</td>
+  <td class="info">{{.ScannerVersion}}</td>
+  <td><a href="/browse/{{.DriveID}}?scan={{.ID}}" class="btn btn-xs">BROWSE</a></td>
+</tr>{{end}}
+</tbody>
+</table>
+</div>
+{{end}}

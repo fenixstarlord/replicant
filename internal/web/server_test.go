@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
+	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
@@ -12,6 +14,8 @@ import (
 
 	"github.com/fenixstarlord/indexserver/internal/api"
 	"github.com/fenixstarlord/indexserver/internal/bundle"
+	"github.com/fenixstarlord/indexserver/internal/clips"
+	"github.com/fenixstarlord/indexserver/internal/meta"
 	"github.com/fenixstarlord/indexserver/internal/scan"
 	"github.com/fenixstarlord/indexserver/internal/store"
 )
@@ -142,12 +146,12 @@ func TestPasswordLoginAndSession(t *testing.T) {
 		t.Fatalf("login: %d cookies=%v", rec.Code, cookies)
 	}
 
-	req = httptest.NewRequest("GET", "/", nil)
+	req = httptest.NewRequest("GET", "/drives", nil)
 	req.AddCookie(cookies[0])
 	rec = httptest.NewRecorder()
 	s.ServeHTTP(rec, req)
-	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "session") {
-		t.Errorf("home with session: %d %s", rec.Code, rec.Body.String())
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "DRIVES") || !strings.Contains(rec.Body.String(), "LOGOUT") {
+		t.Errorf("drives with session: %d %.200s", rec.Code, rec.Body.String())
 	}
 
 	// Tampered and expired cookies are rejected.
@@ -176,5 +180,116 @@ func TestPasswordLoginAndSession(t *testing.T) {
 	}
 	if _, err := New(context.Background(), st2, Config{}, nil); err == nil {
 		t.Error("expected error when no password is configured")
+	}
+}
+
+// seedPages ingests a small bundle with metadata and returns a session cookie.
+func seedPages(t *testing.T) (*Server, *http.Cookie, api.IngestResponse) {
+	t.Helper()
+	s, st := newTestServer(t)
+	now := time.Now().UTC()
+	entries := []scan.Entry{
+		{Path: "A001", Name: "A001", Kind: scan.KindDir, IsDir: true, ModTime: now},
+		{Path: "A001/A001C001.mxf", Name: "A001C001.mxf", Ext: "mxf", Kind: scan.KindVideo, Size: 1234, ModTime: now, Fingerprint: "00000000deadbeef", ClipID: "k1"},
+		{Path: "notes.txt", Name: "notes.txt", Ext: "txt", Kind: scan.KindSidecar, Size: 5, ModTime: now},
+	}
+	cl := []clips.Clip{{ID: "k1", Kind: clips.KindFile, Name: "A001C001", RootPath: "A001/A001C001.mxf", Files: []string{"A001/A001C001.mxf"}, FileCount: 1, TotalSize: 1234, ModTime: now,
+		Meta:    &meta.Fields{Codec: meta.Str("ARRICORE"), Width: meta.Int(4608), Height: meta.Int(3164), FPS: meta.Float(24), CameraModel: meta.Str("ALEXA 35"), ISO: meta.Int(800), TCStart: meta.Str("08:46:50:00")},
+		Sources: map[string]string{"codec": "ale", "iso": "ale"}, Raw: map[string]json.RawMessage{"ale": json.RawMessage(`{"Name":"A001C001"}`)}}}
+	var buf bytes.Buffer
+	if err := bundle.Write(&buf, bundle.Manifest{ScannedAt: now, Volume: scan.Volume{UUID: "U9", Name: "Shelf9"}}, entries, cl); err != nil {
+		t.Fatal(err)
+	}
+	b, err := bundle.Read(bytes.NewReader(buf.Bytes()), int64(buf.Len()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := st.Ingest(context.Background(), b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	form := url.Values{"password": {"hunter2"}, "next": {"/"}}
+	req := httptest.NewRequest("POST", "/login", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+	return s, rec.Result().Cookies()[0], res
+}
+
+func get(t *testing.T, s *Server, c *http.Cookie, path string) (int, string) {
+	t.Helper()
+	req := httptest.NewRequest("GET", path, nil)
+	req.AddCookie(c)
+	rec := httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+	return rec.Code, rec.Body.String()
+}
+
+func TestPagesRender(t *testing.T) {
+	s, c, res := seedPages(t)
+	var clipID, entryID int64
+	if err := s.store.DB.QueryRow(`SELECT id FROM clips WHERE scan_id = ?`, res.ScanID).Scan(&clipID); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.store.DB.QueryRow(`SELECT id FROM entries WHERE scan_id = ? AND path = 'A001/A001C001.mxf'`, res.ScanID).Scan(&entryID); err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		path string
+		want []string
+	}{
+		{"/drives", []string{"Shelf9", "BROWSE"}},
+		{fmt.Sprintf("/drives/%d", res.DriveID), []string{"SCAN HISTORY", "LATEST", "WHERE IS IT"}},
+		{"/search?q=c001", []string{"1 CLIPS", "A001C001", "ARRICORE", "4608x3164", "ALEXA 35"}},
+		{"/search?camera=ALEXA+35&fps=24&iso_min=800&iso_max=800", []string{"1 CLIPS", "A001C001"}},
+		{"/search?q=zzz", []string{"0 CLIPS", "NO CLIPS"}},
+		{"/search?mode=files&q=notes", []string{"1 FILES", "notes.txt"}},
+		{fmt.Sprintf("/browse/%d", res.DriveID), []string{"A001/", "notes.txt"}},
+		{fmt.Sprintf("/browse/%d/A001", res.DriveID), []string{"A001C001.mxf", "file"}},
+		{fmt.Sprintf("/clips/%d", clipID), []string{"A001C001", "ARRICORE", "[ale]", "08:46:50:00", "RAW EXTRACTOR OUTPUT", "LOCATION NOT SET"}},
+		{fmt.Sprintf("/files/%d", entryID), []string{"A001C001.mxf", "00000000deadbeef", "file CLIP"}},
+		{fmt.Sprintf("/scans/%d", res.ScanID), []string{"SCAN #", "CHANGES VS PREVIOUS SCAN"}},
+		{"/settings", []string{"API TOKENS", "UPLOAD SCAN"}},
+	}
+	for _, tc := range cases {
+		code, body := get(t, s, c, tc.path)
+		if code != 200 {
+			t.Errorf("%s: status %d: %.300s", tc.path, code, body)
+			continue
+		}
+		for _, w := range tc.want {
+			if !strings.Contains(body, w) {
+				t.Errorf("%s: missing %q", tc.path, w)
+			}
+		}
+	}
+	if code, _ := get(t, s, c, "/clips/999999"); code != 404 {
+		t.Errorf("missing clip = %d", code)
+	}
+	// htmx request gets only the content block, no <html>.
+	req := httptest.NewRequest("GET", "/search?q=c001", nil)
+	req.AddCookie(c)
+	req.Header.Set("HX-Request", "true")
+	rec := httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+	if strings.Contains(rec.Body.String(), "<html") || !strings.Contains(rec.Body.String(), `id="results"`) {
+		t.Errorf("htmx fragment wrong: %.200s", rec.Body.String())
+	}
+	// Drive label edit round-trips.
+	form := url.Values{"label": {"2TB LACIE"}, "location": {"SHELF B, BOX 3"}, "notes": {""}}
+	req = httptest.NewRequest("POST", fmt.Sprintf("/drives/%d", res.DriveID), strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(c)
+	rec = httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+	if rec.Code != 303 {
+		t.Errorf("edit = %d", rec.Code)
+	}
+	if _, body := get(t, s, c, fmt.Sprintf("/clips/%d", clipID)); !strings.Contains(body, "SHELF B, BOX 3") {
+		t.Errorf("location not shown on clip page")
+	}
+	// Static assets are served.
+	if code, body := get(t, s, c, "/static/app.css"); code != 200 || !strings.Contains(body, "stealth57") {
+		t.Errorf("static css = %d", code)
 	}
 }

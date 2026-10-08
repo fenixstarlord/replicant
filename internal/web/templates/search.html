@@ -1,0 +1,49 @@
+{{define "content"}}
+<h1>SEARCH</h1>
+<form method="get" action="/search" id="searchform"
+      hx-get="/search" hx-trigger="input changed delay:300ms from:#q, change" hx-target="#results" hx-select="#results" hx-swap="outerHTML" hx-push-url="true">
+  <div class="flex gap-2 items-center flex-wrap">
+    <input id="q" type="search" name="q" value="{{.Form.Get "q"}}" placeholder="NAME, PATH, REEL, CAMERA, LENS ..." class="input" autofocus>
+    <label class="flex gap-2 items-center"><input type="radio" name="mode" value="clips" class="radio radio-sm" {{if ne .Mode "files"}}checked{{end}}> CLIPS</label>
+    <label class="flex gap-2 items-center"><input type="radio" name="mode" value="files" class="radio radio-sm" {{if eq .Mode "files"}}checked{{end}}> FILES</label>
+    <label class="flex gap-2 items-center"><input type="checkbox" name="old" value="1" class="toggle toggle-sm" {{if .Q.IncludeOld}}checked{{end}}> INCLUDE OLD SCANS</label>
+    <button class="btn btn-primary btn-sm">GO</button>
+    <a href="/search" class="btn btn-sm">CLEAR</a>
+  </div>
+  <details class="collapse mt-2" {{if gt (len .Form) 2}}open{{end}}>
+    <summary class="collapse-title">FILTERS</summary>
+    <div class="collapse-content filters">
+      <label>DRIVE<select name="drive" class="select select-sm"><option value="">ANY</option>{{$d := .Form.Get "drive"}}{{range .Drives}}<option value="{{.ID}}" {{if eq $d (printf "%d" .ID)}}selected{{end}}>{{.Name}}</option>{{end}}</select></label>
+      <label>KIND<select name="kind" class="select select-sm"><option value="">ANY</option>{{$k := .Form.Get "kind"}}{{range .Facets.Kinds}}<option {{if eq $k .}}selected{{end}}>{{.}}</option>{{end}}</select></label>
+      <label>CODEC<select name="codec" class="select select-sm"><option value="">ANY</option>{{$c := .Form.Get "codec"}}{{range .Facets.Codecs}}<option {{if eq $c .}}selected{{end}}>{{.}}</option>{{end}}</select></label>
+      <label>CAMERA<select name="camera" class="select select-sm"><option value="">ANY</option>{{$cm := .Form.Get "camera"}}{{range .Facets.Cameras}}<option {{if eq $cm .}}selected{{end}}>{{.}}</option>{{end}}</select></label>
+      <label>COLOR / GAMMA<select name="gamma" class="select select-sm"><option value="">ANY</option>{{$g := .Form.Get "gamma"}}{{range .Facets.Gammas}}<option {{if eq $g .}}selected{{end}}>{{.}}</option>{{end}}</select></label>
+      <label>MIN WIDTH<input class="input input-sm" name="min_width" type="number" value="{{.Form.Get "min_width"}}" placeholder="3840"></label>
+      <label>FPS<input class="input input-sm" name="fps" type="number" step="0.001" value="{{.Form.Get "fps"}}" placeholder="25"></label>
+      <label>ISO MIN<input class="input input-sm" name="iso_min" type="number" value="{{.Form.Get "iso_min"}}"></label>
+      <label>ISO MAX<input class="input input-sm" name="iso_max" type="number" value="{{.Form.Get "iso_max"}}"></label>
+      <label>WB MIN K<input class="input input-sm" name="wb_min" type="number" value="{{.Form.Get "wb_min"}}"></label>
+      <label>WB MAX K<input class="input input-sm" name="wb_max" type="number" value="{{.Form.Get "wb_max"}}"></label>
+      <label>LENS<input class="input input-sm" name="lens" value="{{.Form.Get "lens"}}"></label>
+      <label>FOCAL MIN<input class="input input-sm" name="focal_min" type="number" value="{{.Form.Get "focal_min"}}"></label>
+      <label>FOCAL MAX<input class="input input-sm" name="focal_max" type="number" value="{{.Form.Get "focal_max"}}"></label>
+      <label>REEL<input class="input input-sm" name="reel" value="{{.Form.Get "reel"}}"></label>
+      <label>SCENE<input class="input input-sm" name="scene" value="{{.Form.Get "scene"}}"></label>
+      <label>TAKE<input class="input input-sm" name="take" value="{{.Form.Get "take"}}"></label>
+      <label>TIMECODE CONTAINS<input class="input input-sm" name="tc" value="{{.Form.Get "tc"}}" placeholder="09:57"></label>
+      <label>RECORDED FROM<input class="input input-sm" name="from" type="date" value="{{.Form.Get "from"}}"></label>
+      <label>RECORDED TO<input class="input input-sm" name="to" type="date" value="{{.Form.Get "to"}}"></label>
+      <label>DUR MIN S<input class="input input-sm" name="dur_min" type="number" value="{{.Form.Get "dur_min"}}"></label>
+      <label>DUR MAX S<input class="input input-sm" name="dur_max" type="number" value="{{.Form.Get "dur_max"}}"></label>
+      <label>SIZE MIN GB<input class="input input-sm" name="size_min" type="number" value="{{.Form.Get "size_min"}}"></label>
+      <label>SIZE MAX GB<input class="input input-sm" name="size_max" type="number" value="{{.Form.Get "size_max"}}"></label>
+      <label>EXT (FILES)<input class="input input-sm" name="ext" value="{{.Form.Get "ext"}}" placeholder="mxf"></label>
+    </div>
+  </details>
+</form>
+<div id="results" class="mt-2">
+  <p class="info">{{n .Total}} {{if eq .Mode "files"}}FILES{{else}}CLIPS{{end}}{{if .Q.Text}} MATCHING "{{.Q.Text}}"{{end}}</p>
+  {{if eq .Mode "files"}}{{template "entries_table" .}}{{else}}{{template "clips_table" .}}{{end}}
+  {{template "pager" .}}
+</div>
+{{end}}

@@ -1,0 +1,30 @@
+{{define "layout"}}<!doctype html>
+<html lang="en" data-theme="m8">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Title}} · SHELF</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/htmx.min.js" defer></script>
+</head>
+<body>
+<nav class="navbar bg-base-100 border-b border-base-200">
+  <div class="navbar-start gap-4">
+    <a href="/drives" class="text-primary font-bold">SHELF</a>
+    <a href="/drives" {{if eq .Path "/drives"}}class="text-m8-value"{{end}}>DRIVES</a>
+    <a href="/search" {{if eq .Path "/search"}}class="text-m8-value"{{end}}>SEARCH</a>
+    <a href="/settings" {{if eq .Path "/settings"}}class="text-m8-value"{{end}}>SETTINGS</a>
+  </div>
+  <div class="navbar-end gap-4">
+    <form method="get" action="/search" class="flex gap-2 items-center">
+      <input type="search" name="q" placeholder="FIND CLIP OR FILE" class="input input-sm" aria-label="search">
+    </form>
+    {{if .Identity.Auth}}<form method="post" action="/logout"><button class="btn btn-sm">LOGOUT</button></form>{{end}}
+  </div>
+</nav>
+<main class="container p-4 max-w-screen-2xl mx-auto">
+{{block "content" .}}{{end}}
+</main>
+<footer class="info p-4 text-xs">SHELF {{.Version}} · FONT: STEALTH57 BY TRASH80 (CC BY-SA 3.0) · NOT AFFILIATED WITH DIRTYWAVE</footer>
+</body>
+</html>{{end}}

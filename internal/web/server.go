@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"html"
 	"io"
 	"log/slog"
 	"net/http"
@@ -71,6 +70,7 @@ func (s *Server) routes() {
 	m.Handle("GET "+api.PathDrives, s.requireAuth(http.HandlerFunc(s.handleDrives)))
 	m.Handle("GET "+api.PathMe, s.requireAuth(http.HandlerFunc(s.handleMe)))
 	m.Handle("GET /{$}", s.requireAuth(http.HandlerFunc(s.handleHome)))
+	s.pageRoutes()
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -91,7 +91,6 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, "ok")
 }
 
-// Placeholder pages until the real UI lands in Phase 5.
 func (s *Server) handleLoginForm(w http.ResponseWriter, r *http.Request) {
 	if _, err := s.authenticate(r); err == nil {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -101,13 +100,7 @@ func (s *Server) handleLoginForm(w http.ResponseWriter, r *http.Request) {
 	if !strings.HasPrefix(next, "/") {
 		next = "/"
 	}
-	failed := r.URL.Query().Get("failed") != ""
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	fmt.Fprintf(w, `<!doctype html><title>shelf login</title><body style="background:#000;color:#8C8CBA;font-family:monospace">
-<h1 style="color:#32ECFF">SHELF</h1>%s<form method="post" action="/login">
-<input type="hidden" name="next" value="%s">
-<label>PASSWORD <input type="password" name="password" autofocus></label> <button>LOGIN</button></form></body>`,
-		map[bool]string{true: `<p style="color:#FF3070">WRONG PASSWORD</p>`, false: ""}[failed], html.EscapeString(next))
+	s.render(w, r, "login", map[string]any{"Title": "LOGIN", "Next": next, "Failed": r.URL.Query().Get("failed") != ""})
 }
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
@@ -139,12 +132,6 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	clearSession(w)
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
-}
-
-func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
-	id, _ := IdentityFrom(r.Context())
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	fmt.Fprintf(w, "shelf-server %s: logged in via %s. Web UI arrives in Phase 5.\n", s.cfg.Version, id.Auth)
 }
 
 func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {

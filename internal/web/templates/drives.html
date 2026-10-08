@@ -1,0 +1,30 @@
+{{define "content"}}
+<h1>DRIVES</h1>
+<div class="stats stats-horizontal mb-2">
+  <div class="stat"><div class="stat-title">DRIVES</div><div class="stat-value">{{len .Drives}}</div></div>
+  <div class="stat"><div class="stat-title">FILES</div><div class="stat-value">{{n .TotalFiles}}</div></div>
+  <div class="stat"><div class="stat-title">CLIPS</div><div class="stat-value">{{n .TotalClips}}</div></div>
+  <div class="stat"><div class="stat-title">BYTES</div><div class="stat-value">{{bytes .TotalBytes}}</div></div>
+</div>
+<div class="overflow-x-auto">
+<table class="table table-xs">
+<thead><tr><th>NAME</th><th>LABEL</th><th>LOCATION</th><th>FS</th><th class="num">CAPACITY</th><th>USED</th><th class="num">FREE</th><th class="num">FILES</th><th class="num">CLIPS</th><th class="num">SCANS</th><th>LAST SCAN</th><th></th></tr></thead>
+<tbody>
+{{range .Drives}}<tr tabindex="0">
+  <td><a href="/drives/{{.ID}}" class="value">{{.Name}}</a></td>
+  <td>{{or .Label "--"}}</td>
+  <td>{{or .Location "--"}}</td>
+  <td class="info">{{.FSType}}</td>
+  <td class="num">{{bytes .CapacityBytes}}</td>
+  <td><progress class="progress progress-primary w-24" value="{{pct (used .CapacityBytes .FreeBytes) .CapacityBytes}}" max="100"></progress></td>
+  <td class="num">{{bytes .FreeBytes}}</td>
+  <td class="num">{{n .FileCount}}</td>
+  <td class="num">{{n .ClipCount}}</td>
+  <td class="num">{{.ScanCount}}</td>
+  <td>{{datetime .LastScannedAt}}</td>
+  <td><a href="/browse/{{.ID}}" class="btn btn-xs">BROWSE</a> <a href="/search?drive={{.ID}}" class="btn btn-xs">SEARCH</a></td>
+</tr>{{else}}<tr><td colspan="12" class="empty">-- NO DRIVES YET. RUN: shelf scan /Volumes/NAME --</td></tr>{{end}}
+</tbody>
+</table>
+</div>
+{{end}}

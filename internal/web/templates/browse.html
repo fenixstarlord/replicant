@@ -1,0 +1,25 @@
+{{define "content"}}
+<h1><a href="/drives/{{.Drive.ID}}">{{.Drive.Name}}</a></h1>
+<p class="info">SCAN #{{.Scan.ID}} · {{datetime .Scan.ScannedAt}}{{if .Scan.IsLatest}} · LATEST{{else}} · <span class="text-warning">OLD SCAN</span>{{end}} · {{if .Drive.Location}}{{.Drive.Location}}{{else}}LOCATION NOT SET{{end}}</p>
+<div class="breadcrumbs text-sm"><ul>
+  <li><a href="/browse/{{.Drive.ID}}?scan={{.Scan.ID}}">/</a></li>
+  {{$d := .Drive.ID}}{{$s := .Scan.ID}}{{range .Crumbs}}<li><a href="/browse/{{$d}}/{{.Path}}?scan={{$s}}">{{.Name}}</a></li>{{end}}
+</ul></div>
+<p class="info">{{n .Dir.DirFileCount}} FILES · {{bytes .Dir.DirTotalSize}}</p>
+<div class="overflow-x-auto">
+<table class="table table-xs">
+<thead><tr><th>NAME</th><th>KIND</th><th class="num">SIZE</th><th class="num">FILES</th><th>MODIFIED</th><th>CLIP</th><th>FINGERPRINT</th></tr></thead>
+<tbody>
+{{range .Entries}}<tr tabindex="0" {{if .Error}}class="text-error"{{end}}>
+  <td>{{if .IsDir}}{{if .ClipID}}<a href="/clips/{{.ClipID}}" class="value">{{.Name}}/</a>{{else}}<a href="/browse/{{$d}}/{{.Path}}?scan={{$s}}" class="value">{{.Name}}/</a>{{end}}{{else}}<a href="/files/{{.ID}}" class="value">{{.Name}}</a>{{end}}{{if .IsSymlink}} <span class="badge badge-xs badge-neutral">LINK</span>{{end}}{{if .IsPackage}} <span class="badge badge-xs badge-neutral">PKG</span>{{end}}</td>
+  <td><span class="badge badge-xs {{kindBadge .Kind}}">{{.Kind}}</span></td>
+  <td class="num">{{if .IsDir}}{{bytes .DirTotalSize}}{{else}}{{bytes .Size}}{{end}}</td>
+  <td class="num">{{if .IsDir}}{{n .DirFileCount}}{{else}}<span class="empty">--</span>{{end}}</td>
+  <td>{{datetime .ModTime}}</td>
+  <td>{{if .ClipID}}<a href="/clips/{{.ClipID}}">{{.ClipKind}}</a>{{else}}<span class="empty">--</span>{{end}}</td>
+  <td class="info">{{or .Fingerprint "--"}}</td>
+</tr>{{else}}<tr><td colspan="7" class="empty">-- EMPTY --</td></tr>{{end}}
+</tbody>
+</table>
+</div>
+{{end}}
