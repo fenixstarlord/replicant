@@ -20,8 +20,11 @@ Working name is **Shelf**; it may be renamed. Grep for the name before hardcodin
 
 Track progress here. Update this section at the end of each phase, and commit.
 
-- [ ] **Phase 1 — Skeleton.** Go module, repo layout, `shelf dump`, FTS5 trigram check.
-- [ ] Phase 2 — Clip grouping + bundle
+- [x] Phase 1 — Skeleton (2026-10-08). Module, `internal/scan` (walk, skip rules, packages,
+  xxHash64 fingerprint), `shelf dump`, `internal/store` with the FTS5 trigram check (passes on
+  `modernc.org/sqlite`, no cgo needed), `shelf-server` stub with `/healthz`, `./start.sh`, Makefile.
+- [ ] **Phase 2 — Clip grouping + bundle.** R3D/ARRIRAW/Sony card detection, sidecar attachment,
+  volume identity via `diskutil`, bundle writer, `shelf scan -o --fast`.
 - [ ] Phase 3 — Server core (local `./start.sh`; Docker image deferred, see below)
 - [ ] Phase 4 — Extractors
 - [ ] Phase 5 — Search + browse UI
@@ -45,8 +48,8 @@ same change unless asked.
 5. **Metadata only.** No thumbnails, no frame decoding, no transcoding, no moving or deleting
    media. These are explicit v1 non-goals; do not add them "while you're there".
 6. **No multi-user auth.** One password for the UI, API tokens for the CLI. Do not add roles.
-7. **Pure Go.** Prefer `modernc.org/sqlite` (no cgo) so the Docker build is a plain static
-   binary. Only fall back to `mattn/go-sqlite3` if Phase 1 proves FTS5 trigram does not work.
+7. **Pure Go.** `modernc.org/sqlite` (no cgo) so the Docker build is a plain static binary.
+   Phase 1 verified FTS5 with the trigram tokenizer works on it (`internal/store.CheckFTS5Trigram`).
 8. **Extractors are per format/vendor, never per camera body.** Field mappings are data-driven
    tables, so a new camera's field names are a mapping change, not new code.
 
@@ -63,8 +66,16 @@ testdata/
 Shared code between CLI and server lives in `internal/bundle` and `internal/meta`. The server
 must not import anything under `internal/extract`.
 
+## Go skills: always load
+
+For any Go coding, review, debugging, or setup task, load `golang-how-to` first; it routes to the
+other installed Go skills.
+
 ## Conventions
 
+- **Architecture:** flat packages under `internal/`, no clean/hexagonal layers, no DI library.
+  Wire dependencies by hand in `cmd/*/main.go` with plain constructors. Add structure only when a
+  package genuinely outgrows it.
 - **Go:** standard library first. Use `log/slog` for logging, `context.Context` on every I/O
   path, `errors.Is/As` with `%w` wrapping. CLI via `spf13/cobra`. Config in
   `~/.config/shelf/config.toml`.
