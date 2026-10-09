@@ -88,9 +88,9 @@
     </div>
     <label class="form-control"><span class="label-text">Label</span><input class="input input-bordered input-sm" name="label"></label>
     <label class="form-control"><span class="label-text">Schedule</span><select name="interval" class="select select-bordered select-sm">{{template "interval_options" -1}}</select></label>
-    <label class="label cursor-pointer justify-start gap-3"><input type="checkbox" name="extract" value="1" class="toggle toggle-sm"><span class="label-text">Extract metadata<br><span class="muted text-xs">Runs ffprobe and the sidecar parsers on the server.</span></span></label>
-    <label class="label cursor-pointer justify-start gap-3"><input type="checkbox" name="fingerprint" value="1" class="toggle toggle-sm"><span class="label-text">Fingerprint files<br><span class="muted text-xs">Reads the first and last megabyte of every file; needed for duplicate detection.</span></span></label>
-    <label class="label cursor-pointer justify-start gap-3"><input type="checkbox" name="enabled" value="1" class="toggle toggle-sm"><span class="label-text">Enabled</span></label>
+    <label class="flex items-start gap-3 cursor-pointer"><input type="checkbox" name="extract" value="1" class="toggle toggle-sm mt-0.5 shrink-0"><span class="min-w-0 text-sm whitespace-normal">Extract metadata<span class="block muted text-xs">Runs ffprobe and the sidecar parsers on the server.</span></span></label>
+    <label class="flex items-start gap-3 cursor-pointer"><input type="checkbox" name="fingerprint" value="1" class="toggle toggle-sm mt-0.5 shrink-0"><span class="min-w-0 text-sm whitespace-normal">Fingerprint files<span class="block muted text-xs">Reads the first and last megabyte of every file; needed to find copies across drives.</span></span></label>
+    <label class="flex items-start gap-3 cursor-pointer"><input type="checkbox" name="enabled" value="1" class="toggle toggle-sm mt-0.5 shrink-0"><span class="min-w-0 text-sm whitespace-normal">Enabled</span></label>
     <div class="modal-action mt-auto">
       <button type="button" class="btn btn-sm" onclick="document.getElementById('job-editor').close()">Cancel</button>
       <button class="btn btn-sm btn-primary">Save</button>

@@ -479,7 +479,10 @@ func TestDefaultViewGroupsAndScanJobs(t *testing.T) {
 	if rec := post(t, s, c, fmt.Sprintf("/settings/jobs/%d/run", jobs[0].ID), nil); rec.Code != 303 {
 		t.Errorf("run = %d", rec.Code)
 	}
-	time.Sleep(50 * time.Millisecond)
+	deadline := time.Now().Add(3 * time.Second)
+	for len(fs.ran) == 0 && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
 	if len(fs.ran) != 1 || fs.ran[0] != jobs[0].ID {
 		t.Errorf("scheduler not asked to run: %v", fs.ran)
 	}
