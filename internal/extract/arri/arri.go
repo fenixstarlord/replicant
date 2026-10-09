@@ -59,6 +59,9 @@ type Extractor struct {
 func (e *Extractor) Name() string  { return "art-cmd" }
 func (e *Extractor) Priority() int { return extract.PriorityVendor }
 
+// BinPath is the resolved tool path after Available ran.
+func (e *Extractor) BinPath() string { return e.bin }
+
 func (e *Extractor) Available(ctx context.Context) (bool, string) {
 	paths := make([]string, 0, len(DefaultPaths))
 	for _, p := range DefaultPaths {

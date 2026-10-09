@@ -50,6 +50,10 @@ struct SettingsView: View {
                                 if t.available {
                                     Text(t.displayName)
                                     Text(t.version ?? "found").font(.caption).foregroundStyle(.secondary)
+                                } else if t.isQuarantined {
+                                    Text(t.displayName)
+                                    Text("Installed, but macOS blocks downloaded command-line tools until they are allowed.").font(.caption).foregroundStyle(.orange)
+                                    Button("Allow it to run") { Task { await toolsCheck.allow(t) } }.controlSize(.small)
                                 } else if let v = t.version, !v.isEmpty {
                                     Text(t.displayName)
                                     Text(v).font(.caption).foregroundStyle(.orange)

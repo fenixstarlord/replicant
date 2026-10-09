@@ -6,7 +6,11 @@ struct ToolStatus: Identifiable, Decodable {
     let name: String
     let version: String?
     let available: Bool
+    let path: String?
     var id: String { name }
+
+    /// Installed but refused by macOS because of the download quarantine.
+    var isQuarantined: Bool { !available && (version ?? "").contains("quarantine") && path != nil }
 
     /// Built-in parsers never need installing; only external tools are
     /// worth reporting as missing.
@@ -86,4 +90,11 @@ final class ToolChecker: ObservableObject {
     }
 
     func openDocs() { NSWorkspace.shared.open(docsURL) }
+
+    /// Clears the quarantine flag from a blocked tool's package and rechecks.
+    func allow(_ t: ToolStatus) async {
+        guard let path = t.path else { return }
+        Quarantine.clear(root: Quarantine.packageRoot(forBinary: path))
+        await check()
+    }
 }

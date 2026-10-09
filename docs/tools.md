@@ -26,13 +26,11 @@ folder the tool needs beside it, and `doc/` with the manual. Keep the folder tog
 
 1. Unzip it and move the folder to `/Applications/ARRI Reference Tool CMD` (or
    `~/Applications/ARRI Reference Tool CMD`). Shelf looks there by default.
-2. macOS marks everything a browser downloads with a quarantine flag. The tool is signed by ARRI,
-   but as a bare command-line program it has no "Open anyway" button, so running it shows
-   “libArriImageSdk… Not Opened” until the flag is cleared. Clear it once, for the whole folder:
-
-   ```bash
-   xattr -dr com.apple.quarantine "/Applications/ARRI Reference Tool CMD"
-   ```
+2. macOS marks everything a browser downloads with a quarantine flag. The tool is signed by ARRI
+   but not notarized, so macOS refuses to load its libraries until the flag is cleared; running
+   it shows “libArriImageSdk… Not Opened”. The menu bar app handles this: open Settings, and
+   next to the ARRI tool click **Allow it to run**. (From a terminal the equivalent is
+   `xattr -dr com.apple.quarantine "/Applications/ARRI Reference Tool CMD"`.)
 
 3. Check with `shelf doctor` (or Recheck in the menu bar app). `art-cmd` should show its version.
 

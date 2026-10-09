@@ -48,6 +48,12 @@ type Status struct {
 	Version   string `json:"version,omitempty"`
 	Available bool   `json:"available"`
 	Priority  int    `json:"priority"`
+	Path      string `json:"path,omitempty"` // resolved tool binary, for external tools
+}
+
+// Located is implemented by extractors that wrap an external binary.
+type Located interface {
+	BinPath() string
 }
 
 // Options controls a run.
@@ -67,8 +73,12 @@ func NewRunner(ctx context.Context, extractors []Extractor) *Runner {
 	r := &Runner{}
 	for _, e := range extractors {
 		ok, ver := e.Available(ctx)
+		st := Status{Name: e.Name(), Version: ver, Available: ok, Priority: e.Priority()}
+		if l, isLocated := e.(Located); isLocated {
+			st.Path = l.BinPath()
+		}
 		r.extractors = append(r.extractors, e)
-		r.status = append(r.status, Status{Name: e.Name(), Version: ver, Available: ok, Priority: e.Priority()})
+		r.status = append(r.status, st)
 	}
 	return r
 }
