@@ -42,15 +42,7 @@ struct MenuContent: View {
             }
         }
         Divider()
-        Button {
-            showSettings()
-        } label: {
-            if toolsCheck.missing.isEmpty {
-                Text("Settings…")
-            } else {
-                Label("Settings…", systemImage: "exclamationmark.triangle")
-            }
-        }
+        Button(toolsCheck.missing.isEmpty ? "Settings…" : "⚠️ Settings…") { showSettings() }
         Button("Quit Shelf") { NSApplication.shared.terminate(nil) }
     }
 
