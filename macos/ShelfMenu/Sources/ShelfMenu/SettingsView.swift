@@ -65,7 +65,7 @@ struct SettingsView: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 HStack {
-                    Button("Recheck") { Task { await toolsCheck.check() } }
+                    Button(toolsCheck.checking ? "Checking…" : "↻ Recheck") { Task { await toolsCheck.check() } }.disabled(toolsCheck.checking)
                     Button("Install notes…") { toolsCheck.openDocs() }
                 }
             }

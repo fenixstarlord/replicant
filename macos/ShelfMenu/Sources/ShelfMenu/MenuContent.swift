@@ -43,10 +43,15 @@ struct MenuContent: View {
         }
         Divider()
         Button(toolsCheck.missing.isEmpty ? "Settings…" : "⚠️ Settings…") { showSettings() }
+        if !toolsCheck.missing.isEmpty {
+            Button(toolsCheck.checking ? "Checking tools…" : "↻ Recheck tools") { Task { await toolsCheck.check() } }
+                .disabled(toolsCheck.checking)
+        }
         Button("Quit Shelf") { NSApplication.shared.terminate(nil) }
     }
 
     private func showSettings() {
+        Task { await toolsCheck.check() }
         SettingsWindow.shared.show(
             SettingsView()
                 .environmentObject(volumes)

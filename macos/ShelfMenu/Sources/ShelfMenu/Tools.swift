@@ -55,13 +55,24 @@ private struct DoctorReport: Decodable {
 final class ToolChecker: ObservableObject {
     @Published private(set) var tools: [ToolStatus] = []
     @Published private(set) var checked = false
+    @Published private(set) var checking = false
     @Published private(set) var docsURL = URL(string: "https://github.com/fenixstarlord/indexserver/blob/main/docs/tools.md")!
+    private var timer: Timer?
 
     var missing: [ToolStatus] { tools.filter { $0.isExternal && !$0.available } }
 
-    init() { Task { await check() } }
+    init() {
+        Task { await check() }
+        // Tools get installed while the app is running; look again now and then.
+        timer = Timer.scheduledTimer(withTimeInterval: 10 * 60, repeats: true) { [weak self] _ in
+            Task { @MainActor in await self?.check() }
+        }
+    }
 
     func check() async {
+        if checking { return }
+        checking = true
+        defer { checking = false }
         let (code, out) = await ShelfCLI.run(["doctor", "--json"])
         guard code == 0, let data = out.data(using: .utf8),
               let report = try? JSONDecoder().decode(DoctorReport.self, from: data) else {
