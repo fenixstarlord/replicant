@@ -328,7 +328,10 @@ reads `replicant doctor --json` to report missing metadata tools with a link to 
   browser, `confirm()` dialogs become NSAlerts. `Updates.swift` polls the GitHub releases API (15 s
   after launch, then every 6 h) and compares `tag_name` with `CFBundleShortVersionString`
   (git describe; the numeric prefix is compared, dev builds never nag); the download link is the
-  release asset named `replicant-client-*` or `replicant-standalone-*`.
+  release asset named `replicant-client-*` or `replicant-standalone-*`. The app icon is
+  `macos/icon/AppIcon.png` (user-supplied pixel art, 1024 px, masked to the macOS tile);
+  `build-app.sh` turns it into the .icns with sips + iconutil. `macos/icon/make-icon.swift` draws
+  three code-only alternatives (`r`, `eye`, `figure`) used only when that PNG is absent.
 
 ## Open questions (ask the user, don't guess)
 

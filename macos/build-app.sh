@@ -33,12 +33,20 @@ echo "building menu bar app (${ARCHS[*]:-native})"
 BIN=$(cd macos/ReplicantMenu && swift build -c release ${ARCHS[@]+"${ARCHS[@]}"} --show-bin-path)
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-# App icon: drawn by macos/icon/make-icon.swift (no font or image assets).
+# App icon: macos/icon/AppIcon.png (1024 px, transparent outside the tile)
+# if present, else drawn by macos/icon/make-icon.swift.
 ICONSET=dist/AppIcon.iconset
 if [[ ! -f dist/AppIcon.icns ]]; then
   rm -rf "$ICONSET" && mkdir -p "$ICONSET"
-  swift macos/icon/make-icon.swift "$ICONSET" 2>&1 | grep -v warning || true
-  rm -f "$ICONSET/preview.png"
+  if [[ -f macos/icon/AppIcon.png ]]; then
+    for n in 16 32 128 256 512; do
+      sips -z $n $n macos/icon/AppIcon.png --out "$ICONSET/icon_${n}x${n}.png" >/dev/null
+      sips -z $((n*2)) $((n*2)) macos/icon/AppIcon.png --out "$ICONSET/icon_${n}x${n}@2x.png" >/dev/null
+    done
+  else
+    swift macos/icon/make-icon.swift "$ICONSET" 2>&1 | grep -v warning || true
+    rm -f "$ICONSET/preview.png"
+  fi
   iconutil -c icns "$ICONSET" -o dist/AppIcon.icns
 fi
 cp dist/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
