@@ -49,17 +49,16 @@ struct SettingsView: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("Per-drive rules") {
-                let listed = volumes.volumes.filter { autoScan.allowed($0) }
-                if listed.isEmpty && autoScan.unmountedRuleNames.isEmpty {
-                    Text("No drives mounted.").foregroundStyle(.secondary)
+                let mounted = Dictionary(volumes.volumes.map { ($0.name, $0) }, uniquingKeysWith: { a, _ in a })
+                let names = autoScan.ruleNames
+                if names.isEmpty {
+                    Text("No drives yet. Mount one, or scan one so the server knows it.").foregroundStyle(.secondary)
                 }
-                ForEach(listed) { v in
-                    AutoScanRow(name: v.name, path: v.url.path, isInternal: v.isInternal, mounted: true)
+                ForEach(names, id: \.self) { name in
+                    let v = mounted[name]
+                    AutoScanRow(name: name, path: v?.url.path, isInternal: v?.isInternal ?? false, mounted: v != nil)
                 }
-                ForEach(autoScan.unmountedRuleNames, id: \.self) { name in
-                    AutoScanRow(name: name, path: nil, isInternal: false, mounted: false)
-                }
-                Text("On mount: scan when the drive appears. Interval: rescan while it stays mounted, counted from its last scan; a drive never scanned by this app is scanned at the next check. Scans queue one at a time.")
+                Text("Lists mounted drives, drives in the server's catalog, and drives seen before. On mount: scan when the drive appears. Interval: rescan while it stays mounted, counted from its last scan; a drive never scanned by this app is scanned at the next check. Scans queue one at a time.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("Metadata tools") {
@@ -116,6 +115,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .task { await autoScan.refreshCatalog() }
     }
 
     private func save() async {
@@ -177,9 +177,6 @@ struct AutoScanRow: View {
                 ForEach(AutoScanner.intervals, id: \.hours) { Text($0.label).tag($0.hours) }
             }
             .labelsHidden().frame(width: 150)
-            if !mounted {
-                Button("Remove") { autoScan.setRule(AutoScanRule(), for: name) }.controlSize(.small)
-            }
         }
     }
 }

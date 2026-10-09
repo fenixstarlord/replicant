@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -130,7 +131,8 @@ func uploadBundle(cmd *cobra.Command, c *client.Client, path string) error {
 }
 
 func newDrivesCmd() *cobra.Command {
-	return &cobra.Command{
+	var asJSON bool
+	cmd := &cobra.Command{
 		Use:   "drives",
 		Short: "List drives known to the server",
 		Args:  cobra.NoArgs,
@@ -142,6 +144,11 @@ func newDrivesCmd() *cobra.Command {
 			drives, err := c.Drives(cmd.Context())
 			if err != nil {
 				return err
+			}
+			if asJSON {
+				enc := json.NewEncoder(cmd.OutOrStdout())
+				enc.SetIndent("", "  ")
+				return enc.Encode(drives)
 			}
 			w := tabwriter.NewWriter(cmd.OutOrStdout(), 2, 4, 2, ' ', 0)
 			fmt.Fprintln(w, "ID\tNAME\tLABEL\tLOCATION\tCAPACITY\tFREE\tFILES\tCLIPS\tSCANS\tLAST SCAN")
@@ -157,6 +164,8 @@ func newDrivesCmd() *cobra.Command {
 			return w.Flush()
 		},
 	}
+	cmd.Flags().BoolVar(&asJSON, "json", false, "print the drives as JSON")
+	return cmd
 }
 
 func humanBytes(n int64) string {

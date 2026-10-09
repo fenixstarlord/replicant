@@ -28,6 +28,10 @@ final class AutoScanner: ObservableObject {
     @Published private(set) var rules: [String: AutoScanRule]
     /// Last successful scan per volume path, manual or automatic.
     @Published private(set) var lastScanned: [String: Date]
+    /// External drive names ever mounted while the app ran.
+    @Published private(set) var seen: Set<String>
+    /// Drive names in the server's catalog, from `shelf drives --json`.
+    @Published private(set) var catalog: [String] = []
 
     private let defaults = UserDefaults.standard
     private let volumes: VolumeMonitor
@@ -48,7 +52,9 @@ final class AutoScanner: ObservableObject {
             rules = [:]
         }
         lastScanned = (defaults.dictionary(forKey: "autoScanLast") as? [String: Date]) ?? [:]
+        seen = Set(defaults.stringArray(forKey: "autoScanSeen") ?? [])
         known = Set(volumes.volumes.map(\.id))
+        remember()
 
         scans.onFinished = { [weak self] url, ok in
             guard let self, ok else { return }
@@ -79,10 +85,34 @@ final class AutoScanner: ObservableObject {
         if let data = try? JSONEncoder().encode(rules) { defaults.set(data, forKey: "autoScanRules") }
     }
 
-    /// Names with a rule that are not currently mounted.
-    var unmountedRuleNames: [String] {
-        let mounted = Set(volumes.volumes.map(\.name))
-        return rules.keys.filter { !mounted.contains($0) }.sorted()
+    /// Records the external drives mounted right now.
+    private func remember() {
+        let names = volumes.volumes.filter { !$0.isRoot && !$0.isInternal }.map(\.name)
+        let merged = seen.union(names)
+        if merged != seen {
+            seen = merged
+            defaults.set(Array(seen).sorted(), forKey: "autoScanSeen")
+        }
+    }
+
+    /// Asks the server which drives it knows, so unplugged drives can
+    /// get rules too.
+    func refreshCatalog() async {
+        let (code, out) = await ShelfCLI.run(["drives", "--json"])
+        guard code == 0, let data = out.data(using: .utf8),
+              let rows = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return }
+        catalog = rows.compactMap { $0["name"] as? String }.sorted()
+    }
+
+    /// Every drive name that can have a rule, mounted or not: mounted
+    /// drives, the server's catalog, drives seen before, and existing rules.
+    var ruleNames: [String] {
+        var names = Set(volumes.volumes.filter { allowed($0) }.map(\.name))
+        names.formUnion(catalog)
+        names.formUnion(seen)
+        names.formUnion(rules.keys)
+        names.subtract(settings.ignored)
+        return names.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
     }
 
     /// Volumes that may ever be scanned automatically.
@@ -98,6 +128,7 @@ final class AutoScanner: ObservableObject {
 
     private func mounted(_ url: URL?) {
         volumes.refresh()
+        remember()
         let current = Set(volumes.volumes.map(\.id))
         let added = current.subtracting(known)
         known = current
