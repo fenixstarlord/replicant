@@ -11,12 +11,16 @@ final class SettingsWindow {
 
     func show<Content: View>(_ content: @autoclosure () -> Content) {
         if window == nil {
-            let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 480, height: 640),
-                             styleMask: [.titled, .closable, .miniaturizable],
+            let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 500, height: 680),
+                             styleMask: [.titled, .closable, .miniaturizable, .resizable],
                              backing: .buffered, defer: false)
             w.title = "Shelf Settings"
             w.isReleasedWhenClosed = false
-            w.contentViewController = NSHostingController(rootView: content())
+            let host = NSHostingController(rootView: content().frame(minWidth: 480, minHeight: 600))
+            host.sizingOptions = [] // keep the window size we set, not the view's intrinsic size
+            w.contentViewController = host
+            w.setContentSize(NSSize(width: 500, height: 680))
+            w.minSize = NSSize(width: 480, height: 500)
             w.center()
             window = w
         }

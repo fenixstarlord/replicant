@@ -66,8 +66,6 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 460)
-        .padding(.bottom)
         .onAppear { server = settings.server }
     }
 
