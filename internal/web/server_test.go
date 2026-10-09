@@ -156,7 +156,11 @@ func TestPasswordLoginAndSession(t *testing.T) {
 
 	// Tampered and expired cookies are rejected.
 	bad := *cookies[0]
-	bad.Value = bad.Value[:len(bad.Value)-1] + "0"
+	last := "0"
+	if strings.HasSuffix(bad.Value, "0") {
+		last = "1"
+	}
+	bad.Value = bad.Value[:len(bad.Value)-1] + last
 	req = httptest.NewRequest("GET", "/api/me", nil)
 	req.AddCookie(&bad)
 	rec = httptest.NewRecorder()
