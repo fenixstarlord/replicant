@@ -13,3 +13,4 @@
 .env
 .tools/
 internal/web/static/src/daisyui*.js
+macos/ShelfMenu/.build/

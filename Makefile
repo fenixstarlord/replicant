@@ -1,7 +1,7 @@
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X main.version=$(VERSION)
 
-.PHONY: build test vet fmt tidy check run-server css dist
+.PHONY: build test vet fmt tidy check run-server css dist app
 
 build:
 	go build -ldflags '$(LDFLAGS)' -o bin/shelf ./cmd/shelf
@@ -35,3 +35,7 @@ dist:
 	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags '$(LDFLAGS)' -o dist/shelf-server-linux-arm64 ./cmd/shelf-server
 	cp deploy/shelf-server.service dist/
 	@ls -la dist/
+
+# macOS menu bar app with the shelf CLI bundled inside (dist/Shelf.app).
+app:
+	./macos/build-app.sh

@@ -23,18 +23,25 @@ import (
 	"github.com/fenixstarlord/indexserver/internal/meta"
 )
 
-// DefaultPaths are likely art-cmd locations on macOS.
+// DefaultPaths are likely art-cmd locations. ART CMD is a separate
+// download from the ARRI Reference Tool GUI app and ships as an archive
+// with no installer, so these are the conventional places to unpack or
+// link it (see docs/tools.md). PATH is searched last.
 var DefaultPaths = []string{
-	"/Applications/ARRI Reference Tool.app/Contents/MacOS/art-cmd",
-	"/Applications/ARRI/ARRI Reference Tool/art-cmd",
+	"/Applications/ARRI Reference Tool CMD/art-cmd",
+	"/Applications/ARRI/ARRI Reference Tool CMD/art-cmd",
 	"/usr/local/bin/art-cmd",
 	"/opt/homebrew/bin/art-cmd",
+	"/opt/arri/art-cmd/art-cmd",
 }
 
-// DefaultArgs is the metadata-export invocation; {input} and {outdir}
-// are substituted. Override via config `tools.art_cmd_args` once the
-// real flags are confirmed.
-var DefaultArgs = []string{"--input", "{input}", "--export-metadata", "json", "--output", "{outdir}"}
+// DefaultArgs is the metadata-only export from the ART CMD 1.0.0 user
+// manual (section 3.4.1): `art-cmd export --input <clip> --output <file>.json`
+// writes static clip metadata and dynamic frame metadata as one JSON
+// document and skips audio and look files. {input} and {outdir} are
+// substituted; the file name keeps the extractor's JSON lookup simple.
+// Override via config `tools.art_cmd_args`.
+var DefaultArgs = []string{"export", "--input", "{input}", "--output", "{outdir}/metadata.json"}
 
 // clipNameRe matches ARRI clip names: A001C001_..., A_0001C001_..., B021C004_...
 var clipNameRe = regexp.MustCompile(`(?i)^[A-Z]_?\d{3,4}C\d{3}_`)

@@ -162,8 +162,9 @@ other installed Go skills.
 | Docker | 29.x at `/opt/homebrew/bin/docker` | For the server image and the end-to-end suite. |
 | xxhsum | present | Handy for cross-checking fingerprints in tests. |
 | sqlite3 CLI | present (miniconda) | Ad-hoc DB inspection only. |
-| ARRI Reference Tool (`art-cmd`) | **not installed yet** | User will install before Phase 4 (free from ARRI, needs an account). Re-check with `shelf doctor`. |
-| REDCINE-X PRO / REDline | **not installed yet** | User will install before Phase 4. Default path once installed: inside the REDCINE-X PRO app bundle. |
+| ARRI Reference Tool CMD (`art-cmd`) | **not installed yet** (2026-10-09) | Only the ART **GUI** app is in `/Applications`; it does not contain `art-cmd`. ART CMD is a separate download. Install per `docs/tools.md`, then re-check with `shelf doctor`. |
+| REDCINE-X PRO / REDline | **not installed yet** (2026-10-09) | `RED Tools.app` in `/Applications` is the iPad app wrapper, not REDCINE-X PRO. Install per `docs/tools.md`; REDline lives inside the REDCINE-X PRO app bundle. |
+| mediainfo | present (Homebrew) | Not used by Shelf. Handy for cross-checks: it reads the ARRICORE descriptor and R3D version. |
 | Blackmagic RAW SDK | not installed | Only needed if the Phase 5 decision says the `.sidecar` + ffprobe path is too thin. |
 | Arch | Apple Silicon (arm64) | Verify `art-cmd` runs natively; note if it needs Rosetta. |
 
@@ -268,6 +269,16 @@ pure camera drive): 614k entries, 13.6 TB, walked in 8.6 s. Counts that matter f
 Extractor order suggested by this drive: ffprobe (mov/mxf/mp4/mts) → Sony XML → ALE/CDL →
 R3D → BRAW → ARRI, with Canon CRM added to the format table. Re-survey when real camera drives
 are attached; this RAID is not representative of the shelf drives.
+
+## Menu bar app (2026-10-09)
+
+`macos/ShelfMenu` is a SwiftUI `MenuBarExtra` app (SwiftPM, macOS 14+, built with the Command Line
+Tools; no Xcode project). It does no scanning itself: it runs the bundled Go `shelf` binary
+(`Contents/MacOS/shelf`) as a subprocess (`shelf scan <path>`, `shelf login <url>` with the key on
+stdin) and streams its stderr as progress. Server and key therefore live in the CLI's
+`config.toml`; the ignore list and launch-at-login are app-only (UserDefaults, SMAppService).
+`macos/build-app.sh` (`make app`) builds a universal CLI and app and assembles `dist/Shelf.app`
+with an ad-hoc signature. Keep CLI output lines stable; the app shows the last stderr line.
 
 ## Decisions, continued
 

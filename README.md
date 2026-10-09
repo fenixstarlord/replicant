@@ -46,14 +46,25 @@ shelf dump /Volumes/X [--clips]        print what would be indexed as JSON lines
 
 Scans never write to the scanned volume. Vendor tools get a temp directory on the Mac.
 
-Tool paths can be set in the config file:
+Metadata extraction uses external tools where a format needs one: ffprobe, ARRI's `art-cmd` and
+RED's `REDline`. All are optional; a missing tool is noted on the affected clips. Installation
+on the Mac and on the Linux server is covered in [docs/tools.md](docs/tools.md). Tools are found
+on `PATH` or in their usual install locations; explicit paths can be set in the config file:
 
 ```toml
 [tools]
 ffprobe = "/opt/homebrew/bin/ffprobe"
-art_cmd = "/Applications/ARRI Reference Tool.app/Contents/MacOS/art-cmd"
-redline = "/Applications/REDCINE-X PRO/REDline"
+art_cmd = "/Applications/ARRI Reference Tool CMD/art-cmd"
+redline = "/Applications/REDCINE-X Professional/REDCINE-X PRO.app/Contents/MacOS/REDline"
 ```
+
+## Menu bar app (macOS)
+
+`make app` builds `dist/Shelf.app`, a menu bar app with the `shelf` CLI bundled inside. Drag it to
+Applications and open it. From the drop-down, click a drive to scan it and push it to the server;
+Browse… scans a folder or network share instead. Settings… holds the server URL and API key
+(stored in the same `~/.config/shelf/config.toml` the CLI uses), drives to ignore, and launch at
+login. Scans run one at a time; a notification reports each result.
 
 ## Server
 

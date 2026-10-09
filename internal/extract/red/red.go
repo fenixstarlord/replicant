@@ -19,12 +19,17 @@ import (
 	"github.com/fenixstarlord/indexserver/internal/meta"
 )
 
-// DefaultPaths are where REDCINE-X PRO installs REDline on macOS.
+// DefaultPaths are where REDline is found. The macOS REDCINE-X PRO
+// installer puts the app under /Applications/REDCINE-X Professional/ with
+// REDline inside the bundle; on Linux the standalone REDline archive is
+// unpacked by hand (see docs/tools.md). PATH is searched last.
 var DefaultPaths = []string{
-	"/Applications/REDCINE-X PRO/REDline",
+	"/Applications/REDCINE-X Professional/REDCINE-X PRO.app/Contents/MacOS/REDline",
 	"/Applications/REDCINE-X PRO.app/Contents/MacOS/REDline",
+	"/Applications/REDCINE-X PRO/REDline",
 	"/Applications/REDline/REDline",
 	"/usr/local/bin/REDline",
+	"/opt/REDline/REDline",
 }
 
 // Extractor runs REDline. Path may be empty to use the defaults.
