@@ -215,8 +215,8 @@ Add a skill with `npx skills add <owner/repo> -s <skill> -a claude-code -y` and 
 ## Decisions so far (2026-10-08)
 
 - **Name:** Replicant. Binaries `replicant` and `replicant-server`.
-- **Module path:** `github.com/fenixstarlord/indexserver` (the GitHub repo). Binaries and the
-  product are still called Replicant; imports look like `github.com/fenixstarlord/indexserver/internal/scan`.
+- **Module path:** `github.com/fenixstarlord/replicant` (the GitHub repo). Binaries and the
+  product are still called Replicant; imports look like `github.com/fenixstarlord/replicant/internal/scan`.
 - **Home server:** amd64 (x86_64). Still build the image multi-arch (amd64 + arm64) so it also
   runs locally on this Apple Silicon Mac for the end-to-end suite.
 - **UI component library:** DaisyUI on Tailwind, built with the standalone Tailwind CLI, output

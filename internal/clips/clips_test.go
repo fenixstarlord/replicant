@@ -8,7 +8,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/fenixstarlord/indexserver/internal/scan"
+	"github.com/fenixstarlord/replicant/internal/scan"
 )
 
 func touch(t *testing.T, root, rel string, size int) {

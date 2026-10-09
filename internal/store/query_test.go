@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fenixstarlord/indexserver/internal/meta"
+	"github.com/fenixstarlord/replicant/internal/meta"
 )
 
 func seed(t *testing.T) (*Store, IngestResult) {

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fenixstarlord/indexserver/internal/meta"
+	"github.com/fenixstarlord/replicant/internal/meta"
 )
 
 // ClipRow is a clip as shown in search results and detail pages.

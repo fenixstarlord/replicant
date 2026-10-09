@@ -7,9 +7,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/fenixstarlord/indexserver/internal/cliconfig"
-	"github.com/fenixstarlord/indexserver/internal/extract"
-	"github.com/fenixstarlord/indexserver/internal/extract/registry"
+	"github.com/fenixstarlord/replicant/internal/cliconfig"
+	"github.com/fenixstarlord/replicant/internal/extract"
+	"github.com/fenixstarlord/replicant/internal/extract/registry"
 )
 
 func newDoctorCmd() *cobra.Command {
@@ -28,7 +28,7 @@ func newDoctorCmd() *cobra.Command {
 				p, _ := cliconfig.Path()
 				return json.NewEncoder(cmd.OutOrStdout()).Encode(map[string]any{
 					"extractors": runner.Statuses(), "config": p, "server": cfg.Server, "logged_in": cfg.Token != "",
-					"docs": "https://github.com/fenixstarlord/indexserver/blob/main/docs/tools.md",
+					"docs": "https://github.com/fenixstarlord/replicant/blob/main/docs/tools.md",
 				})
 			}
 			w := tabwriter.NewWriter(cmd.OutOrStdout(), 2, 4, 2, ' ', 0)

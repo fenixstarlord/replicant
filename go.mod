@@ -1,4 +1,4 @@
-module github.com/fenixstarlord/indexserver
+module github.com/fenixstarlord/replicant
 
 go 1.27.1
 

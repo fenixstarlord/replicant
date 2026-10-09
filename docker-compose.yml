@@ -1,7 +1,7 @@
 # Replicant server. Edit the values below, then: docker compose up -d
 services:
   replicant:
-    image: ghcr.io/fenixstarlord/indexserver:latest
+    image: ghcr.io/fenixstarlord/replicant:latest
     container_name: replicant
     restart: unless-stopped
     # The image runs as UID/GID 1000. On TrueNAS SCALE, run as the apps user

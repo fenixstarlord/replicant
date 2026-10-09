@@ -44,4 +44,4 @@ standalone:
 
 # Server image for this machine's architecture (CI publishes multi-arch to GHCR).
 docker:
-	docker build --build-arg VERSION=$(VERSION) -t ghcr.io/fenixstarlord/indexserver:dev .
+	docker build --build-arg VERSION=$(VERSION) -t ghcr.io/fenixstarlord/replicant:dev .

@@ -14,9 +14,9 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
-	"github.com/fenixstarlord/indexserver/internal/api"
-	"github.com/fenixstarlord/indexserver/internal/cliconfig"
-	"github.com/fenixstarlord/indexserver/internal/client"
+	"github.com/fenixstarlord/replicant/internal/api"
+	"github.com/fenixstarlord/replicant/internal/cliconfig"
+	"github.com/fenixstarlord/replicant/internal/client"
 )
 
 // loadClient builds an API client from the saved config.

@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fenixstarlord/indexserver/internal/bundle"
-	"github.com/fenixstarlord/indexserver/internal/meta"
-	"github.com/fenixstarlord/indexserver/internal/scan"
+	"github.com/fenixstarlord/replicant/internal/bundle"
+	"github.com/fenixstarlord/replicant/internal/meta"
+	"github.com/fenixstarlord/replicant/internal/scan"
 )
 
 // IngestResult summarises a stored scan.

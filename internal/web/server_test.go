@@ -13,12 +13,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fenixstarlord/indexserver/internal/api"
-	"github.com/fenixstarlord/indexserver/internal/bundle"
-	"github.com/fenixstarlord/indexserver/internal/clips"
-	"github.com/fenixstarlord/indexserver/internal/meta"
-	"github.com/fenixstarlord/indexserver/internal/scan"
-	"github.com/fenixstarlord/indexserver/internal/store"
+	"github.com/fenixstarlord/replicant/internal/api"
+	"github.com/fenixstarlord/replicant/internal/bundle"
+	"github.com/fenixstarlord/replicant/internal/clips"
+	"github.com/fenixstarlord/replicant/internal/meta"
+	"github.com/fenixstarlord/replicant/internal/scan"
+	"github.com/fenixstarlord/replicant/internal/store"
 )
 
 func newTestServer(t *testing.T) (*Server, *store.Store) {

@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/fenixstarlord/indexserver/internal/store"
+	"github.com/fenixstarlord/replicant/internal/store"
 )
 
 // column is one Finder-style column: the listing of a folder, with the

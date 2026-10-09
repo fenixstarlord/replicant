@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fenixstarlord/indexserver/internal/meta"
+	"github.com/fenixstarlord/replicant/internal/meta"
 )
 
 func golden(t *testing.T, name string) []byte {

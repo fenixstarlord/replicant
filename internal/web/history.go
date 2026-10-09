@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/fenixstarlord/indexserver/internal/store"
+	"github.com/fenixstarlord/replicant/internal/store"
 )
 
 func (s *Server) historyRoutes() {

@@ -11,12 +11,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/fenixstarlord/indexserver/internal/bundle"
-	"github.com/fenixstarlord/indexserver/internal/cliconfig"
-	"github.com/fenixstarlord/indexserver/internal/client"
-	"github.com/fenixstarlord/indexserver/internal/clips"
-	"github.com/fenixstarlord/indexserver/internal/scan"
-	"github.com/fenixstarlord/indexserver/internal/scanner"
+	"github.com/fenixstarlord/replicant/internal/bundle"
+	"github.com/fenixstarlord/replicant/internal/cliconfig"
+	"github.com/fenixstarlord/replicant/internal/client"
+	"github.com/fenixstarlord/replicant/internal/clips"
+	"github.com/fenixstarlord/replicant/internal/scan"
+	"github.com/fenixstarlord/replicant/internal/scanner"
 )
 
 // scanFlags are shared by `scan` and `dump`.

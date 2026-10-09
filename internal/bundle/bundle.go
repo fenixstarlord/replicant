@@ -12,8 +12,8 @@ import (
 	"io"
 	"time"
 
-	"github.com/fenixstarlord/indexserver/internal/clips"
-	"github.com/fenixstarlord/indexserver/internal/scan"
+	"github.com/fenixstarlord/replicant/internal/clips"
+	"github.com/fenixstarlord/replicant/internal/scan"
 )
 
 // Version is the bundle format version written into the manifest.

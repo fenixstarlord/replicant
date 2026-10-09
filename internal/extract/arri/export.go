@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fenixstarlord/indexserver/internal/meta"
+	"github.com/fenixstarlord/replicant/internal/meta"
 )
 
 // Export is the shape of `art-cmd export` JSON (ARRI metadata_output

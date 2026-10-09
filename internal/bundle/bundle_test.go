@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fenixstarlord/indexserver/internal/clips"
-	"github.com/fenixstarlord/indexserver/internal/scan"
+	"github.com/fenixstarlord/replicant/internal/clips"
+	"github.com/fenixstarlord/replicant/internal/scan"
 )
 
 func TestRoundTrip(t *testing.T) {

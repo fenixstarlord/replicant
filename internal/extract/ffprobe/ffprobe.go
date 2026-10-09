@@ -13,9 +13,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fenixstarlord/indexserver/internal/clips"
-	"github.com/fenixstarlord/indexserver/internal/extract"
-	"github.com/fenixstarlord/indexserver/internal/meta"
+	"github.com/fenixstarlord/replicant/internal/clips"
+	"github.com/fenixstarlord/replicant/internal/extract"
+	"github.com/fenixstarlord/replicant/internal/meta"
 )
 
 // Extractor runs ffprobe. Path may be empty to search PATH.

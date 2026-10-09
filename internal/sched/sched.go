@@ -12,9 +12,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/fenixstarlord/indexserver/internal/cliconfig"
-	"github.com/fenixstarlord/indexserver/internal/scanner"
-	"github.com/fenixstarlord/indexserver/internal/store"
+	"github.com/fenixstarlord/replicant/internal/cliconfig"
+	"github.com/fenixstarlord/replicant/internal/scanner"
+	"github.com/fenixstarlord/replicant/internal/store"
 )
 
 // Scheduler owns the server-side scan jobs.

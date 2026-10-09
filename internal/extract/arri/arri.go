@@ -18,9 +18,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/fenixstarlord/indexserver/internal/clips"
-	"github.com/fenixstarlord/indexserver/internal/extract"
-	"github.com/fenixstarlord/indexserver/internal/meta"
+	"github.com/fenixstarlord/replicant/internal/clips"
+	"github.com/fenixstarlord/replicant/internal/extract"
+	"github.com/fenixstarlord/replicant/internal/meta"
 )
 
 // DefaultPaths are likely art-cmd locations. ART CMD is a separate

@@ -16,7 +16,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
-	"github.com/fenixstarlord/indexserver/internal/store"
+	"github.com/fenixstarlord/replicant/internal/store"
 )
 
 const (

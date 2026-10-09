@@ -16,8 +16,8 @@ import (
 
 	"github.com/cespare/xxhash/v2"
 
-	"github.com/fenixstarlord/indexserver/internal/meta"
-	"github.com/fenixstarlord/indexserver/internal/scan"
+	"github.com/fenixstarlord/replicant/internal/meta"
+	"github.com/fenixstarlord/replicant/internal/scan"
 )
 
 // Kind says what structure a clip was built from.

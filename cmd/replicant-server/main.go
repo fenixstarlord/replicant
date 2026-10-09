@@ -20,11 +20,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/fenixstarlord/indexserver/internal/bundle"
-	"github.com/fenixstarlord/indexserver/internal/client"
-	"github.com/fenixstarlord/indexserver/internal/sched"
-	"github.com/fenixstarlord/indexserver/internal/store"
-	"github.com/fenixstarlord/indexserver/internal/web"
+	"github.com/fenixstarlord/replicant/internal/bundle"
+	"github.com/fenixstarlord/replicant/internal/client"
+	"github.com/fenixstarlord/replicant/internal/sched"
+	"github.com/fenixstarlord/replicant/internal/store"
+	"github.com/fenixstarlord/replicant/internal/web"
 )
 
 // version is set at build time via -ldflags "-X main.version=...".

@@ -114,7 +114,7 @@ The server does not terminate TLS; keep it off the public internet. For HTTPS be
 ### Docker
 
 The image is a static `replicant-server` on Debian slim with ffmpeg (for ffprobe), published to
-`ghcr.io/fenixstarlord/indexserver` for amd64 and arm64 by the GitHub workflow on every push to
+`ghcr.io/fenixstarlord/replicant` for amd64 and arm64 by the GitHub workflow on every push to
 `main` (`latest`) and on `v*` tags. `make docker` builds it locally.
 
 Edit `docker-compose.yml` (password, `REPLICANT_PUBLIC_URL`, and the paths), then:
@@ -137,7 +137,7 @@ Those show up under Settings → Server scans. Vendor tools are not in the image
 `art-cmd` or `REDline` can be mounted at `/opt/replicant-tools`, which is on `PATH`.
 
 **TrueNAS SCALE:** Apps → Discover Apps → Custom App (or "Install via YAML" and paste the compose
-file). Image `ghcr.io/fenixstarlord/indexserver:latest`, port 8080, environment `REPLICANT_PASSWORD`
+file). Image `ghcr.io/fenixstarlord/replicant:latest`, port 8080, environment `REPLICANT_PASSWORD`
 and `REPLICANT_PUBLIC_URL` (the NetBird address of the NAS, e.g. `http://100.64.0.5:8080`), host-path
 storage: a dataset such as `/mnt/rock/apps/replicant` at `/data`, and each media dataset at its own
 path under `/media`, read-only. The container runs as UID/GID 1000 by default; on TrueNAS uncomment `user: "568:568"` in the

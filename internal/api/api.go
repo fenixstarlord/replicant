@@ -1,7 +1,7 @@
 // Package api holds the JSON types shared by the server and the CLI client.
 package api
 
-import "github.com/fenixstarlord/indexserver/internal/store"
+import "github.com/fenixstarlord/replicant/internal/store"
 
 // Paths of the HTTP API.
 const (

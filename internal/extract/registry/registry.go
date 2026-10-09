@@ -2,16 +2,16 @@
 package registry
 
 import (
-	"github.com/fenixstarlord/indexserver/internal/cliconfig"
-	"github.com/fenixstarlord/indexserver/internal/extract"
-	"github.com/fenixstarlord/indexserver/internal/extract/ale"
-	"github.com/fenixstarlord/indexserver/internal/extract/arri"
-	"github.com/fenixstarlord/indexserver/internal/extract/braw"
-	"github.com/fenixstarlord/indexserver/internal/extract/bwf"
-	"github.com/fenixstarlord/indexserver/internal/extract/ffprobe"
-	"github.com/fenixstarlord/indexserver/internal/extract/red"
-	"github.com/fenixstarlord/indexserver/internal/extract/sony"
-	"github.com/fenixstarlord/indexserver/internal/scan"
+	"github.com/fenixstarlord/replicant/internal/cliconfig"
+	"github.com/fenixstarlord/replicant/internal/extract"
+	"github.com/fenixstarlord/replicant/internal/extract/ale"
+	"github.com/fenixstarlord/replicant/internal/extract/arri"
+	"github.com/fenixstarlord/replicant/internal/extract/braw"
+	"github.com/fenixstarlord/replicant/internal/extract/bwf"
+	"github.com/fenixstarlord/replicant/internal/extract/ffprobe"
+	"github.com/fenixstarlord/replicant/internal/extract/red"
+	"github.com/fenixstarlord/replicant/internal/extract/sony"
+	"github.com/fenixstarlord/replicant/internal/scan"
 )
 
 // All returns every extractor, configured from tools and bound to the

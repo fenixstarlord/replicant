@@ -15,8 +15,8 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"github.com/fenixstarlord/indexserver/internal/clips"
-	"github.com/fenixstarlord/indexserver/internal/meta"
+	"github.com/fenixstarlord/replicant/internal/clips"
+	"github.com/fenixstarlord/replicant/internal/meta"
 )
 
 // Extractor produces metadata for clips it recognises.

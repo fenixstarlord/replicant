@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fenixstarlord/indexserver/internal/meta"
+	"github.com/fenixstarlord/replicant/internal/meta"
 )
 
 //go:embed templates/*.html

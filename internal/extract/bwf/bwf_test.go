@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/fenixstarlord/indexserver/internal/clips"
+	"github.com/fenixstarlord/replicant/internal/clips"
 )
 
 func TestParseSoundDevices(t *testing.T) {

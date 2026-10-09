@@ -14,10 +14,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fenixstarlord/indexserver/internal/bundle"
-	"github.com/fenixstarlord/indexserver/internal/client"
-	"github.com/fenixstarlord/indexserver/internal/scanner"
-	"github.com/fenixstarlord/indexserver/internal/store"
+	"github.com/fenixstarlord/replicant/internal/bundle"
+	"github.com/fenixstarlord/replicant/internal/client"
+	"github.com/fenixstarlord/replicant/internal/scanner"
+	"github.com/fenixstarlord/replicant/internal/store"
 )
 
 const pageSize = 100

@@ -60,7 +60,7 @@ final class ToolChecker: ObservableObject {
     @Published private(set) var tools: [ToolStatus] = []
     @Published private(set) var checked = false
     @Published private(set) var checking = false
-    @Published private(set) var docsURL = URL(string: "https://github.com/fenixstarlord/indexserver/blob/main/docs/tools.md")!
+    @Published private(set) var docsURL = URL(string: "https://github.com/fenixstarlord/replicant/blob/main/docs/tools.md")!
     private var timer: Timer?
 
     var missing: [ToolStatus] { tools.filter { $0.isExternal && !$0.available } }
