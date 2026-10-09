@@ -75,7 +75,8 @@ Browse… scans a folder or network share instead. Settings… takes the connect
 server's API keys page (one string with the address and the key, stored in the same
 `~/.config/replicant/config.toml` the CLI uses), drives to ignore, automatic scans (a global "scan any
 external drive when it is mounted" switch, plus per-drive rules for on-mount and/or interval
-rescans), and launch at login. Scans run one at a time; a notification reports each result.
+rescans), and launch at login. Both apps check GitHub Releases on launch and every six hours; a newer version
+shows an "Update to vX.Y.Z…" item in the menu, a notification, and a download button in Settings. Scans run one at a time; a notification reports each result.
 
 ## Server
 

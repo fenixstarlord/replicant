@@ -8,7 +8,13 @@ struct MenuContent: View {
     @EnvironmentObject var toolsCheck: ToolChecker
     @EnvironmentObject var autoScan: AutoScanner
     @EnvironmentObject var local: LocalServer
+    @EnvironmentObject var updates: UpdateChecker
+
     var body: some View {
+        if let r = updates.available {
+            Button("⬆ Update to \(r.tag)…") { updates.openDownload() }
+            Divider()
+        }
         if LocalServer.isStandalone {
             Button(local.running ? "Open Replicant" : local.status) { local.open() }.disabled(!local.running)
             Divider()
@@ -65,6 +71,7 @@ struct MenuContent: View {
                 .environmentObject(toolsCheck)
                 .environmentObject(autoScan)
                 .environmentObject(local)
+                .environmentObject(updates)
         )
     }
 

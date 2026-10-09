@@ -10,15 +10,17 @@ struct ReplicantMenuApp: App {
     @StateObject private var toolsCheck = ToolChecker()
     @StateObject private var autoScan: AutoScanner
     @StateObject private var local: LocalServer
+    @StateObject private var updates: UpdateChecker
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
 
     init() {
-        let volumes = VolumeMonitor(), scans = ScanManager(), settings = AppSettings(), local = LocalServer()
+        let volumes = VolumeMonitor(), scans = ScanManager(), settings = AppSettings(), local = LocalServer(), updates = UpdateChecker()
         _volumes = StateObject(wrappedValue: volumes)
         _scans = StateObject(wrappedValue: scans)
         _settings = StateObject(wrappedValue: settings)
         _autoScan = StateObject(wrappedValue: AutoScanner(volumes: volumes, scans: scans, settings: settings))
         _local = StateObject(wrappedValue: local)
+        _updates = StateObject(wrappedValue: updates)
         // The standalone app's main window (AppKit-owned so the menu-bar-only
         // build has no window scene at all).
         CatalogWindow.shared.content = {
@@ -26,7 +28,8 @@ struct ReplicantMenuApp: App {
                 .environmentObject(volumes)
                 .environmentObject(scans)
                 .environmentObject(settings)
-                .environmentObject(local))
+                .environmentObject(local)
+                .environmentObject(updates))
         }
     }
 
@@ -39,6 +42,7 @@ struct ReplicantMenuApp: App {
                 .environmentObject(toolsCheck)
                 .environmentObject(autoScan)
                 .environmentObject(local)
+                .environmentObject(updates)
         } label: {
             Image(systemName: scans.isScanning ? "externaldrive.badge.timemachine" : "externaldrive")
         }

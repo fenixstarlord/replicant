@@ -325,7 +325,10 @@ reads `replicant doctor --json` to report missing metadata tools with a link to 
   regular app (`LSUIElement` false) whose main window (`CatalogWindow.swift`, an AppKit NSWindow
   hosting a WKWebView; SwiftUI `Window` scenes cannot be conditional, so the menu-bar-only build
   simply never creates it) shows the catalog; downloads go to ~/Downloads, external links to the
-  browser, `confirm()` dialogs become NSAlerts.
+  browser, `confirm()` dialogs become NSAlerts. `Updates.swift` polls the GitHub releases API (15 s
+  after launch, then every 6 h) and compares `tag_name` with `CFBundleShortVersionString`
+  (git describe; the numeric prefix is compared, dev builds never nag); the download link is the
+  release asset named `replicant-client-*` or `replicant-standalone-*`.
 
 ## Open questions (ask the user, don't guess)
 

@@ -7,6 +7,7 @@ struct SettingsView: View {
     @EnvironmentObject var toolsCheck: ToolChecker
     @EnvironmentObject var autoScan: AutoScanner
     @EnvironmentObject var local: LocalServer
+    @EnvironmentObject var updates: UpdateChecker
     @State private var connection = ""
     @State private var message = ""
     @State private var busy = false
@@ -124,6 +125,24 @@ struct SettingsView: View {
                     Button(toolsCheck.checking ? "Checking…" : "↻ Recheck") { Task { await toolsCheck.check() } }.disabled(toolsCheck.checking)
                     Button("Install notes…") { toolsCheck.openDocs() }
                 }
+            }
+            Section("Updates") {
+                LabeledContent("This version") { Text(UpdateChecker.currentVersion).textSelection(.enabled) }
+                if let r = updates.available {
+                    LabeledContent("Available") { Text(r.tag).foregroundStyle(.green) }
+                    HStack {
+                        Button("Download \(r.tag)") { updates.openDownload() }
+                        Link("Release notes", destination: r.page)
+                    }
+                    Text("Quit Replicant, unzip the download, and replace the app in Applications. Your settings and catalog stay where they are.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                HStack {
+                    Button(updates.checking ? "Checking…" : "Check now") { Task { await updates.check() } }.disabled(updates.checking)
+                    if !updates.message.isEmpty { Text(updates.message).font(.caption).foregroundStyle(.secondary) }
+                }
+                Text("Checked on launch and every six hours against the GitHub releases of this project.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
             Section {
                 Toggle("Launch at login", isOn: Binding(get: { settings.launchAtLogin }, set: { settings.setLaunchAtLogin($0) }))
