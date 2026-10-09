@@ -3,7 +3,7 @@
 // Runner title lettering. Pure CoreGraphics, no fonts, so it builds the
 // same everywhere. Usage: swift make-icon.swift <out dir>
 // Writes icon_<n>x<n>[@2x].png files for iconutil, plus preview.png.
-// A second argument picks the design: "r" (default) or "eye".
+// A second argument picks the design: "r" (default), "eye", or "figure".
 import AppKit
 import CoreGraphics
 import Foundation
@@ -149,6 +149,95 @@ func drawEye(_ ctx: CGContext, cs: CGColorSpace, tile: CGRect, s: CGFloat) {
     ctx.strokePath()
 }
 
+/// Option three: an original noir silhouette, head and shoulders in
+/// profile with the collar up, rim-lit in orange against a city glow,
+/// with rain. Nothing traced; the profile is a handful of curves.
+func drawFigure(_ ctx: CGContext, cs: CGColorSpace, tile: CGRect, s: CGFloat) {
+    // Warm burst low on the left, like a searchlight through smoke.
+    let burst = CGGradient(colorsSpace: cs, colors: [rgba(0xFFB347, 0.85), rgba(0xE8521C, 0.55), rgba(0x5A0A10, 0.25), rgba(0x000000, 0)] as CFArray, locations: [0, 0.3, 0.6, 1])!
+    ctx.drawRadialGradient(burst, startCenter: CGPoint(x: tile.minX + tile.width * 0.22, y: tile.minY + tile.height * 0.3), startRadius: 0,
+                           endCenter: CGPoint(x: tile.minX + tile.width * 0.22, y: tile.minY + tile.height * 0.3), endRadius: tile.width * 0.75, options: [])
+    // Distant towers in the glow.
+    ctx.setFillColor(rgba(0x1A0609, 0.7))
+    let towers: [(CGFloat, CGFloat, CGFloat)] = [(0.0, 0.06, 0.2), (0.07, 0.04, 0.3), (0.12, 0.07, 0.17), (0.2, 0.05, 0.34), (0.26, 0.04, 0.24), (0.31, 0.06, 0.19), (0.38, 0.04, 0.27)]
+    for (x, w, h) in towers {
+        ctx.fill(CGRect(x: tile.minX + x * tile.width, y: tile.minY, width: w * tile.width, height: h * tile.height))
+    }
+    // Rain: thin slanted streaks.
+    ctx.saveGState()
+    ctx.setStrokeColor(rgba(0xFFD6A0, 0.16))
+    ctx.setLineWidth(max(0.5, s * 0.0025))
+    var seed: UInt32 = 7
+    func rnd() -> CGFloat { seed = seed &* 1664525 &+ 1013904223; return CGFloat(seed >> 8) / CGFloat(1 << 24) }
+    for _ in 0..<80 {
+        let x = tile.minX + rnd() * tile.width, y = tile.minY + rnd() * tile.height
+        let len = tile.height * (0.04 + rnd() * 0.08)
+        ctx.move(to: CGPoint(x: x, y: y))
+        ctx.addLine(to: CGPoint(x: x - len * 0.18, y: y - len))
+    }
+    ctx.strokePath()
+    ctx.restoreGState()
+
+    // The figure is two shapes filled together: a head with neck, and a
+    // body with a turned-up collar. Coordinates in a 0...100 box, y up,
+    // facing left.
+    func P(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+        CGPoint(x: tile.minX + tile.width * (0.12 + x * 0.0082), y: tile.minY + tile.height * (-0.02 + x * 0 + y * 0.0092))
+    }
+    let head = CGMutablePath()
+    head.move(to: P(60, 98))                                              // crown
+    head.addCurve(to: P(40, 86), control1: P(50, 99), control2: P(42, 94))   // hairline
+    head.addCurve(to: P(37, 73), control1: P(37, 82), control2: P(36, 77))   // forehead
+    head.addCurve(to: P(30, 62), control1: P(38, 70), control2: P(32, 66))   // brow and nose
+    head.addCurve(to: P(36, 58), control1: P(29, 59), control2: P(33, 58))   // nostril
+    head.addCurve(to: P(34, 50), control1: P(35, 55), control2: P(33, 52))   // lips
+    head.addCurve(to: P(36, 43), control1: P(36, 48), control2: P(34, 44))   // chin
+    head.addCurve(to: P(50, 37), control1: P(40, 40), control2: P(45, 37))   // jaw
+    head.addLine(to: P(50, 26))                                           // neck front, into the collar
+    head.addLine(to: P(66, 26))                                           // neck back
+    head.addCurve(to: P(66, 60), control1: P(66, 34), control2: P(64, 50))   // nape
+    head.addCurve(to: P(60, 98), control1: P(76, 70), control2: P(78, 96))   // back of the head
+    head.closeSubpath()
+    let body = CGMutablePath()
+    body.move(to: P(-5, -6))
+    body.addCurve(to: P(14, 24), control1: P(2, 8), control2: P(8, 20))      // far shoulder
+    body.addCurve(to: P(58, 38), control1: P(26, 32), control2: P(44, 38))   // collar rising behind the chin
+    body.addCurve(to: P(105, 8), control1: P(80, 38), control2: P(98, 22))   // near shoulder
+    body.addLine(to: P(105, -6))
+    body.closeSubpath()
+    // The head and body wind in opposite directions, so they are filled
+    // one at a time rather than as one nonzero path (which would punch a
+    // hole where the neck overlaps the collar).
+    func fill(_ color: CGColor) {
+        for part in [head, body] {
+            ctx.addPath(part)
+            ctx.setFillColor(color)
+            ctx.fillPath()
+        }
+    }
+    // Rim light: an orange copy, then the black figure shifted right so a
+    // sliver of orange survives along the lit edge.
+    ctx.saveGState()
+    fill(rgba(0xFFB04A))
+    ctx.restoreGState()
+    ctx.saveGState()
+    ctx.setShadow(offset: .zero, blur: s * 0.03, color: rgba(0x000000, 0.7))
+    ctx.translateBy(x: s * 0.011, y: -s * 0.004)
+    fill(rgba(0x07050A))
+    ctx.restoreGState()
+
+    // Soft warm fill-light on the lit side of the figure.
+    let rim = CGGradient(colorsSpace: cs, colors: [rgba(0xD84A1E, 0.55), rgba(0x5A1410, 0.3), rgba(0x000000, 0)] as CFArray, locations: [0, 0.18, 0.4])!
+    for part in [head, body] {
+        ctx.saveGState()
+        ctx.translateBy(x: s * 0.011, y: -s * 0.004)
+        ctx.addPath(part)
+        ctx.clip()
+        ctx.drawLinearGradient(rim, start: CGPoint(x: P(30, 0).x, y: 0), end: CGPoint(x: P(100, 0).x, y: 0), options: [])
+        ctx.restoreGState()
+    }
+}
+
 func render(size: Int, scale: Int, to url: URL) {
     let px = size * scale
     let cs = CGColorSpace(name: CGColorSpace.sRGB)!
@@ -179,8 +268,8 @@ func render(size: Int, scale: Int, to url: URL) {
     let glow = CGGradient(colorsSpace: cs, colors: [rgba(0xA8141C, 0.55), rgba(0x5A0A10, 0.25), rgba(0x000000, 0)] as CFArray, locations: [0, 0.45, 1])!
     ctx.drawRadialGradient(glow, startCenter: CGPoint(x: s * 0.5, y: s * 0.42), startRadius: 0, endCenter: CGPoint(x: s * 0.5, y: s * 0.42), endRadius: s * 0.5, options: [])
 
-    if variant == "eye" {
-        drawEye(ctx, cs: cs, tile: tile, s: s)
+    if variant == "eye" || variant == "figure" {
+        if variant == "eye" { drawEye(ctx, cs: cs, tile: tile, s: s) } else { drawFigure(ctx, cs: cs, tile: tile, s: s) }
         ctx.restoreGState()
         guard let img = ctx.makeImage() else { return }
         let rep = NSBitmapImageRep(cgImage: img)
