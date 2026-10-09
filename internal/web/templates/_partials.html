@@ -28,7 +28,7 @@
 <tbody>
 {{range .Clips}}<tr class="hover">
   <td><a href="/clips/{{.ID}}" class="link link-hover font-medium">{{.Name}}</a> <span class="badge badge-ghost badge-xs">{{.Kind}}</span>{{if not .IsLatest}} <span class="badge badge-warning badge-xs">old scan</span>{{end}}</td>
-  <td><a href="/drives/{{.DriveID}}" class="link link-hover">{{.DriveName}}</a>{{if .Location}} <span class="muted">· {{.Location}}</span>{{end}}</td>
+  <td><a href="/browse/{{.DriveID}}" class="link link-hover">{{.DriveName}}</a>{{if .Location}} <span class="muted">· {{.Location}}</span>{{end}}</td>
   <td class="muted mono"><a href="/browse/{{.DriveID}}/{{.Dir}}?scan={{.ScanID}}" class="link link-hover">{{.Dir}}</a></td>
   <td>{{or (str .Meta.Codec) "—"}}</td>
   <td>{{or (res .Meta) "—"}}</td>
@@ -54,7 +54,7 @@
 {{range .Entries}}<tr class="hover">
   <td>{{if .IsDir}}<a href="/browse/{{.DriveID}}/{{.Path}}?scan={{.ScanID}}" class="link link-hover font-medium">{{.Name}}/</a>{{else}}<a href="/files/{{.ID}}" class="link link-hover font-medium">{{.Name}}</a>{{end}}{{if not .IsLatest}} <span class="badge badge-warning badge-xs">old scan</span>{{end}}</td>
   <td><span class="badge badge-ghost badge-xs">{{.Kind}}</span></td>
-  <td><a href="/drives/{{.DriveID}}" class="link link-hover">{{.DriveName}}</a></td>
+  <td><a href="/browse/{{.DriveID}}" class="link link-hover">{{.DriveName}}</a></td>
   <td class="muted mono"><a href="/browse/{{.DriveID}}/{{.ParentPath}}?scan={{.ScanID}}" class="link link-hover">{{.ParentPath}}</a></td>
   <td class="num">{{if .IsDir}}{{bytes .DirTotalSize}}{{else}}{{bytes .Size}}{{end}}</td>
   <td>{{datetime .ModTime}}</td>

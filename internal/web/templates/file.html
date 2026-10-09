@@ -1,7 +1,7 @@
 {{define "content"}}
 {{$e := .Entry}}
 <h1>{{$e.Name}} <span class="badge badge-ghost">{{$e.Kind}}</span>{{if not $e.IsLatest}} <span class="badge badge-warning">old scan</span>{{end}}</h1>
-<p class="text-sm"><a href="/drives/{{$e.DriveID}}" class="link link-hover">{{$e.DriveName}}</a>{{if .Drive.Label}} · {{.Drive.Label}}{{end}} · <strong>{{if .Drive.Location}}{{.Drive.Location}}{{else}}location not set{{end}}</strong> · <a href="/browse/{{$e.DriveID}}/{{$e.ParentPath}}?scan={{$e.ScanID}}" class="link link-hover mono muted">{{$e.Path}}</a></p>
+<p class="text-sm"><a href="/browse/{{$e.DriveID}}" class="link link-hover">{{$e.DriveName}}</a>{{if .Drive.Label}} · {{.Drive.Label}}{{end}} · <strong>{{if .Drive.Location}}{{.Drive.Location}}{{else}}location not set{{end}}</strong> · <a href="/browse/{{$e.DriveID}}/{{$e.ParentPath}}?scan={{$e.ScanID}}" class="link link-hover mono muted">{{$e.Path}}</a></p>
 {{if $e.Error}}<div role="alert" class="alert alert-error text-sm my-2">{{$e.Error}}</div>{{end}}
 <div class="card bg-base-100 border border-base-300 mt-4"><div class="card-body">
 <dl class="kv">
@@ -18,6 +18,6 @@
 </div></div>
 <h2>Other copies</h2>
 <div class="overflow-x-auto rounded-box border border-base-300 bg-base-100"><table class="table table-sm"><thead><tr><th>Drive</th><th>Path</th><th class="num">Size</th><th>Modified</th></tr></thead><tbody>
-{{range .Copies}}<tr class="hover"><td><a href="/drives/{{.DriveID}}" class="link link-hover">{{.DriveName}}</a></td><td class="mono"><a href="/files/{{.ID}}" class="link link-hover">{{.Path}}</a></td><td class="num">{{bytes .Size}}</td><td>{{datetime .ModTime}}</td></tr>{{else}}<tr><td colspan="4" class="muted text-center py-6">No other copies known.</td></tr>{{end}}
+{{range .Copies}}<tr class="hover"><td><a href="/browse/{{.DriveID}}" class="link link-hover">{{.DriveName}}</a></td><td class="mono"><a href="/files/{{.ID}}" class="link link-hover">{{.Path}}</a></td><td class="num">{{bytes .Size}}</td><td>{{datetime .ModTime}}</td></tr>{{else}}<tr><td colspan="4" class="muted text-center py-6">No other copies known.</td></tr>{{end}}
 </tbody></table></div>
 {{end}}

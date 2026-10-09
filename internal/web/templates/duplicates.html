@@ -8,7 +8,7 @@
 {{range .Groups}}
 <h2>{{.Name}} <span class="muted font-normal text-sm">{{bytes .Size}} × {{.Count}} · {{bytes .WastedBytes}} wasted</span></h2>
 <div class="overflow-x-auto rounded-box border border-base-300 bg-base-100"><table class="table table-sm"><thead><tr><th>Drive</th><th>Path</th><th>Modified</th></tr></thead><tbody>
-{{range .Copies}}<tr class="hover"><td><a href="/drives/{{.DriveID}}" class="link link-hover">{{.DriveName}}</a></td><td class="mono"><a href="/files/{{.ID}}" class="link link-hover">{{.Path}}</a></td><td>{{datetime .ModTime}}</td></tr>{{end}}
+{{range .Copies}}<tr class="hover"><td><a href="/browse/{{.DriveID}}" class="link link-hover">{{.DriveName}}</a></td><td class="mono"><a href="/files/{{.ID}}" class="link link-hover">{{.Path}}</a></td><td>{{datetime .ModTime}}</td></tr>{{end}}
 </tbody></table></div>
 {{else}}<p class="muted mt-4">No duplicates found.</p>{{end}}
 {{end}}

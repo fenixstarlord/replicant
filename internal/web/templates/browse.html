@@ -2,14 +2,20 @@
 {{$d := .Drive.ID}}{{$s := .Scan.ID}}
 <div class="flex items-start justify-between gap-4 flex-wrap">
   <div>
-    <h1><a href="/drives/{{.Drive.ID}}" class="link link-hover">{{.Drive.Name}}</a></h1>
+    <h1>{{.Drive.Name}}{{if .Drive.Label}} <span class="muted font-normal">· {{.Drive.Label}}</span>{{end}}</h1>
     <p class="muted text-sm">Scan #{{.Scan.ID}} · {{datetime .Scan.ScannedAt}}{{if .Scan.IsLatest}} · latest{{else}} · <span class="text-warning">old scan</span>{{end}}{{if .Scan.IsPartial}} · <span class="text-warning">partial scan of {{.Scan.Root}}</span>{{end}} · {{if .Drive.Location}}{{.Drive.Location}}{{else}}location not set{{end}}</p>
   </div>
-  <div class="join">
-    <a href="/browse/{{$d}}/{{.DirPath}}?scan={{$s}}&view=columns" class="join-item btn btn-sm {{if eq .View "columns"}}btn-active{{end}}" title="Column view">▥ Columns</a>
-    <a href="/browse/{{$d}}/{{.DirPath}}?scan={{$s}}&view=list" class="join-item btn btn-sm {{if eq .View "list"}}btn-active{{end}}" title="List view">☰ List</a>
+  <div class="flex gap-2 items-center">
+    <div class="join">
+      <a href="/browse/{{$d}}/{{.DirPath}}?scan={{$s}}&view=columns" class="join-item btn btn-sm {{if eq .View "columns"}}btn-active{{end}}" title="Column view">▥ Columns</a>
+      <a href="/browse/{{$d}}/{{.DirPath}}?scan={{$s}}&view=list" class="join-item btn btn-sm {{if eq .View "list"}}btn-active{{end}}" title="List view">☰ List</a>
+    </div>
+    <button type="button" id="inspector-toggle" class="btn btn-sm gap-1" onclick="toggleInspector()" title="Show or hide the inspector">{{template "icon_info"}} Info</button>
   </div>
 </div>
+
+<div id="workspace" class="workspace">
+<div class="min-w-0">
 <div class="breadcrumbs text-sm mono"><ul>
   <li><a href="/browse/{{$d}}?scan={{$s}}">{{.Drive.Name}}</a></li>
   {{range .Crumbs}}<li><a href="/browse/{{$d}}/{{.Path}}?scan={{$s}}">{{.Name}}</a></li>{{end}}
@@ -24,16 +30,18 @@
   <ul class="menu menu-sm flex-nowrap w-64 shrink-0 border-r border-base-300 max-h-[70vh] overflow-y-auto p-1">
     {{$sel := .Selected}}
     {{range .Entries}}
-    <li><a href="/browse/{{$d}}/{{.Path}}?scan={{$s}}" class="{{if eq .Path $sel}}menu-active{{end}} {{if .Error}}text-error{{end}} flex justify-between gap-2" title="{{.Name}}">
-      <span class="truncate">{{if .IsDir}}<span class="muted">▸ </span>{{end}}{{.Name}}</span>
+    <li><a href="/browse/{{$d}}/{{.Path}}?scan={{$s}}" class="{{if eq .Path $sel}}menu-active{{end}} {{if .Error}}text-error{{end}} flex items-center gap-2" title="{{.Name}}">
+      {{template "entry_icon" .}}
+      <span class="truncate flex-1">{{.Name}}</span>
       <span class="muted text-xs shrink-0">{{if .IsDir}}{{if .ClipID}}{{.ClipKind}}{{else}}{{n .DirFileCount}}{{end}}{{else}}{{bytes .Size}}{{end}}</span>
+      {{if and .IsDir (not .ClipID)}}{{template "icon_chevron"}}{{end}}
     </a></li>
     {{else}}<li class="muted p-2 text-sm">Empty folder</li>{{end}}
   </ul>
   {{end}}
   {{if .IsFile}}{{$e := .Target}}
   <div class="w-80 shrink-0 p-4 text-sm">
-    <div class="font-semibold break-all">{{$e.Name}}</div>
+    <div class="flex items-center gap-2 font-semibold break-all">{{template "icon_file"}} {{$e.Name}}</div>
     <div class="muted mb-3"><span class="badge badge-ghost badge-xs">{{$e.Kind}}</span>{{if $e.IsSymlink}} <span class="badge badge-ghost badge-xs">link</span>{{end}}</div>
     <dl class="kv">
       <dt>Size</dt><dd>{{bytes $e.Size}}</dd>
@@ -58,19 +66,80 @@
 </div>
 {{end}}
 </div>
+</div>
+
+<aside id="inspector" class="inspector">
+  <div class="card bg-base-100 border border-base-300"><div class="card-body gap-4 text-sm">
+    <div>
+      <h2 class="card-title text-base mt-0">Drive</h2>
+      <div class="stats stats-vertical w-full bg-base-200 my-2">
+        <div class="stat py-2"><div class="stat-title">Capacity</div><div class="stat-value text-lg">{{bytes .Drive.CapacityBytes}}</div><div class="stat-desc">{{bytes .Drive.FreeBytes}} free · {{.Drive.FSType}}</div><progress class="progress progress-primary w-full mt-1" value="{{pct (used .Drive.CapacityBytes .Drive.FreeBytes) .Drive.CapacityBytes}}" max="100"></progress></div>
+        <div class="stat py-2"><div class="stat-title">Catalogued</div><div class="stat-value text-lg">{{n .Drive.FileCount}} files</div><div class="stat-desc">{{n .Drive.ClipCount}} clips · {{bytes .Drive.TotalBytes}}</div></div>
+      </div>
+      <dl class="kv">
+        <dt>UUID</dt><dd class="mono text-xs break-all">{{.Drive.VolumeUUID}}</dd>
+        {{if .Drive.MediaName}}<dt>Media</dt><dd>{{.Drive.MediaName}}</dd>{{end}}
+        <dt>First seen</dt><dd>{{datetime .Drive.FirstSeen}}</dd>
+        <dt>Last seen</dt><dd>{{datetime .Drive.LastSeen}}</dd>
+      </dl>
+    </div>
+    <div>
+      <h2 class="text-base mt-0">Where is it?</h2>
+      <form method="post" action="/drives/{{$d}}" class="flex flex-col gap-2">
+        <label class="form-control"><span class="label-text">Label</span><input class="input input-bordered input-sm" name="label" value="{{.Drive.Label}}" placeholder="e.g. 2TB silver LaCie"></label>
+        <label class="form-control"><span class="label-text">Location</span><input class="input input-bordered input-sm" name="location" value="{{.Drive.Location}}" placeholder="e.g. Shelf B, box 3"></label>
+        <label class="form-control"><span class="label-text">Notes</span><input class="input input-bordered input-sm" name="notes" value="{{.Drive.Notes}}"></label>
+        <div><button class="btn btn-primary btn-sm">Save</button></div>
+      </form>
+    </div>
+    <div>
+      <h2 class="text-base mt-0">Scan history</h2>
+      <ul class="flex flex-col gap-1">
+        {{range .Scans}}<li class="flex items-center gap-2 {{if eq .ID $s}}font-semibold{{end}}">
+          <a href="/browse/{{$d}}?scan={{.ID}}" class="link link-hover">#{{.ID}}</a>
+          <span class="muted">{{datetime .ScannedAt}}</span>
+          {{if .IsLatest}}<span class="badge badge-success badge-xs">latest</span>{{end}}{{if .IsPartial}}<span class="badge badge-warning badge-xs" title="{{.Root}}">partial</span>{{end}}
+          <span class="ml-auto text-xs"><a href="/scans/{{.ID}}?change=added" class="link link-hover text-success" title="Added">+{{n .Added}}</a> <a href="/scans/{{.ID}}?change=removed" class="link link-hover text-error" title="Removed">−{{n .Removed}}</a> <a href="/scans/{{.ID}}?change=changed" class="link link-hover text-warning" title="Changed">~{{n .Changed}}</a></span>
+        </li>{{end}}
+      </ul>
+      {{if gt (len .Scans) 1}}<form method="get" class="flex gap-1 items-end flex-wrap mt-2" onsubmit="location.href='/scans/'+this.a.value+'/diff/'+this.b.value;return false">
+        <label class="form-control"><span class="label-text text-xs">Compare</span><select name="a" class="select select-bordered select-xs">{{range .Scans}}<option value="{{.ID}}">#{{.ID}}</option>{{end}}</select></label>
+        <label class="form-control"><span class="label-text text-xs">with</span><select name="b" class="select select-bordered select-xs">{{range $i, $sc := .Scans}}<option value="{{$sc.ID}}" {{if eq $i 0}}selected{{end}}>#{{$sc.ID}}</option>{{end}}</select></label>
+        <button class="btn btn-xs">Go</button>
+      </form>{{end}}
+      <div class="flex gap-2 mt-3 flex-wrap">
+        <a href="/scans/{{$s}}" class="btn btn-xs">This scan</a>
+        <a href="/search?drive={{$d}}" class="btn btn-xs">Search drive</a>
+        <a href="/export.csv?drive={{$d}}" class="btn btn-xs btn-ghost">CSV</a>
+        <a href="/export.ale?drive={{$d}}" class="btn btn-xs btn-ghost">ALE</a>
+      </div>
+    </div>
+  </div></div>
+</aside>
+</div>
+
 <script>
-// Keep the deepest column in view, like Finder.
 function scrollColumns() { const c = document.querySelector('.explorer-columns'); if (c) c.scrollLeft = c.scrollWidth; }
 scrollColumns();
 document.body.addEventListener('htmx:afterSettle', scrollColumns);
+function applyInspector(open) {
+  document.getElementById('workspace').classList.toggle('inspector-open', open);
+  document.getElementById('inspector-toggle').classList.toggle('btn-active', open);
+}
+function toggleInspector() {
+  const open = !document.getElementById('workspace').classList.contains('inspector-open');
+  try { localStorage.setItem('shelf.inspector', open ? '1' : '0'); } catch (e) {}
+  applyInspector(open);
+}
+(function () { let open = true; try { open = localStorage.getItem('shelf.inspector') !== '0'; } catch (e) {} applyInspector(open); })();
 function twirl(btn) {
   const tr = btn.closest('tr'), path = tr.dataset.path;
   if (tr.dataset.open) {
     let n = tr.nextElementSibling;
     while (n && n.dataset.path && n.dataset.path.startsWith(path + '/')) { const x = n; n = n.nextElementSibling; x.remove(); }
-    delete tr.dataset.open; btn.textContent = '▸'; return;
+    delete tr.dataset.open; return;
   }
-  tr.dataset.open = '1'; btn.textContent = '▾';
+  tr.dataset.open = '1';
   htmx.ajax('GET', tr.dataset.children, { target: tr, swap: 'afterend' });
 }
 </script>
@@ -78,8 +147,8 @@ function twirl(btn) {
 
 {{define "browse_rows"}}
 {{$d := .Drive.ID}}{{$s := .Scan.ID}}{{$depth := .Depth}}
-{{range .Entries}}<tr class="hover {{if .Error}}text-error{{end}}" data-path="{{.Path}}" data-children="/browse/{{$d}}/{{.Path}}?scan={{$s}}&frag=rows&depth={{$depth}}">
-  <td><span class="inline-block" style="width:{{mul $depth 20}}px"></span>{{if .IsDir}}<button type="button" class="btn btn-ghost btn-xs w-6 px-0 mr-1" onclick="twirl(this)" aria-label="Expand">▸</button>{{else}}<span class="inline-block w-6 mr-1"></span>{{end}}{{if .IsDir}}{{if .ClipID}}<a href="/clips/{{.ClipID}}" class="link link-hover font-medium" hx-boost="false">{{.Name}}/</a>{{else}}<a href="/browse/{{$d}}/{{.Path}}?scan={{$s}}" class="link link-hover font-medium">{{.Name}}/</a>{{end}}{{else}}<a href="/files/{{.ID}}" class="link link-hover" hx-boost="false">{{.Name}}</a>{{end}}{{if .IsSymlink}} <span class="badge badge-ghost badge-xs">link</span>{{end}}{{if .IsPackage}} <span class="badge badge-ghost badge-xs">package</span>{{end}}</td>
+{{range .Entries}}<tr class="hover {{if gt $depth 0}}row-enter{{end}} {{if .Error}}text-error{{end}}" data-path="{{.Path}}" data-children="/browse/{{$d}}/{{.Path}}?scan={{$s}}&frag=rows&depth={{$depth}}">
+  <td><span class="inline-flex items-center gap-1"><span class="inline-block" style="width:{{mul $depth 20}}px"></span>{{if and .IsDir (not .ClipID)}}<button type="button" class="twirl btn btn-ghost btn-xs w-6 px-0" onclick="twirl(this)" aria-label="Expand">{{template "icon_chevron"}}</button>{{else}}<span class="inline-block w-6"></span>{{end}}{{template "entry_icon" .}}{{if .IsDir}}{{if .ClipID}}<a href="/clips/{{.ClipID}}" class="link link-hover font-medium" hx-boost="false">{{.Name}}</a>{{else}}<a href="/browse/{{$d}}/{{.Path}}?scan={{$s}}" class="link link-hover font-medium">{{.Name}}</a>{{end}}{{else}}<a href="/files/{{.ID}}" class="link link-hover" hx-boost="false">{{.Name}}</a>{{end}}{{if .IsSymlink}} <span class="badge badge-ghost badge-xs">link</span>{{end}}{{if .IsPackage}} <span class="badge badge-ghost badge-xs">package</span>{{end}}</span></td>
   <td><span class="badge badge-ghost badge-xs">{{.Kind}}</span></td>
   <td class="num">{{if .IsDir}}{{bytes .DirTotalSize}}{{else}}{{bytes .Size}}{{end}}</td>
   <td class="num">{{if .IsDir}}{{n .DirFileCount}}{{else}}<span class="muted">—</span>{{end}}</td>

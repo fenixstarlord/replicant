@@ -33,4 +33,28 @@
   .filters label { display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.8rem; color: color-mix(in oklch, var(--color-base-content) 65%, transparent); }
   .filters .input, .filters .select { width: 100%; }
   @media (max-width: 640px) { .filters { grid-template-columns: repeat(2, 1fr); } }
+
+  /* Explorer icons */
+  .icon         { width: 1.1em; height: 1.1em; flex: none; vertical-align: -0.2em; }
+  .icon-folder  { color: oklch(72% 0.14 75); }
+  .icon-clip    { color: var(--color-primary); }
+  .icon-file    { color: color-mix(in oklch, var(--color-base-content) 55%, transparent); }
+  .icon-chevron { color: color-mix(in oklch, var(--color-base-content) 50%, transparent); transition: transform 150ms ease; }
+  .menu-active .icon-chevron { color: inherit; }
+  .twirl .icon-chevron { width: 1em; height: 1em; }
+  tr[data-open="1"] .twirl .icon-chevron { transform: rotate(90deg); }
+  .explorer-columns .icon-chevron { margin-left: 0.25rem; }
+  /* Rows revealed by a twirl slide in. */
+  .row-enter    { animation: row-enter 160ms ease-out both; }
+  @keyframes row-enter { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+  /* Explorer + inspector layout. */
+  .workspace    { display: grid; grid-template-columns: minmax(0, 1fr) 0; gap: 0; transition: grid-template-columns 200ms ease; align-items: start; }
+  .workspace.inspector-open { grid-template-columns: minmax(0, 1fr) 22rem; gap: 1rem; }
+  .inspector    { overflow: hidden; opacity: 0; transition: opacity 150ms ease; }
+  .inspector-open .inspector { opacity: 1; }
+  @media (max-width: 900px) {
+    .workspace, .workspace.inspector-open { grid-template-columns: minmax(0, 1fr); }
+    .inspector-open .inspector { margin-top: 1rem; }
+    .workspace:not(.inspector-open) .inspector { display: none; }
+  }
 }

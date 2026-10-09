@@ -1,7 +1,7 @@
 {{define "content"}}
 {{$c := .Clip}}{{$m := .Clip.Meta}}{{$s := .Clip.Sources}}
 <h1>{{$c.Name}} <span class="badge badge-ghost">{{$c.Kind}}</span>{{if not $c.IsLatest}} <span class="badge badge-warning">old scan</span>{{end}}</h1>
-<p class="text-sm"><a href="/drives/{{$c.DriveID}}" class="link link-hover">{{$c.DriveName}}</a>{{if .Drive.Label}} · {{.Drive.Label}}{{end}} · <strong>{{if .Drive.Location}}{{.Drive.Location}}{{else}}location not set{{end}}</strong> · <a href="/browse/{{$c.DriveID}}/{{$c.Dir}}?scan={{$c.ScanID}}" class="link link-hover mono muted">{{$c.RootPath}}</a></p>
+<p class="text-sm"><a href="/browse/{{$c.DriveID}}" class="link link-hover">{{$c.DriveName}}</a>{{if .Drive.Label}} · {{.Drive.Label}}{{end}} · <strong>{{if .Drive.Location}}{{.Drive.Location}}{{else}}location not set{{end}}</strong> · <a href="/browse/{{$c.DriveID}}/{{$c.Dir}}?scan={{$c.ScanID}}" class="link link-hover mono muted">{{$c.RootPath}}</a></p>
 <p class="muted text-sm">{{n $c.FileCount}} files · {{bytes $c.TotalSize}} · modified {{datetime $c.ModTime}} · scan #{{$c.ScanID}} {{datetime $c.ScannedAt}}{{if $c.SeqFrames}} · {{n $c.SeqFrames}} frames{{end}}</p>
 {{range $c.Errors}}<div role="alert" class="alert alert-warning text-sm my-2">{{.}}</div>{{end}}
 
@@ -69,7 +69,7 @@
 <ul class="mono text-sm muted list-disc list-inside">{{range $c.Files}}<li>{{.}}</li>{{end}}{{range $c.Sidecars}}<li>{{.}} <span class="badge badge-ghost badge-xs">sidecar</span></li>{{end}}</ul>
 {{if .Copies}}<h2>Other copies</h2>
 <div class="overflow-x-auto rounded-box border border-base-300 bg-base-100"><table class="table table-sm"><thead><tr><th>Drive</th><th>Path</th><th class="num">Size</th></tr></thead><tbody>
-{{range .Copies}}<tr class="hover"><td><a href="/drives/{{.DriveID}}" class="link link-hover">{{.DriveName}}</a></td><td class="mono"><a href="/files/{{.ID}}" class="link link-hover">{{.Path}}</a></td><td class="num">{{bytes .Size}}</td></tr>{{end}}
+{{range .Copies}}<tr class="hover"><td><a href="/browse/{{.DriveID}}" class="link link-hover">{{.DriveName}}</a></td><td class="mono"><a href="/files/{{.ID}}" class="link link-hover">{{.Path}}</a></td><td class="num">{{bytes .Size}}</td></tr>{{end}}
 </tbody></table></div>{{end}}
 <h2>History on this drive</h2>
 <div class="overflow-x-auto rounded-box border border-base-300 bg-base-100"><table class="table table-sm"><thead><tr><th>Scan</th><th>Scanned</th><th class="num">Size</th><th>Codec</th><th>Camera</th></tr></thead><tbody>

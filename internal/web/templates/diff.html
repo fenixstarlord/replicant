@@ -1,6 +1,6 @@
 {{define "content"}}
 {{$d := .Diff}}
-<h1>Diff <a href="/scans/{{$d.A.ID}}" class="link link-hover">#{{$d.A.ID}}</a> → <a href="/scans/{{$d.B.ID}}" class="link link-hover">#{{$d.B.ID}}</a> <span class="muted font-normal">· <a href="/drives/{{$d.A.DriveID}}" class="link link-hover">{{$d.A.DriveName}}</a></span></h1>
+<h1>Diff <a href="/scans/{{$d.A.ID}}" class="link link-hover">#{{$d.A.ID}}</a> → <a href="/scans/{{$d.B.ID}}" class="link link-hover">#{{$d.B.ID}}</a> <span class="muted font-normal">· <a href="/browse/{{$d.A.DriveID}}" class="link link-hover">{{$d.A.DriveName}}</a></span></h1>
 <p class="muted text-sm">{{datetime $d.A.ScannedAt}} → {{datetime $d.B.ScannedAt}}</p>
 <div class="stats stats-vertical sm:stats-horizontal bg-base-100 border border-base-300 my-4 w-full sm:w-auto">
   <div class="stat"><div class="stat-title">Added</div><div class="stat-value text-2xl text-success">+{{n (len $d.Added)}}</div></div>

@@ -36,6 +36,7 @@ func init() {
 		}
 		pages[base] = template.Must(template.New(base).Funcs(funcs).ParseFS(templateFS,
 			"templates/layout.html", "templates/_*.html", n))
+
 	}
 }
 

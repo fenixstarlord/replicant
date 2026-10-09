@@ -76,23 +76,15 @@ func (s *Server) handleDrivesPage(w http.ResponseWriter, r *http.Request) {
 		"TotalFiles": files, "TotalClips": clips, "TotalBytes": bytes})
 }
 
+// handleDrivePage sends a drive straight to its latest scan in the explorer;
+// the drive details live in the explorer's inspector panel.
 func (s *Server) handleDrivePage(w http.ResponseWriter, r *http.Request) {
 	id, err := pathID(r, "id")
 	if err != nil {
 		http.NotFound(w, r)
 		return
 	}
-	d, err := s.store.GetDrive(r.Context(), id)
-	if err != nil {
-		s.fail(w, r, err, "drive")
-		return
-	}
-	scans, err := s.store.ListScans(r.Context(), id)
-	if err != nil {
-		s.fail(w, r, err, "scans")
-		return
-	}
-	s.render(w, r, "drive", map[string]any{"Title": d.Name, "Drive": d, "Scans": scans, "Edit": r.URL.Query().Get("edit") != ""})
+	http.Redirect(w, r, fmt.Sprintf("/browse/%d", id), http.StatusSeeOther)
 }
 
 func (s *Server) handleDriveEdit(w http.ResponseWriter, r *http.Request) {
@@ -110,7 +102,7 @@ func (s *Server) handleDriveEdit(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err, "update drive")
 		return
 	}
-	http.Redirect(w, r, fmt.Sprintf("/drives/%d", id), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/browse/%d", id), http.StatusSeeOther)
 }
 
 // parseSearch reads the search form into a query.
@@ -347,5 +339,5 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.log.Info("ingested scan via web", "scan_id", res.ScanID, "drive", res.DriveName, "entries", res.Entries)
-	http.Redirect(w, r, fmt.Sprintf("/drives/%d", res.DriveID), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf("/browse/%d", res.DriveID), http.StatusSeeOther)
 }

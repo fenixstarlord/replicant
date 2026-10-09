@@ -238,8 +238,8 @@ func TestPagesRender(t *testing.T) {
 		path string
 		want []string
 	}{
-		{"/drives", []string{"Shelf9", "Browse"}},
-		{fmt.Sprintf("/drives/%d", res.DriveID), []string{"Scan history", "latest", "Where is it?"}},
+		{"/drives", []string{"Shelf9", "/browse/", "Search"}},
+		{fmt.Sprintf("/browse/%d", res.DriveID), []string{"Scan history", "latest", "Where is it?", "inspector"}},
 		{"/search?q=c001", []string{"1 clips", "A001C001", "ARRICORE", "4608x3164", "ALEXA 35"}},
 		{"/search?camera=ALEXA+35&fps=24&iso_min=800&iso_max=800", []string{"1 clips", "A001C001"}},
 		{"/search?q=zzz", []string{"0 clips", "No clips match"}},
@@ -247,7 +247,7 @@ func TestPagesRender(t *testing.T) {
 		{fmt.Sprintf("/browse/%d", res.DriveID), []string{"A001", "notes.txt", "Columns", "List"}},
 		{fmt.Sprintf("/browse/%d/A001?view=columns", res.DriveID), []string{"A001C001.mxf", "menu-active"}},
 		{fmt.Sprintf("/browse/%d/A001/A001C001.mxf?view=columns", res.DriveID), []string{"Details", "00000000deadbeef", "file clip"}},
-		{fmt.Sprintf("/browse/%d?view=list", res.DriveID), []string{"A001/", "twirl(this)", "notes.txt"}},
+		{fmt.Sprintf("/browse/%d?view=list", res.DriveID), []string{">A001<", "twirl(this)", "icon-folder", "notes.txt"}},
 		{fmt.Sprintf("/scans/%d?change=added", res.ScanID), []string{"Added (2)", "tab-active", "first scan of this root", "Browse the scan"}},
 		{fmt.Sprintf("/scans/%d?change=removed", res.ScanID), []string{"No removed files"}},
 		{fmt.Sprintf("/clips/%d", clipID), []string{"A001C001", "ARRICORE", ">ale<", "08:46:50:00", "Raw extractor output", "location not set"}},
@@ -287,8 +287,8 @@ func TestPagesRender(t *testing.T) {
 	req.AddCookie(c)
 	rec = httptest.NewRecorder()
 	s.ServeHTTP(rec, req)
-	if rec.Code != 303 {
-		t.Errorf("edit = %d", rec.Code)
+	if rec.Code != 303 || !strings.Contains(rec.Header().Get("Location"), "/browse/") {
+		t.Errorf("edit = %d -> %s", rec.Code, rec.Header().Get("Location"))
 	}
 	if _, body := get(t, s, c, fmt.Sprintf("/clips/%d", clipID)); !strings.Contains(body, "SHELF B, BOX 3") {
 		t.Errorf("location not shown on clip page")
@@ -405,7 +405,10 @@ func TestBrowseFragmentsAndViewCookie(t *testing.T) {
 		t.Errorf("list view not remembered")
 	}
 	// Drive page counts link to filtered change lists.
-	if _, body := get(t, s, c, fmt.Sprintf("/drives/%d", res.DriveID)); !strings.Contains(body, fmt.Sprintf("/scans/%d?change=added", res.ScanID)) {
-		t.Errorf("drive page lacks change links")
+	if _, body := get(t, s, c, fmt.Sprintf("/browse/%d", res.DriveID)); !strings.Contains(body, fmt.Sprintf("/scans/%d?change=added", res.ScanID)) {
+		t.Errorf("inspector lacks change links")
+	}
+	if code, _ := get(t, s, c, fmt.Sprintf("/drives/%d", res.DriveID)); code != 303 {
+		t.Errorf("drive page should redirect to the explorer, got %d", code)
 	}
 }

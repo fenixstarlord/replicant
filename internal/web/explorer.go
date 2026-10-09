@@ -87,8 +87,14 @@ func (s *Server) handleBrowse(w http.ResponseWriter, r *http.Request) {
 			dirPath = target.ParentPath
 		}
 	}
+	scans, err := s.store.ListScans(ctx, driveID)
+	if err != nil {
+		s.fail(w, r, err, "scans")
+		return
+	}
 	view := browseView(w, r)
 	data := map[string]any{
+		"Scans": scans,
 		"Title": d.Name + " / " + p, "Drive": d, "Scan": sc, "View": view,
 		"DirPath": dirPath, "Crumbs": crumbs(dirPath), "Target": target, "IsFile": target.ID != 0 && !target.IsDir,
 	}
