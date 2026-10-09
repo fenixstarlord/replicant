@@ -66,7 +66,9 @@ redline = "/Applications/REDCINE-X Professional/REDCINE-X PRO.app/Contents/MacOS
 Applications and open it. From the drop-down, click a drive to scan it and push it to the server;
 Browse… scans a folder or network share instead. Settings… takes the connection key from the
 server's API keys page (one string with the address and the key, stored in the same
-`~/.config/shelf/config.toml` the CLI uses), drives to ignore, and launch at login. Scans run one at a time; a notification reports each result.
+`~/.config/shelf/config.toml` the CLI uses), drives to ignore, automatic scans (when a drive is
+mounted, and/or every N hours while it stays mounted; external drives only unless opted in), and
+launch at login. Scans run one at a time; a notification reports each result.
 
 ## Server
 

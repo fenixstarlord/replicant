@@ -4,6 +4,7 @@ struct SettingsView: View {
     @EnvironmentObject var volumes: VolumeMonitor
     @EnvironmentObject var settings: AppSettings
     @EnvironmentObject var toolsCheck: ToolChecker
+    @EnvironmentObject var autoScan: AutoScanner
     @State private var connection = ""
     @State private var message = ""
     @State private var busy = false
@@ -40,6 +41,27 @@ struct SettingsView: View {
                     TextField("Add a drive name to ignore", text: $newIgnore)
                     Button("Add") { settings.setIgnored(newIgnore.trimmingCharacters(in: .whitespaces), true); newIgnore = "" }
                         .disabled(newIgnore.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+            Section("Automatic scans") {
+                Toggle("Scan a drive when it is mounted", isOn: $autoScan.onMount)
+                Picker("Rescan mounted drives", selection: $autoScan.intervalHours) {
+                    ForEach(AutoScanner.intervals, id: \.hours) { Text($0.label).tag($0.hours) }
+                }
+                Toggle("Include internal drives", isOn: $autoScan.includeInternal)
+                Text("Ignored drives and the startup disk are never scanned automatically. Interval scans start with any mounted drive this app has not scanned yet, then repeat on schedule; scans queue one at a time.")
+                    .font(.caption).foregroundStyle(.secondary)
+                let due = volumes.volumes.filter { autoScan.eligible($0) }
+                if autoScan.intervalHours > 0, !due.isEmpty {
+                    ForEach(due) { v in
+                        LabeledContent(v.name) {
+                            if let last = autoScan.lastScanned[v.url.path] {
+                                Text("scanned \(last.formatted(.relative(presentation: .named)))").foregroundStyle(.secondary)
+                            } else {
+                                Text("not scanned yet · next check").foregroundStyle(.secondary)
+                            }
+                        }.font(.caption)
+                    }
                 }
             }
             Section("Metadata tools") {

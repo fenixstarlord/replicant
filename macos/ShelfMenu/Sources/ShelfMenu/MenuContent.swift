@@ -6,6 +6,7 @@ struct MenuContent: View {
     @EnvironmentObject var scans: ScanManager
     @EnvironmentObject var settings: AppSettings
     @EnvironmentObject var toolsCheck: ToolChecker
+    @EnvironmentObject var autoScan: AutoScanner
 
     var body: some View {
         if let name = scans.current {
@@ -58,6 +59,7 @@ struct MenuContent: View {
                 .environmentObject(scans)
                 .environmentObject(settings)
                 .environmentObject(toolsCheck)
+                .environmentObject(autoScan)
         )
     }
 

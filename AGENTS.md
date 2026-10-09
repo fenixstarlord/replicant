@@ -280,7 +280,9 @@ are attached; this RAID is not representative of the shelf drives.
 Tools; no Xcode project). It does no scanning itself: it runs the bundled Go `shelf` binary
 (`Contents/MacOS/shelf`) as a subprocess (`shelf scan <path>`, `shelf login <url>` with the key on
 stdin) and streams its stderr as progress. Server and key therefore live in the CLI's
-`config.toml`; the ignore list and launch-at-login are app-only (UserDefaults, SMAppService).
+`config.toml`; the ignore list, automatic scans (`AutoScan.swift`: on mount via
+`NSWorkspace.didMountNotification`, and a 60 s timer for interval rescans, last-scan times in
+UserDefaults) and launch-at-login are app-only (UserDefaults, SMAppService).
 `macos/build-app.sh` (`make app`) builds a universal CLI and app and assembles `dist/Shelf.app`
 with an ad-hoc signature. Keep CLI output lines stable; the app shows the last stderr line, and
 reads `shelf doctor --json` to report missing metadata tools with a link to `docs/tools.md`.

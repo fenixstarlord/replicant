@@ -59,6 +59,8 @@ final class ScanManager: ObservableObject {
     @Published private(set) var status: String = ""          // last progress line
     @Published private(set) var queue: [URL] = []
     @Published private(set) var recent: [ScanRecord] = []
+    /// Called after every scan with the path and whether it succeeded.
+    var onFinished: ((URL, Bool) -> Void)?
     private var process: Process?
 
     var isScanning: Bool { current != nil }
@@ -131,6 +133,7 @@ final class ScanManager: ObservableObject {
         if recent.count > 10 { recent.removeLast() }
         current = nil
         status = ""
+        onFinished?(url, ok)
         let content = UNMutableNotificationContent()
         content.title = ok ? "Scanned \(name)" : "Scan of \(name) failed"
         content.body = summary

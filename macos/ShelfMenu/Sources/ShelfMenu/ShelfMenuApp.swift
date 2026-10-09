@@ -4,10 +4,19 @@ import SwiftUI
 /// pushes the result to the server through the bundled `shelf` CLI.
 @main
 struct ShelfMenuApp: App {
-    @StateObject private var volumes = VolumeMonitor()
-    @StateObject private var scans = ScanManager()
-    @StateObject private var settings = AppSettings()
+    @StateObject private var volumes: VolumeMonitor
+    @StateObject private var scans: ScanManager
+    @StateObject private var settings: AppSettings
     @StateObject private var toolsCheck = ToolChecker()
+    @StateObject private var autoScan: AutoScanner
+
+    init() {
+        let volumes = VolumeMonitor(), scans = ScanManager(), settings = AppSettings()
+        _volumes = StateObject(wrappedValue: volumes)
+        _scans = StateObject(wrappedValue: scans)
+        _settings = StateObject(wrappedValue: settings)
+        _autoScan = StateObject(wrappedValue: AutoScanner(volumes: volumes, scans: scans, settings: settings))
+    }
 
     var body: some Scene {
         MenuBarExtra {
@@ -16,6 +25,7 @@ struct ShelfMenuApp: App {
                 .environmentObject(scans)
                 .environmentObject(settings)
                 .environmentObject(toolsCheck)
+                .environmentObject(autoScan)
         } label: {
             Image(systemName: scans.isScanning ? "externaldrive.badge.timemachine" : "externaldrive")
         }
