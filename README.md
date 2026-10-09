@@ -60,6 +60,13 @@ art_cmd = "/Applications/ARRI Reference Tool CMD/art-cmd"
 redline = "/Applications/REDCINE-X Professional/REDCINE-X PRO.app/Contents/MacOS/REDline"
 ```
 
+## Releases
+
+Tagging a commit `vX.Y.Z` builds everything on GitHub: universal macOS apps (menu bar client and
+standalone), Linux server binaries with the systemd unit, and the Docker image tagged with the
+version. They land on the repo's Releases page. The apps are ad-hoc signed, not notarized, so the
+first launch on another Mac is right-click → Open.
+
 ## Menu bar app (macOS)
 
 `make app` builds `dist/Replicant.app`, a menu bar app with the `replicant` CLI bundled inside. Drag it to

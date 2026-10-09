@@ -1,7 +1,7 @@
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X main.version=$(VERSION)
 
-.PHONY: build test vet fmt tidy check run-server css dist app standalone docker
+.PHONY: build test vet fmt tidy check run-server css dist app standalone docker release
 
 build:
 	go build -ldflags '$(LDFLAGS)' -o bin/replicant ./cmd/replicant
@@ -45,3 +45,9 @@ standalone:
 # Server image for this machine's architecture (CI publishes multi-arch to GHCR).
 docker:
 	docker build --build-arg VERSION=$(VERSION) -t ghcr.io/fenixstarlord/replicant:dev .
+
+# Tag and push a release; GitHub Actions builds the apps and binaries.
+# Usage: make release V=v0.1.0
+release:
+	@test -n "$(V)" || (echo "usage: make release V=vX.Y.Z" && exit 1)
+	git tag -a $(V) -m "Replicant $(V)" && git push origin $(V)

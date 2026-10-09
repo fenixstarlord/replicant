@@ -1,0 +1,78 @@
+name: Release
+
+# Tag a commit v* and this builds the macOS apps (universal, on a macOS
+# runner with Xcode) and the Linux server binaries, and attaches them to a
+# GitHub release. The Docker workflow publishes the matching image tag.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  apps:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build the menu bar app and the standalone app
+        run: |
+          make app
+          make standalone
+      - name: Zip the app bundles
+        run: |
+          cd dist
+          ditto -c -k --keepParent "Replicant.app" "Replicant-${GITHUB_REF_NAME}-macos.zip"
+          ditto -c -k --keepParent "Replicant Standalone.app" "Replicant-Standalone-${GITHUB_REF_NAME}-macos.zip"
+          ls -la *.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-apps
+          path: dist/*.zip
+
+  server:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go test ./...
+      - name: Build Linux server binaries
+        run: |
+          make dist
+          cd dist
+          tar czf "replicant-server-${GITHUB_REF_NAME}-linux-amd64.tar.gz" replicant-server-linux-amd64 replicant-server.service
+          tar czf "replicant-server-${GITHUB_REF_NAME}-linux-arm64.tar.gz" replicant-server-linux-arm64 replicant-server.service
+      - uses: actions/upload-artifact@v4
+        with:
+          name: server-binaries
+          path: dist/*.tar.gz
+
+  release:
+    needs: [apps, server]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > notes.md <<'EOF'
+          **macOS** (universal, macOS 14+): `Replicant-*-macos.zip` is the menu bar client that pushes scans to a server; `Replicant-Standalone-*-macos.zip` runs its own catalog on the Mac, no server needed. The apps are not notarized: right-click → Open on first launch. Install ffmpeg (`brew install ffmpeg`) for ffprobe metadata.
+
+          **Server**: `docker pull ghcr.io/fenixstarlord/replicant:${GITHUB_REF_NAME#v}` (or `latest`), or the Linux binaries below with the systemd unit.
+          EOF
+          sed -i "s/\${GITHUB_REF_NAME#v}/${GITHUB_REF_NAME#v}/" notes.md
+          gh release create "$GITHUB_REF_NAME" out/* --title "Replicant $GITHUB_REF_NAME" --notes-file notes.md --generate-notes
