@@ -242,7 +242,7 @@ func TestPagesRender(t *testing.T) {
 		path string
 		want []string
 	}{
-		{"/drives", []string{"Shelf9", "/browse/", "Search"}},
+		{"/drives", []string{"Shelf9", "/browse/", "Search this drive", "New group", "Ungrouped"}},
 		{fmt.Sprintf("/browse/%d", res.DriveID), []string{"Scan history", "latest", "Where is it?", "inspector"}},
 		{"/search?q=c001", []string{"1 clips", "A001C001", "ARRICORE", "4608x3164", "ALEXA 35"}},
 		{"/search?camera=ALEXA+35&fps=24&iso_min=800&iso_max=800", []string{"1 clips", "A001C001"}},
@@ -504,5 +504,44 @@ func TestDefaultViewGroupsAndScanJobs(t *testing.T) {
 	}
 	if code, _ := get(t, s, c, "/duplicates"); code != 404 {
 		t.Errorf("duplicates page should be gone, got %d", code)
+	}
+}
+
+func TestGroupsCreateMoveDelete(t *testing.T) {
+	s, c, res := seedPages(t)
+	if rec := post(t, s, c, "/drives/groups", url.Values{"name": {"Client X"}}); rec.Code != 303 {
+		t.Fatalf("create group = %d", rec.Code)
+	}
+	groups, _ := s.store.ListGroups(context.Background())
+	if len(groups) != 1 || groups[0].Name != "Client X" {
+		t.Fatalf("groups = %+v", groups)
+	}
+	if _, body := get(t, s, c, "/drives"); !strings.Contains(body, "Client X") || !strings.Contains(body, "Ungrouped") {
+		t.Errorf("drives page should show the empty group and the ungrouped section")
+	}
+	// Drag-and-drop endpoint: JSON accept gets 204.
+	req := httptest.NewRequest("POST", fmt.Sprintf("/drives/%d/group", res.DriveID), strings.NewReader(url.Values{"group_id": {fmt.Sprint(groups[0].ID)}}.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Accept", "application/json")
+	req.AddCookie(c)
+	rec := httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+	if rec.Code != 204 {
+		t.Fatalf("move = %d %s", rec.Code, rec.Body.String())
+	}
+	if drives, _ := s.store.ListDrives(context.Background()); drives[0].GroupID != groups[0].ID {
+		t.Errorf("drive not moved")
+	}
+	if rec := post(t, s, c, fmt.Sprintf("/drives/%d/group", res.DriveID), url.Values{"group_id": {"999"}}); rec.Code != 400 {
+		t.Errorf("move to missing group = %d", rec.Code)
+	}
+	if rec := post(t, s, c, fmt.Sprintf("/drives/groups/%d/delete", groups[0].ID), nil); rec.Code != 303 {
+		t.Errorf("delete group = %d", rec.Code)
+	}
+	if groups, _ := s.store.ListGroups(context.Background()); len(groups) != 0 {
+		t.Errorf("group not deleted")
+	}
+	if drives, _ := s.store.ListDrives(context.Background()); drives[0].GroupID != 0 {
+		t.Errorf("drive should be ungrouped")
 	}
 }

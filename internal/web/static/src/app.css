@@ -6,16 +6,30 @@
   logs: false;
 }
 
+/* Roomier controls: daisyUI sizes fields and selectors from these units. */
+@plugin "daisyui/theme" {
+  name: "silk";
+  default: true;
+  --size-field: 0.3125rem;
+  --size-selector: 0.3125rem;
+}
+@plugin "daisyui/theme" {
+  name: "dim";
+  prefersdark: true;
+  --size-field: 0.3125rem;
+  --size-selector: 0.3125rem;
+}
+
 @theme {
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
 }
 
 @layer base {
-  html { font-size: 15px; }
+  html { font-size: 17px; }
   body { font-variant-numeric: tabular-nums; }
-  h1 { font-size: 1.5rem; font-weight: 600; letter-spacing: -0.01em; }
-  h2 { font-size: 1.05rem; font-weight: 600; margin-top: 1.5rem; margin-bottom: 0.5rem; }
+  h1 { font-size: 1.75rem; font-weight: 600; letter-spacing: -0.01em; }
+  h2 { font-size: 1.15rem; font-weight: 600; margin-top: 1.5rem; margin-bottom: 0.5rem; }
 }
 
 @layer components {
@@ -23,6 +37,12 @@
   .mono       { font-family: var(--font-mono); font-size: 0.85em; }
   .num        { text-align: right; font-variant-numeric: tabular-nums; }
   .table :where(td, th) { white-space: nowrap; }
+  .table-sm :where(td, th) { padding: 0.5rem 0.9rem; font-size: 0.95rem; }
+  .table :where(td, th) { font-size: 1rem; }
+  .table :where(thead th) { font-size: 0.85rem; }
+  /* Drag-and-drop targets on the Drives page. */
+  .group-zone.drop-target > div { outline: 2px dashed var(--color-primary); outline-offset: -2px; background: color-mix(in oklch, var(--color-primary) 8%, transparent); }
+  .drive-row { cursor: grab; }
   /* Key/value groups on detail pages. */
   .kv         { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; align-items: baseline; }
   .kv dt      { color: color-mix(in oklch, var(--color-base-content) 60%, transparent); font-size: 0.85rem; }

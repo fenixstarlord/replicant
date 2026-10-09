@@ -32,6 +32,9 @@ func (s *Server) pageRoutes() {
 	m.Handle("GET /drives", auth(s.handleDrivesPage))
 	m.Handle("GET /drives/{id}", auth(s.handleDrivePage))
 	m.Handle("POST /drives/{id}", auth(s.handleDriveEdit))
+	m.Handle("POST /drives/{id}/group", auth(s.handleDriveMove))
+	m.Handle("POST /drives/groups", auth(s.handleGroupCreate))
+	m.Handle("POST /drives/groups/{id}/delete", auth(s.handleGroupDelete))
 	m.Handle("GET /search", auth(s.handleSearch))
 	m.Handle("GET /browse/{drive}", auth(s.handleBrowse))
 	m.Handle("GET /browse/{drive}/{path...}", auth(s.handleBrowse))
@@ -80,18 +83,31 @@ func (s *Server) handleDrivesPage(w http.ResponseWriter, r *http.Request) {
 		clips += d.ClipCount
 		bytes += d.TotalBytes
 	}
+	// Every group gets a section, even when empty, so it can be a drop target.
+	groups, err := s.store.ListGroups(r.Context())
+	if err != nil {
+		s.fail(w, r, err, "groups")
+		return
+	}
 	type group struct {
 		ID     int64
 		Name   string
 		Drives []store.Drive
 	}
-	var byGroup []group
-	for _, d := range drives { // ListDrives orders by group then name; ungrouped last
-		if n := len(byGroup); n > 0 && byGroup[n-1].ID == d.GroupID {
-			byGroup[n-1].Drives = append(byGroup[n-1].Drives, d)
-			continue
-		}
-		byGroup = append(byGroup, group{ID: d.GroupID, Name: d.GroupName, Drives: []store.Drive{d}})
+	byGroup := make([]group, 0, len(groups)+1)
+	index := map[int64]int{}
+	for _, g := range groups {
+		index[g.ID] = len(byGroup)
+		byGroup = append(byGroup, group{ID: g.ID, Name: g.Name})
+	}
+	index[0] = len(byGroup)
+	byGroup = append(byGroup, group{ID: 0, Name: ""})
+	for _, d := range drives {
+		i := index[d.GroupID]
+		byGroup[i].Drives = append(byGroup[i].Drives, d)
+	}
+	if len(groups) == 0 && len(drives) == 0 {
+		byGroup = nil
 	}
 	s.render(w, r, "drives", map[string]any{"Title": "Drives", "Drives": drives, "ByGroup": byGroup,
 		"TotalFiles": files, "TotalClips": clips, "TotalBytes": bytes})
@@ -494,4 +510,45 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	s.log.Info("ingested scan via web", "scan_id", res.ScanID, "drive", res.DriveName, "entries", res.Entries)
 	http.Redirect(w, r, fmt.Sprintf("/browse/%d", res.DriveID), http.StatusSeeOther)
+}
+
+// handleDriveMove moves a drive into a group (group_id 0 ungroups). It is
+// called by drag-and-drop on the Drives page.
+func (s *Server) handleDriveMove(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r, "id")
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	gid, _ := strconv.ParseInt(r.FormValue("group_id"), 10, 64)
+	if err := s.store.SetDriveGroupID(r.Context(), id, gid); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if strings.Contains(r.Header.Get("Accept"), "application/json") {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	http.Redirect(w, r, "/drives", http.StatusSeeOther)
+}
+
+func (s *Server) handleGroupCreate(w http.ResponseWriter, r *http.Request) {
+	if _, err := s.store.CreateGroup(r.Context(), r.FormValue("name")); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	http.Redirect(w, r, "/drives", http.StatusSeeOther)
+}
+
+func (s *Server) handleGroupDelete(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r, "id")
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if err := s.store.DeleteGroup(r.Context(), id); err != nil {
+		s.fail(w, r, err, "delete group")
+		return
+	}
+	http.Redirect(w, r, "/drives", http.StatusSeeOther)
 }

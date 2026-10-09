@@ -359,8 +359,30 @@ func TestGroupsAndScanJobs(t *testing.T) {
 	if err := s.SetDriveGroup(ctx, r.DriveID, ""); err != nil {
 		t.Fatal(err)
 	}
-	if groups, _ := s.ListGroups(ctx); len(groups) != 0 {
-		t.Errorf("empty group should be deleted: %+v", groups)
+	if groups, _ := s.ListGroups(ctx); len(groups) != 1 || groups[0].Count != 0 {
+		t.Errorf("empty group should remain: %+v", groups)
+	}
+	gid, err := s.CreateGroup(ctx, "Client X")
+	if err != nil || gid == 0 {
+		t.Fatalf("create group: %d %v", gid, err)
+	}
+	if again, _ := s.CreateGroup(ctx, "Client X"); again != gid {
+		t.Errorf("creating an existing group should return it")
+	}
+	if err := s.SetDriveGroupID(ctx, r.DriveID, gid); err != nil {
+		t.Fatal(err)
+	}
+	if drives, _ := s.ListDrives(ctx); drives[0].GroupID != gid {
+		t.Errorf("drive not moved by id: %+v", drives[0])
+	}
+	if err := s.SetDriveGroupID(ctx, r.DriveID, 999); err == nil {
+		t.Error("moving to a missing group should fail")
+	}
+	if err := s.DeleteGroup(ctx, gid); err != nil {
+		t.Fatal(err)
+	}
+	if drives, _ := s.ListDrives(ctx); drives[0].GroupID != 0 {
+		t.Errorf("drive should be ungrouped after group delete: %+v", drives[0])
 	}
 
 	id, err := s.CreateScanJob(ctx, ScanJob{Path: "/mnt/raid", Label: "RAID", IntervalMin: 60, Extract: true, Fingerprint: true, Enabled: true})
