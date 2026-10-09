@@ -44,30 +44,7 @@ func statVolume(path string) (Volume, error) {
 		v.MountPoint = "/"
 	}
 	v.Name = filepath.Base(v.MountPoint)
-	v.UUID = uuidForDevice(v.Device)
 	return v, nil
-}
-
-// uuidForDevice finds the filesystem UUID udev recorded for a block device.
-func uuidForDevice(dev string) string {
-	if dev == "" {
-		return ""
-	}
-	real, err := filepath.EvalSymlinks(dev)
-	if err != nil {
-		real = dev
-	}
-	entries, err := os.ReadDir("/dev/disk/by-uuid")
-	if err != nil {
-		return ""
-	}
-	for _, e := range entries {
-		p := filepath.Join("/dev/disk/by-uuid", e.Name())
-		if target, err := filepath.EvalSymlinks(p); err == nil && target == real {
-			return strings.ToUpper(e.Name())
-		}
-	}
-	return ""
 }
 
 // fillVolumeDetails has nothing to add outside macOS.

@@ -115,8 +115,7 @@ func (s *Server) handleBrowse(w http.ResponseWriter, r *http.Request) {
 	}
 	view := s.browseView(w, r)
 	data := map[string]any{
-		"Scans": scans, "Groups": groups, "Clients": clients, "ScanState": s.driveScanState(ctx, d),
-		"Message": r.URL.Query().Get("msg"), "Error": r.URL.Query().Get("err"),
+		"Scans": scans, "Groups": groups, "Clients": clients,
 		"Title": d.Name + " / " + p, "Drive": d, "Scan": sc, "View": view,
 		"DirPath": dirPath, "Crumbs": crumbs(dirPath), "Target": target, "IsFile": target.ID != 0 && !target.IsDir,
 	}
