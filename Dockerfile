@@ -4,7 +4,9 @@
 
 ARG GO_VERSION=1.27
 
-FROM --platform=$BUILDPLATFORM golang:${GO_VERSION}-bookworm AS builder
+# Base images come from Amazon's public mirror of the Docker official images
+# (no Docker Hub auth or rate limits in CI; Docker Hub outages took builds down).
+FROM --platform=$BUILDPLATFORM public.ecr.aws/docker/library/golang:${GO_VERSION}-bookworm AS builder
 WORKDIR /src
 # Dependencies first so they cache separately from source changes.
 COPY go.mod go.sum ./
@@ -15,7 +17,7 @@ RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache
     CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
     go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/replicant-server ./cmd/replicant-server
 
-FROM debian:bookworm-slim AS runtime
+FROM public.ecr.aws/docker/library/debian:bookworm AS runtime
 # ffmpeg supplies ffprobe. Vendor tools (art-cmd, REDline) are not
 # redistributable; bind-mount them under /opt/replicant-tools (on PATH).
 RUN apt-get update \
