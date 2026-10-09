@@ -21,6 +21,16 @@ struct ToolStatus: Identifiable, Decodable {
         }
     }
 
+    /// Vendor download page for an external tool.
+    var vendorURL: URL? {
+        switch name {
+        case "ffprobe": return URL(string: "https://ffmpeg.org/download.html")
+        case "art-cmd": return URL(string: "https://www.arri.com/en/learn-help/learn-help-camera-system/tools/arri-reference-tool")
+        case "redline": return URL(string: "https://www.red.com/downloads")
+        default: return nil
+        }
+    }
+
     var formats: String {
         switch name {
         case "ffprobe": return "MOV, MP4, MXF, BRAW, CRM, WAV…"

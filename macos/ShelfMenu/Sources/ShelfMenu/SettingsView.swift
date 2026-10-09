@@ -44,11 +44,19 @@ struct SettingsView: View {
                 } else {
                     ForEach(toolsCheck.tools.filter(\.isExternal)) { t in
                         HStack {
-                            Image(systemName: t.available ? "checkmark.circle.fill" : "xmark.circle.fill")
-                                .foregroundStyle(t.available ? .green : .red)
+                            Image(systemName: t.available ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                                .foregroundStyle(t.available ? .green : .orange)
                             VStack(alignment: .leading) {
-                                Text(t.displayName)
-                                Text(t.available ? (t.version ?? "found") : "not installed · \(t.formats)").font(.caption).foregroundStyle(.secondary)
+                                if t.available {
+                                    Text(t.displayName)
+                                    Text(t.version ?? "found").font(.caption).foregroundStyle(.secondary)
+                                } else if let url = t.vendorURL {
+                                    Link(t.displayName, destination: url)
+                                    Text("Not installed · needed for \(t.formats) · click to download").font(.caption).foregroundStyle(.secondary)
+                                } else {
+                                    Text(t.displayName)
+                                    Text("Not installed · needed for \(t.formats)").font(.caption).foregroundStyle(.secondary)
+                                }
                             }
                             Spacer()
                         }
@@ -58,7 +66,7 @@ struct SettingsView: View {
                 }
                 HStack {
                     Button("Recheck") { Task { await toolsCheck.check() } }
-                    Button("Where to get them…") { toolsCheck.openDocs() }
+                    Button("Install notes…") { toolsCheck.openDocs() }
                 }
             }
             Section {

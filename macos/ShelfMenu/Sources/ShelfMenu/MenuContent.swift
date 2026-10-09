@@ -19,11 +19,6 @@ struct MenuContent: View {
             Button("Set up server and API key…") { showSettings() }
             Divider()
         }
-        if !toolsCheck.missing.isEmpty {
-            Text("Missing metadata tools: \(toolsCheck.missing.map(\.name).joined(separator: ", "))")
-            Button("How to install them…") { toolsCheck.openDocs() }
-            Divider()
-        }
         let visible = volumes.volumes.filter { !settings.isIgnored($0) }
         if visible.isEmpty {
             Text("No drives").foregroundStyle(.secondary)
@@ -47,7 +42,15 @@ struct MenuContent: View {
             }
         }
         Divider()
-        Button("Settings…") { showSettings() }
+        Button {
+            showSettings()
+        } label: {
+            if toolsCheck.missing.isEmpty {
+                Text("Settings…")
+            } else {
+                Label("Settings… ⚠ \(toolsCheck.missing.count) tool\(toolsCheck.missing.count == 1 ? "" : "s") missing", systemImage: "exclamationmark.triangle")
+            }
+        }
         Button("Quit Shelf") { NSApplication.shared.terminate(nil) }
     }
 
