@@ -1,0 +1,31 @@
+# Shelf server. Copy .env.example to .env (or set the variables in the
+# TrueNAS app form) and run: docker compose up -d
+services:
+  shelf:
+    image: ghcr.io/fenixstarlord/indexserver:${SHELF_TAG:-latest}
+    build:
+      context: .
+      args:
+        VERSION: ${SHELF_VERSION:-dev}
+    container_name: shelf
+    restart: unless-stopped
+    ports:
+      - "${SHELF_PORT:-8080}:8080"
+    environment:
+      SHELF_PASSWORD: ${SHELF_PASSWORD:?set SHELF_PASSWORD in .env}
+      # The address Macs use to reach this server, baked into API keys.
+      # A container cannot see the host's NetBird interface, so set it.
+      SHELF_PUBLIC_URL: ${SHELF_PUBLIC_URL:-}
+      TZ: ${TZ:-UTC}
+    volumes:
+      # Database, uploads and backups.
+      - ${SHELF_DATA:-./data}:/data
+      # Folders the server scans itself (Settings -> Server scans). Read-only.
+      - ${SHELF_MEDIA:-./media}:/media:ro
+      # Optional: Linux builds of art-cmd / REDline, found on PATH.
+      # - /mnt/pool/apps/shelf-tools:/opt/shelf-tools:ro
+    healthcheck:
+      test: ["CMD", "shelf-server", "healthz"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s

@@ -9,6 +9,7 @@ struct ShelfMenuApp: App {
     @StateObject private var settings: AppSettings
     @StateObject private var toolsCheck = ToolChecker()
     @StateObject private var autoScan: AutoScanner
+    @StateObject private var local = LocalServer()
 
     init() {
         let volumes = VolumeMonitor(), scans = ScanManager(), settings = AppSettings()
@@ -26,6 +27,7 @@ struct ShelfMenuApp: App {
                 .environmentObject(settings)
                 .environmentObject(toolsCheck)
                 .environmentObject(autoScan)
+                .environmentObject(local)
         } label: {
             Image(systemName: scans.isScanning ? "externaldrive.badge.timemachine" : "externaldrive")
         }

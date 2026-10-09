@@ -20,7 +20,7 @@ type DrivesResponse struct {
 
 // MeResponse is returned by GET /api/me.
 type MeResponse struct {
-	Auth      string `json:"auth"` // "token" or "session"
+	Auth      string `json:"auth"` // "token", "session", or "open"
 	TokenName string `json:"token_name,omitempty"`
 	Version   string `json:"version"`
 }

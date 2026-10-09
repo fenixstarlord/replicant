@@ -1,7 +1,7 @@
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X main.version=$(VERSION)
 
-.PHONY: build test vet fmt tidy check run-server css dist app
+.PHONY: build test vet fmt tidy check run-server css dist app standalone docker
 
 build:
 	go build -ldflags '$(LDFLAGS)' -o bin/shelf ./cmd/shelf
@@ -24,10 +24,8 @@ check: fmt vet test
 run-server:
 	./start.sh
 
-# Placeholder until Phase 5: builds the embedded stylesheet with the
-# standalone Tailwind CLI (see docs/design/m8-theme.md).
 css:
-	@echo "css build arrives in Phase 5" && exit 1
+	./build-css.sh
 
 # Static linux/amd64 server binary for the home server, plus the systemd unit.
 dist:
@@ -39,3 +37,11 @@ dist:
 # macOS menu bar app with the shelf CLI bundled inside (dist/Shelf.app).
 app:
 	./macos/build-app.sh
+
+# Same app with shelf-server bundled too: runs its own catalog on the Mac.
+standalone:
+	./macos/build-app.sh --standalone
+
+# Server image for this machine's architecture (CI publishes multi-arch to GHCR).
+docker:
+	docker build --build-arg VERSION=$(VERSION) -t ghcr.io/fenixstarlord/indexserver:dev .

@@ -29,6 +29,7 @@ type Config struct {
 	Sched         Scheduler // server-side scans; nil disables the section
 	Listen        string    // listen address, for the port in connection strings
 	PublicURL     string    // SHELF_PUBLIC_URL: address clients use; overrides detection
+	Open          bool      // SHELF_AUTH=open: no password, no API keys (loopback only; see main)
 }
 
 // Scheduler is what the settings page needs from the scan scheduler.
@@ -49,8 +50,8 @@ type Server struct {
 
 // New builds the HTTP handler.
 func New(ctx context.Context, st *store.Store, cfg Config, log *slog.Logger) (*Server, error) {
-	if cfg.Password == "" && cfg.PasswordHash == "" {
-		return nil, errors.New("SHELF_PASSWORD or SHELF_PASSWORD_HASH must be set")
+	if cfg.Password == "" && cfg.PasswordHash == "" && !cfg.Open {
+		return nil, errors.New("SHELF_PASSWORD or SHELF_PASSWORD_HASH must be set (or SHELF_AUTH=open on a loopback address)")
 	}
 	if cfg.MaxUploadSize == 0 {
 		cfg.MaxUploadSize = 4 << 30

@@ -19,7 +19,7 @@ final class AppSettings: ObservableObject {
     }
 
     static var configURL: URL {
-        if let p = ProcessInfo.processInfo.environment["SHELF_CONFIG"], !p.isEmpty { return URL(fileURLWithPath: p) }
+        if let p = ShelfCLI.environment["SHELF_CONFIG"] ?? ProcessInfo.processInfo.environment["SHELF_CONFIG"], !p.isEmpty { return URL(fileURLWithPath: p) }
         return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".config/shelf/config.toml")
     }
 

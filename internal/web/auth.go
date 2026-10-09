@@ -31,7 +31,7 @@ const identityKey ctxKey = 1
 
 // Identity describes who made an authenticated request.
 type Identity struct {
-	Auth      string // "token" or "session"
+	Auth      string // "token", "session", or "open" (no auth configured)
 	TokenName string
 }
 
@@ -115,6 +115,9 @@ var errUnauthenticated = errors.New("unauthenticated")
 
 // authenticate resolves a bearer token or session cookie.
 func (s *Server) authenticate(r *http.Request) (Identity, error) {
+	if s.cfg.Open {
+		return Identity{Auth: "open", TokenName: "local"}, nil
+	}
 	if h := r.Header.Get("Authorization"); h != "" {
 		scheme, token, ok := strings.Cut(h, " ")
 		if !ok || !strings.EqualFold(scheme, "Bearer") || token == "" {

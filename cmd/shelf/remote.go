@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
+	"github.com/fenixstarlord/indexserver/internal/api"
 	"github.com/fenixstarlord/indexserver/internal/cliconfig"
 	"github.com/fenixstarlord/indexserver/internal/client"
 )
@@ -24,8 +25,8 @@ func loadClient() (*client.Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	if cfg.Server == "" || cfg.Token == "" {
-		return nil, errors.New("not logged in: run `shelf login <server-url>` first")
+	if cfg.Server == "" {
+		return nil, errors.New("not logged in: run `shelf login <key>` first")
 	}
 	return client.New(cfg.Server, cfg.Token)
 }
@@ -54,6 +55,13 @@ prompted for without echo.`,
 				token = embedded
 			}
 			if token == "" {
+				// A server with authentication off (SHELF_AUTH=open, the
+				// standalone app) needs no key; ask only if it wants one.
+				if c, err := client.New(server, ""); err == nil {
+					if me, err := c.Me(cmd.Context()); err == nil && me.Auth == "open" {
+						return saveLogin(cmd, c.Server, "", me)
+					}
+				}
 				token, err = promptSecret(cmd, "API key: ")
 				if err != nil {
 					return err
@@ -71,21 +79,33 @@ prompted for without echo.`,
 			if err != nil {
 				return fmt.Errorf("could not verify the key with %s: %w", c.Server, err)
 			}
-			cfg, err := cliconfig.Load()
-			if err != nil {
-				return err
-			}
-			cfg.Server, cfg.Token = c.Server, token
-			if err := cliconfig.Save(cfg); err != nil {
-				return err
-			}
-			p, _ := cliconfig.Path()
-			fmt.Fprintf(cmd.OutOrStdout(), "logged in to %s as key %q (server %s); saved to %s\n", c.Server, me.TokenName, me.Version, p)
-			return nil
+			return saveLogin(cmd, c.Server, token, me)
 		},
 	}
 	cmd.Flags().StringVar(&token, "token", "", "API key, if not part of the first argument (prompted if omitted)")
 	return cmd
+}
+
+func saveLogin(cmd *cobra.Command, server, token string, me api.MeResponse) error {
+	{
+		{
+			cfg, err := cliconfig.Load()
+			if err != nil {
+				return err
+			}
+			cfg.Server, cfg.Token = server, token
+			if err := cliconfig.Save(cfg); err != nil {
+				return err
+			}
+			p, _ := cliconfig.Path()
+			if token == "" {
+				fmt.Fprintf(cmd.OutOrStdout(), "connected to %s (server %s, no key needed); saved to %s\n", server, me.Version, p)
+			} else {
+				fmt.Fprintf(cmd.OutOrStdout(), "logged in to %s as key %q (server %s); saved to %s\n", server, me.TokenName, me.Version, p)
+			}
+			return nil
+		}
+	}
 }
 
 func promptSecret(cmd *cobra.Command, prompt string) (string, error) {

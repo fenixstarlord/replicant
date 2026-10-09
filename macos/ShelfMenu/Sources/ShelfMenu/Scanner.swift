@@ -4,6 +4,16 @@ import UserNotifications
 
 /// Finds the bundled `shelf` CLI.
 enum ShelfCLI {
+    /// Extra environment for every CLI run (the standalone app sets SHELF_CONFIG).
+    nonisolated(unsafe) static var environment: [String: String] = [:]
+
+    static func apply(to p: Process) {
+        var env = ProcessInfo.processInfo.environment
+        env["PATH"] = (env["PATH"] ?? "/usr/bin:/bin") + ":/opt/homebrew/bin:/usr/local/bin"
+        for (k, v) in environment { env[k] = v }
+        p.environment = env
+    }
+
     static var url: URL? {
         if let u = Bundle.main.url(forAuxiliaryExecutable: "shelf"), FileManager.default.isExecutableFile(atPath: u.path) { return u }
         let exe = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath()
@@ -24,6 +34,7 @@ enum ShelfCLI {
             let p = Process()
             p.executableURL = url
             p.arguments = args
+            apply(to: p)
             let out = Pipe()
             p.standardOutput = out
             p.standardError = out
@@ -92,6 +103,7 @@ final class ScanManager: ObservableObject {
         let p = Process()
         p.executableURL = cli
         p.arguments = ["scan", url.path]
+        ShelfCLI.apply(to: p)
         let errPipe = Pipe(), outPipe = Pipe()
         p.standardError = errPipe
         p.standardOutput = outPipe

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -74,13 +75,85 @@ func newRootCmd() *cobra.Command {
 	root.AddCommand(newTokenCmd())
 	root.AddCommand(newIngestCmd())
 	root.AddCommand(newBackupCmd())
+	root.AddCommand(newHealthzCmd())
 	return root
+}
+
+// exitWithParent cancels the context once the parent process has exited
+// (we get re-parented to launchd/init, so the ppid changes).
+func exitWithParent(parent context.Context, log *slog.Logger) context.Context {
+	ctx, cancel := context.WithCancel(parent)
+	ppid := os.Getppid()
+	go func() {
+		t := time.NewTicker(2 * time.Second)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				if os.Getppid() != ppid {
+					log.Info("parent process exited; stopping")
+					cancel()
+					return
+				}
+			}
+		}
+	}()
+	return ctx
+}
+
+// loopback reports whether a listen address binds only to this machine.
+func loopback(listen string) bool {
+	host, _, err := net.SplitHostPort(listen)
+	if err != nil {
+		return false
+	}
+	if host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
+
+// newHealthzCmd is the container HEALTHCHECK: GET /healthz on the listen
+// port, exit 0 when the server answers.
+func newHealthzCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:    "healthz",
+		Short:  "Exit 0 if the server on SHELF_LISTEN answers",
+		Hidden: true,
+		Args:   cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			_, port, err := net.SplitHostPort(envOr("SHELF_LISTEN", ":8080"))
+			if err != nil {
+				return err
+			}
+			ctx, cancel := context.WithTimeout(cmd.Context(), 4*time.Second)
+			defer cancel()
+			req, _ := http.NewRequestWithContext(ctx, http.MethodGet, "http://127.0.0.1:"+port+"/healthz", nil)
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				return err
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusOK {
+				return fmt.Errorf("healthz: HTTP %d", resp.StatusCode)
+			}
+			return nil
+		},
+	}
 }
 
 func serve(parent context.Context) error {
 	ctx, stop := signal.NotifyContext(parent, os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	log := slog.Default()
+	if os.Getenv("SHELF_EXIT_WITH_PARENT") == "1" {
+		// Started by the standalone Mac app: stop when it is gone, even if it
+		// crashed or was killed without a chance to stop us.
+		ctx = exitWithParent(ctx, log)
+	}
 
 	st, err := openStore()
 	if err != nil {
@@ -96,6 +169,13 @@ func serve(parent context.Context) error {
 	scheduler.Start(ctx)
 
 	listen := envOr("SHELF_LISTEN", ":8080")
+	open := os.Getenv("SHELF_AUTH") == "open"
+	if open && !loopback(listen) {
+		return fmt.Errorf("SHELF_AUTH=open needs a loopback listen address (127.0.0.1:port or [::1]:port), got %q", listen)
+	}
+	if open {
+		log.Warn("authentication is off: anyone who can reach this address can read and change the catalog", "listen", listen)
+	}
 	handler, err := web.New(ctx, st, web.Config{
 		Password:      os.Getenv("SHELF_PASSWORD"),
 		PasswordHash:  os.Getenv("SHELF_PASSWORD_HASH"),
@@ -105,6 +185,7 @@ func serve(parent context.Context) error {
 		Sched:         scheduler,
 		Listen:        listen,
 		PublicURL:     os.Getenv("SHELF_PUBLIC_URL"),
+		Open:          open,
 	}, log)
 	if err != nil {
 		return err

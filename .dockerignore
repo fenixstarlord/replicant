@@ -1,0 +1,17 @@
+.git
+.github
+.claude
+.tools
+bin
+dist
+data
+*.shelf
+*.db
+*.db-wal
+*.db-shm
+macos/ShelfMenu/.build
+docs
+*.md
+!README.md
+.env
+.DS_Store

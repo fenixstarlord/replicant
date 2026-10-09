@@ -14,14 +14,14 @@
       <a href="/drives" class="btn btn-ghost text-lg font-semibold px-2">Shelf</a>
       <a href="/drives" class="btn btn-ghost btn-sm {{if eq .Path "/drives"}}btn-active{{end}}">Drives</a>
       <a href="/search" class="btn btn-ghost btn-sm {{if eq .Path "/search"}}btn-active{{end}}">Search</a>
-      <a href="/settings/api-keys" class="btn btn-ghost btn-sm {{if eq .Path "/settings/api-keys"}}btn-active{{end}}">API keys</a>
+      {{if not .Open}}<a href="/settings/api-keys" class="btn btn-ghost btn-sm {{if eq .Path "/settings/api-keys"}}btn-active{{end}}">API keys</a>{{end}}
       <a href="/settings" class="btn btn-ghost btn-sm {{if eq .Path "/settings"}}btn-active{{end}}">Settings</a>
     </div>
     <div class="ml-auto flex items-center gap-2">
       <form method="get" action="/search" class="hidden md:block">
         <input type="search" name="q" placeholder="Find a clip or file…" class="input input-bordered input-sm w-64" aria-label="Search">
       </form>
-      {{if .Identity.Auth}}<form method="post" action="/logout"><button class="btn btn-ghost btn-sm">Log out</button></form>{{end}}
+      {{if and .Identity.Auth (not .Open)}}<form method="post" action="/logout"><button class="btn btn-ghost btn-sm">Log out</button></form>{{end}}
     </div>
   </nav>
 </header>

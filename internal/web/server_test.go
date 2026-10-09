@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -622,5 +623,42 @@ func TestSearchScopedToGroupOrClient(t *testing.T) {
 	s.ServeHTTP(rec, req)
 	if strings.Contains(rec.Body.String(), "A001C001") {
 		t.Errorf("csv export ignored the group scope")
+	}
+}
+
+func TestOpenModeNeedsNoAuth(t *testing.T) {
+	st, err := store.Open(filepath.Join(t.TempDir(), "s.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { st.Close() })
+	s, err := New(context.Background(), st, Config{Open: true, DataDir: t.TempDir(), Version: "t"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"/drives", "/api/me", "/api/drives"} {
+		rec := httptest.NewRecorder()
+		s.ServeHTTP(rec, httptest.NewRequest("GET", path, nil))
+		if rec.Code != 200 {
+			t.Errorf("%s: %d (open mode should not require auth)", path, rec.Code)
+		}
+	}
+	rec := httptest.NewRecorder()
+	s.ServeHTTP(rec, httptest.NewRequest("GET", "/api/me", nil))
+	if !strings.Contains(rec.Body.String(), `"auth":"open"`) {
+		t.Errorf("me = %s", rec.Body.String())
+	}
+	rec = httptest.NewRecorder()
+	s.ServeHTTP(rec, httptest.NewRequest("GET", "/drives", nil))
+	if strings.Contains(rec.Body.String(), "API keys") || strings.Contains(rec.Body.String(), "Log out") {
+		t.Errorf("open mode nav should hide API keys and Log out")
+	}
+	rec = httptest.NewRecorder()
+	s.ServeHTTP(rec, httptest.NewRequest("GET", "/login", nil))
+	if rec.Code != 303 {
+		t.Errorf("login page in open mode = %d, want redirect home", rec.Code)
+	}
+	if _, err := New(context.Background(), st, Config{DataDir: t.TempDir()}, nil); err == nil {
+		t.Errorf("closed mode without a password should fail")
 	}
 }

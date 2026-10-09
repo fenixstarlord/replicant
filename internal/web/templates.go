@@ -280,6 +280,7 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, page string, dat
 	}
 	id, _ := IdentityFrom(r.Context())
 	data["Identity"] = id
+	data["Open"] = s.cfg.Open
 	data["Version"] = s.cfg.Version
 	data["Path"] = r.URL.Path
 	data["Query"] = r.URL.Query()

@@ -62,7 +62,7 @@ Track progress here. Update this section at the end of each phase, and commit.
   fingerprint or name+size with wasted bytes, other copies on clip and file pages.
 - [x] Phase 7 — Polish (2026-10-08). `shelf login` + direct push, CSV and ALE export, backup
   command + Settings button, label/location editing, README, `make dist` (static linux/amd64 and
-  arm64 server binaries + `deploy/shelf-server.service`). Docker image still deferred by decision.
+  arm64 server binaries + `deploy/shelf-server.service`). Docker image added 2026-10-09.
 
 Each phase ends with something runnable and a commit. Do not start the next phase's work in the
 same change unless asked.
@@ -312,7 +312,16 @@ reads `shelf doctor --json` to report missing metadata tools with a link to `doc
 - **Partial scans (decided 2026-10-08):** a scan whose root is not the mount point is `is_partial`;
   latest and diffs are tracked per (drive, root); drive aggregates and default browsing prefer the
   latest full scan (`store.LatestScan`). Migration `0002_partial_scans.sql`.
-- **Home server:** cross-compiled static binary + systemd unit (`make dist`), not Docker, for now.
+- **Home server:** cross-compiled static binary + systemd unit (`make dist`), or the Docker image
+  (2026-10-09): `Dockerfile` (Go builder → Debian slim + ffmpeg, non-root UID 1000, `shelf-server
+  healthz` as HEALTHCHECK), `docker-compose.yml` + `.env.example`, published to GHCR by
+  `.github/workflows/docker.yml` for amd64 + arm64. Vendor tools bind-mount at `/opt/shelf-tools`.
+- **Open mode and the standalone app (2026-10-09):** `SHELF_AUTH=open` disables the password and
+  API keys; `shelf-server` refuses it unless `SHELF_LISTEN` is loopback. `/api/me` reports
+  `auth: "open"` and `shelf login <url>` then saves an empty token. `make standalone` builds
+  `dist/Shelf Standalone.app`, the menu bar app plus a bundled `shelf-server` that
+  `LocalServer.swift` runs on 127.0.0.1:8787 with data in `~/Library/Application Support/Shelf`
+  (`Info.plist` key `ShelfStandalone`; the CLI gets `SHELF_CONFIG` in that folder).
 
 ## Open questions (ask the user, don't guess)
 

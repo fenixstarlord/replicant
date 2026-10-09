@@ -7,8 +7,13 @@ struct MenuContent: View {
     @EnvironmentObject var settings: AppSettings
     @EnvironmentObject var toolsCheck: ToolChecker
     @EnvironmentObject var autoScan: AutoScanner
+    @EnvironmentObject var local: LocalServer
 
     var body: some View {
+        if LocalServer.isStandalone {
+            Button(local.running ? "Open catalog" : local.status) { local.open() }.disabled(!local.running)
+            Divider()
+        }
         if let name = scans.current {
             Text("Scanning \(name)")
             Text(scans.status).font(.caption)
@@ -16,7 +21,7 @@ struct MenuContent: View {
             if !scans.queue.isEmpty { Text("Queued: \(scans.queue.map(\.lastPathComponent).joined(separator: ", "))") }
             Divider()
         }
-        if settings.server.isEmpty || !settings.hasToken {
+        if !LocalServer.isStandalone && (settings.server.isEmpty || !settings.hasToken) {
             Button("Set up server and API key…") { showSettings() }
             Divider()
         }
@@ -60,6 +65,7 @@ struct MenuContent: View {
                 .environmentObject(settings)
                 .environmentObject(toolsCheck)
                 .environmentObject(autoScan)
+                .environmentObject(local)
         )
     }
 

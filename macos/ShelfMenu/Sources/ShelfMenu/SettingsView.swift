@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct SettingsView: View {
@@ -5,6 +6,7 @@ struct SettingsView: View {
     @EnvironmentObject var settings: AppSettings
     @EnvironmentObject var toolsCheck: ToolChecker
     @EnvironmentObject var autoScan: AutoScanner
+    @EnvironmentObject var local: LocalServer
     @State private var connection = ""
     @State private var message = ""
     @State private var busy = false
@@ -12,6 +14,18 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
+            if LocalServer.isStandalone {
+                Section("Catalog") {
+                    LabeledContent("Built-in server") { Text(local.status).textSelection(.enabled) }
+                    LabeledContent("Data") { Text(LocalServer.dataDir.path).textSelection(.enabled) }
+                    HStack {
+                        Button("Open catalog") { local.open() }.disabled(!local.running)
+                        Button("Show data folder") { NSWorkspace.shared.activateFileViewerSelecting([LocalServer.dataDir]) }
+                    }
+                    Text("This app runs its own catalog on this Mac, no server or API key needed. Scans go straight into it; open the catalog in your browser to search. Back it up by copying the data folder.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            } else {
             Section("Server") {
                 if !settings.server.isEmpty {
                     LabeledContent("Connected to") {
@@ -29,6 +43,7 @@ struct SettingsView: View {
                 }
                 Text("Create a key on the server under API keys and paste it here; it includes the server address. Settings are stored in ~/.config/shelf/config.toml, shared with the shelf command.")
                     .font(.caption).foregroundStyle(.secondary)
+            }
             }
             Section("Ignore these drives") {
                 ForEach(volumes.volumes) { v in
