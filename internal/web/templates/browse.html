@@ -2,7 +2,7 @@
 {{$d := .Drive.ID}}{{$s := .Scan.ID}}
 <div class="flex items-start justify-between gap-4 flex-wrap">
   <div>
-    <h1>{{.Drive.Name}}{{if .Drive.Label}} <span class="muted font-normal">· {{.Drive.Label}}</span>{{end}}</h1>
+    <h1>{{.Drive.Name}}{{if .Drive.Label}} <span class="muted font-normal">· {{.Drive.Label}}</span>{{end}}{{if .Drive.GroupName}} <span class="badge badge-ghost align-middle">{{.Drive.GroupName}}</span>{{end}}</h1>
     <p class="muted text-sm">Scan #{{.Scan.ID}} · {{datetime .Scan.ScannedAt}}{{if .Scan.IsLatest}} · latest{{else}} · <span class="text-warning">old scan</span>{{end}}{{if .Scan.IsPartial}} · <span class="text-warning">partial scan of {{.Scan.Root}}</span>{{end}} · {{if .Drive.Location}}{{.Drive.Location}}{{else}}location not set{{end}}</p>
   </div>
   <div class="flex gap-2 items-center">
@@ -89,6 +89,7 @@
         <label class="form-control"><span class="label-text">Label</span><input class="input input-bordered input-sm" name="label" value="{{.Drive.Label}}" placeholder="e.g. 2TB silver LaCie"></label>
         <label class="form-control"><span class="label-text">Location</span><input class="input input-bordered input-sm" name="location" value="{{.Drive.Location}}" placeholder="e.g. Shelf B, box 3"></label>
         <label class="form-control"><span class="label-text">Notes</span><input class="input input-bordered input-sm" name="notes" value="{{.Drive.Notes}}"></label>
+        <label class="form-control"><span class="label-text">Group</span><input class="input input-bordered input-sm" name="group" value="{{.Drive.GroupName}}" list="groups" placeholder="e.g. Shelf B, Client X, 2026"><datalist id="groups">{{range .Groups}}<option value="{{.Name}}">{{end}}</datalist></label>
         <div><button class="btn btn-primary btn-sm">Save</button></div>
       </form>
     </div>

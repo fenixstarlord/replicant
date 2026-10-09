@@ -253,7 +253,7 @@ func TestPagesRender(t *testing.T) {
 		{fmt.Sprintf("/clips/%d", clipID), []string{"A001C001", "ARRICORE", ">ale<", "08:46:50:00", "Raw extractor output", "location not set"}},
 		{fmt.Sprintf("/files/%d", entryID), []string{"A001C001.mxf", "00000000deadbeef", "file clip"}},
 		{fmt.Sprintf("/scans/%d", res.ScanID), []string{"Scan #", "Changes since the previous scan"}},
-		{"/settings", []string{"Upload a scan", "Backups"}},
+		{"/settings", []string{"Upload a scan", "Backups", "Default view", "Server scans", "No server scans configured"}},
 		{"/settings/api-keys", []string{"API keys", "Create a key", "No keys yet"}},
 	}
 	for _, tc := range cases {
@@ -305,7 +305,6 @@ func TestHistoryPagesAndExports(t *testing.T) {
 		path string
 		want []string
 	}{
-		{"/duplicates", []string{"Duplicates", "No duplicates found"}},
 		{fmt.Sprintf("/scans/%d/diff/%d", res.ScanID, res.ScanID), []string{"Diff", "Added", "None"}},
 		{"/export.csv?q=c001", []string{"drive,label,location,path,clip", "A001C001", "ARRICORE"}},
 		{"/export.ale?q=c001", []string{"Heading", "Column", "A001C001.mxf", "ALEXA 35"}},
@@ -410,5 +409,93 @@ func TestBrowseFragmentsAndViewCookie(t *testing.T) {
 	}
 	if code, _ := get(t, s, c, fmt.Sprintf("/drives/%d", res.DriveID)); code != 303 {
 		t.Errorf("drive page should redirect to the explorer, got %d", code)
+	}
+}
+
+type fakeSched struct{ ran []int64 }
+
+func (f *fakeSched) RunJob(ctx context.Context, id int64) (store.IngestResult, error) {
+	f.ran = append(f.ran, id)
+	return store.IngestResult{}, nil
+}
+func (f *fakeSched) Running(id int64) (string, int, int, time.Time, bool) {
+	return "", 0, 0, time.Time{}, false
+}
+func (f *fakeSched) Kick() {}
+
+func post(t *testing.T, s *Server, c *http.Cookie, path string, form url.Values) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest("POST", path, strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(c)
+	rec := httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+	return rec
+}
+
+func TestDefaultViewGroupsAndScanJobs(t *testing.T) {
+	s, c, res := seedPages(t)
+	fs := &fakeSched{}
+	s.cfg.Sched = fs
+
+	// Default view: list unless changed; a cookie overrides; saving resets the cookie.
+	if _, body := get(t, s, c, fmt.Sprintf("/browse/%d", res.DriveID)); !strings.Contains(body, "twirl(this)") {
+		t.Errorf("default view should be list")
+	}
+	if rec := post(t, s, c, "/settings/view", url.Values{"view": {"columns"}}); rec.Code != 303 {
+		t.Fatalf("save view = %d", rec.Code)
+	}
+	if _, body := get(t, s, c, fmt.Sprintf("/browse/%d", res.DriveID)); !strings.Contains(body, "explorer-columns") {
+		t.Errorf("default view should now be columns")
+	}
+
+	// Groups from the inspector form; the drives page sections by group.
+	rec := post(t, s, c, fmt.Sprintf("/drives/%d", res.DriveID), url.Values{"label": {""}, "location": {""}, "notes": {""}, "group": {"Shelf B"}})
+	if rec.Code != 303 {
+		t.Fatalf("group edit = %d", rec.Code)
+	}
+	if _, body := get(t, s, c, "/drives"); !strings.Contains(body, "Shelf B") {
+		t.Errorf("drives page lacks the group heading")
+	}
+	if _, body := get(t, s, c, fmt.Sprintf("/browse/%d", res.DriveID)); !strings.Contains(body, `value="Shelf B"`) {
+		t.Errorf("inspector lacks the group value")
+	}
+
+	// Scan jobs: add, list, run now, delete. A missing path is refused.
+	if rec := post(t, s, c, "/settings/jobs", url.Values{"path": {"/definitely/not/here"}, "interval": {"60"}}); rec.Code != 303 || !strings.Contains(rec.Header().Get("Location"), "err=") {
+		t.Errorf("missing path accepted: %d %s", rec.Code, rec.Header().Get("Location"))
+	}
+	dir := t.TempDir()
+	if rec := post(t, s, c, "/settings/jobs", url.Values{"path": {dir}, "label": {"Archive"}, "interval": {"1440"}, "extract": {"1"}, "fingerprint": {"1"}, "enabled": {"1"}}); rec.Code != 303 || strings.Contains(rec.Header().Get("Location"), "err=") {
+		t.Fatalf("add job = %d %s", rec.Code, rec.Header().Get("Location"))
+	}
+	jobs, _ := s.store.ListScanJobs(context.Background())
+	if len(jobs) != 1 || jobs[0].Label != "Archive" || jobs[0].IntervalMin != 1440 || !jobs[0].Extract {
+		t.Fatalf("job wrong: %+v", jobs)
+	}
+	if _, body := get(t, s, c, "/settings"); !strings.Contains(body, dir) || !strings.Contains(body, "Every day") || !strings.Contains(body, "Scan now") {
+		t.Errorf("settings page lacks the job")
+	}
+	if rec := post(t, s, c, fmt.Sprintf("/settings/jobs/%d/run", jobs[0].ID), nil); rec.Code != 303 {
+		t.Errorf("run = %d", rec.Code)
+	}
+	time.Sleep(50 * time.Millisecond)
+	if len(fs.ran) != 1 || fs.ran[0] != jobs[0].ID {
+		t.Errorf("scheduler not asked to run: %v", fs.ran)
+	}
+	if rec := post(t, s, c, fmt.Sprintf("/settings/jobs/%d", jobs[0].ID), url.Values{"label": {"Archive 2"}, "interval": {"0"}, "enabled": {"1"}}); rec.Code != 303 {
+		t.Errorf("update = %d", rec.Code)
+	}
+	if j, _ := s.store.GetScanJob(context.Background(), jobs[0].ID); j.Label != "Archive 2" || j.IntervalMin != 0 || j.Extract {
+		t.Errorf("update not applied: %+v", j)
+	}
+	if rec := post(t, s, c, fmt.Sprintf("/settings/jobs/%d/delete", jobs[0].ID), nil); rec.Code != 303 {
+		t.Errorf("delete = %d", rec.Code)
+	}
+	if jobs, _ := s.store.ListScanJobs(context.Background()); len(jobs) != 0 {
+		t.Errorf("job not deleted")
+	}
+	if code, _ := get(t, s, c, "/duplicates"); code != 404 {
+		t.Errorf("duplicates page should be gone, got %d", code)
 	}
 }

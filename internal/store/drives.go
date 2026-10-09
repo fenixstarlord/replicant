@@ -25,6 +25,8 @@ type Drive struct {
 	ClipCount     int       `json:"clip_count"`
 	TotalBytes    int64     `json:"total_bytes"`
 	LastScannedAt time.Time `json:"last_scanned_at"`
+	GroupID       int64     `json:"group_id"`
+	GroupName     string    `json:"group_name"`
 }
 
 // ListDrives returns every drive with latest-scan aggregates, by name.
@@ -33,11 +35,13 @@ func (s *Store) ListDrives(ctx context.Context) ([]Drive, error) {
 		SELECT d.id, d.volume_uuid, d.name, d.label, d.location, d.notes, d.fs_type,
 		       d.capacity_bytes, d.free_bytes, d.media_name, d.first_seen, d.last_seen,
 		       (SELECT count(*) FROM scans s WHERE s.drive_id = d.id),
-		       coalesce(ls.file_count, 0), coalesce(ls.clip_count, 0), coalesce(ls.total_bytes, 0), ls.scanned_at
+		       coalesce(ls.file_count, 0), coalesce(ls.clip_count, 0), coalesce(ls.total_bytes, 0), ls.scanned_at,
+		       coalesce(d.group_id, 0), coalesce(g.name, '')
 		FROM drives d
+		LEFT JOIN drive_groups g ON g.id = d.group_id
 		LEFT JOIN scans ls ON ls.id = (SELECT s.id FROM scans s WHERE s.drive_id = d.id AND s.is_latest = 1
 		                               ORDER BY s.is_partial ASC, s.scanned_at DESC LIMIT 1)
-		ORDER BY d.name`)
+		ORDER BY CASE WHEN g.name IS NULL THEN 1 ELSE 0 END, g.name COLLATE NOCASE, d.name COLLATE NOCASE`)
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +53,7 @@ func (s *Store) ListDrives(ctx context.Context) ([]Drive, error) {
 		var scanned sql.NullString
 		if err := rows.Scan(&d.ID, &d.VolumeUUID, &d.Name, &d.Label, &d.Location, &d.Notes, &d.FSType,
 			&d.CapacityBytes, &d.FreeBytes, &d.MediaName, &first, &last,
-			&d.ScanCount, &d.FileCount, &d.ClipCount, &d.TotalBytes, &scanned); err != nil {
+			&d.ScanCount, &d.FileCount, &d.ClipCount, &d.TotalBytes, &scanned, &d.GroupID, &d.GroupName); err != nil {
 			return nil, err
 		}
 		d.FirstSeen, _ = time.Parse(time.RFC3339, first)

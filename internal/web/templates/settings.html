@@ -18,5 +18,73 @@
   <ul class="mt-2 text-sm">{{range .Backups}}<li><a href="/settings/backup/{{.}}" class="link link-hover mono">{{.}}</a></li>{{else}}<li class="muted">No backups yet.</li>{{end}}</ul>
 </div></div>
 </div>
+
+<h2 id="explorer">Explorer</h2>
+<div class="card bg-base-100 border border-base-300"><div class="card-body">
+  <form method="post" action="/settings/view" class="flex items-center gap-4 flex-wrap">
+    <span class="text-sm">Default view</span>
+    <div class="join">
+      <input type="radio" name="view" value="list" class="join-item btn btn-sm" aria-label="List" {{if eq .DefaultView "list"}}checked{{end}}>
+      <input type="radio" name="view" value="columns" class="join-item btn btn-sm" aria-label="Columns" {{if eq .DefaultView "columns"}}checked{{end}}>
+    </div>
+    <button class="btn btn-sm">Save</button>
+    <span class="muted text-sm">Each browser can still switch views; saving here resets this browser to the default.</span>
+  </form>
+</div></div>
+
+<h2 id="server-scans">Server scans</h2>
+<p class="muted text-sm">Folders on this server{{if .Hostname}} ({{.Hostname}}){{end}} that the server scans itself, on demand or on a schedule. Metadata extraction uses whatever tools are installed on the server; run <code class="mono">shelf doctor</code> there to check.</p>
+<div class="overflow-x-auto rounded-box border border-base-300 bg-base-100 my-3">
+<table class="table table-sm">
+<thead><tr><th>Path</th><th>Label</th><th>Every</th><th>Options</th><th>Last run</th><th>Next run</th><th></th></tr></thead>
+<tbody>
+{{range .Jobs}}<tr class="hover">
+  <td class="mono">{{.Path}}</td>
+  <td>{{or .Label "—"}}</td>
+  <td>{{if .Enabled}}{{interval .IntervalMin}}{{else}}<span class="badge badge-ghost badge-xs">disabled</span>{{end}}</td>
+  <td class="muted text-xs">{{if .Extract}}metadata{{else}}filesystem only{{end}}{{if .Fingerprint}} · fingerprints{{end}}</td>
+  <td>{{if .Running}}<span class="badge badge-info badge-xs">running</span> <span class="muted text-xs">{{.Stage}}{{if .Total}} {{.Done}}/{{.Total}}{{end}}</span>
+      {{else if eq .LastStatus "ok"}}<span class="badge badge-success badge-xs">ok</span> {{tm .LastRunAt}} <span class="muted text-xs">{{if .LastScanID}}<a href="/scans/{{.LastScanID}}" class="link link-hover">scan #{{.LastScanID}}</a> · {{end}}{{.LastDuration.Round 1000000000}}</span>
+      {{else if eq .LastStatus "error"}}<span class="badge badge-error badge-xs" title="{{.LastError}}">error</span> {{tm .LastRunAt}} <span class="muted text-xs">{{.LastError}}</span>
+      {{else}}<span class="muted">never</span>{{end}}</td>
+  <td>{{if .NextRunAt}}{{tm .NextRunAt}}{{else}}<span class="muted">—</span>{{end}}</td>
+  <td class="text-right whitespace-nowrap">
+    <form method="post" action="/settings/jobs/{{.ID}}/run" class="inline"><button class="btn btn-xs btn-primary" {{if .Running}}disabled{{end}}>Scan now</button></form>
+    <details class="dropdown dropdown-end inline-block"><summary class="btn btn-xs btn-ghost">Edit</summary>
+      <form method="post" action="/settings/jobs/{{.ID}}" class="dropdown-content z-10 card bg-base-100 border border-base-300 w-72 p-3 flex flex-col gap-2 text-left">
+        <label class="form-control"><span class="label-text text-xs">Label</span><input class="input input-bordered input-xs" name="label" value="{{.Label}}"></label>
+        <label class="form-control"><span class="label-text text-xs">Schedule</span><select name="interval" class="select select-bordered select-xs">{{template "interval_options" .IntervalMin}}</select></label>
+        <label class="label cursor-pointer justify-start gap-2"><input type="checkbox" name="extract" value="1" class="checkbox checkbox-xs" {{if .Extract}}checked{{end}}><span class="label-text text-xs">Extract metadata</span></label>
+        <label class="label cursor-pointer justify-start gap-2"><input type="checkbox" name="fingerprint" value="1" class="checkbox checkbox-xs" {{if .Fingerprint}}checked{{end}}><span class="label-text text-xs">Fingerprint files</span></label>
+        <label class="label cursor-pointer justify-start gap-2"><input type="checkbox" name="enabled" value="1" class="checkbox checkbox-xs" {{if .Enabled}}checked{{end}}><span class="label-text text-xs">Enabled</span></label>
+        <button class="btn btn-xs btn-primary">Save</button>
+      </form></details>
+    <form method="post" action="/settings/jobs/{{.ID}}/delete" class="inline" onsubmit="return confirm('Remove this scan job? Past scans stay in the catalog.')"><button class="btn btn-xs btn-ghost text-error">Remove</button></form>
+  </td>
+</tr>{{else}}<tr><td colspan="7" class="muted text-center py-6">No server scans configured.</td></tr>{{end}}
+</tbody>
+</table>
+</div>
+<div class="card bg-base-100 border border-base-300"><div class="card-body">
+  <h3 class="font-semibold text-sm">Add a folder to scan</h3>
+  <form method="post" action="/settings/jobs" class="flex flex-wrap gap-3 items-end">
+    <label class="form-control grow"><span class="label-text">Path on the server</span><input class="input input-bordered input-sm w-full" name="path" list="mounts" placeholder="/mnt/raid or /Volumes/Archive" required><datalist id="mounts">{{range .Mounts}}<option value="{{.Path}}">{{.FSType}}</option>{{end}}</datalist></label>
+    <label class="form-control"><span class="label-text">Label</span><input class="input input-bordered input-sm w-40" name="label" placeholder="optional"></label>
+    <label class="form-control"><span class="label-text">Schedule</span><select name="interval" class="select select-bordered select-sm">{{template "interval_options" 1440}}</select></label>
+    <label class="label cursor-pointer gap-2"><input type="checkbox" name="extract" value="1" class="checkbox checkbox-sm" checked><span class="label-text">Extract metadata</span></label>
+    <label class="label cursor-pointer gap-2"><input type="checkbox" name="fingerprint" value="1" class="checkbox checkbox-sm" checked><span class="label-text">Fingerprint files</span></label>
+    <input type="hidden" name="enabled" value="1">
+    <button class="btn btn-primary btn-sm">Add</button>
+  </form>
+  {{if .Mounts}}<p class="muted text-xs mt-2">Mounted here: {{range $i, $m := .Mounts}}{{if $i}}, {{end}}<code class="mono">{{$m.Path}}</code>{{end}}</p>{{end}}
+</div></div>
+
+<h2>Groups</h2>
+<div class="card bg-base-100 border border-base-300"><div class="card-body text-sm">
+  {{if .Groups}}<ul class="flex flex-wrap gap-2">{{range .Groups}}<li><a href="/drives#g-{{.ID}}" class="badge badge-outline badge-lg">{{.Name}} · {{.Count}}</a></li>{{end}}</ul>
+  {{else}}<p class="muted">No groups yet.</p>{{end}}
+  <p class="muted mt-2">Assign a drive to a group from the Group field in its inspector. Groups disappear when their last drive leaves.</p>
+</div></div>
+
 <p class="muted text-sm mt-6">API keys for the <code class="mono">shelf</code> CLI are managed on the <a href="/settings/api-keys" class="link">API keys</a> page.</p>
 {{end}}

@@ -1,18 +1,21 @@
 package web
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
 	"io"
 	"io/fs"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/fenixstarlord/indexserver/internal/bundle"
+	"github.com/fenixstarlord/indexserver/internal/scanner"
 	"github.com/fenixstarlord/indexserver/internal/store"
 )
 
@@ -36,6 +39,11 @@ func (s *Server) pageRoutes() {
 	m.Handle("GET /files/{id}", auth(s.handleFile))
 	m.Handle("GET /scans/{id}", auth(s.handleScan))
 	m.Handle("GET /settings", auth(s.handleSettings))
+	m.Handle("POST /settings/view", auth(s.handleSettingsView))
+	m.Handle("POST /settings/jobs", auth(s.handleJobCreate))
+	m.Handle("POST /settings/jobs/{id}", auth(s.handleJobUpdate))
+	m.Handle("POST /settings/jobs/{id}/run", auth(s.handleJobRun))
+	m.Handle("POST /settings/jobs/{id}/delete", auth(s.handleJobDelete))
 	m.Handle("GET /settings/api-keys", auth(s.handleAPIKeys))
 	m.Handle("POST /settings/tokens", auth(s.handleTokenCreate))
 	m.Handle("POST /settings/tokens/{id}/revoke", auth(s.handleTokenRevoke))
@@ -72,7 +80,20 @@ func (s *Server) handleDrivesPage(w http.ResponseWriter, r *http.Request) {
 		clips += d.ClipCount
 		bytes += d.TotalBytes
 	}
-	s.render(w, r, "drives", map[string]any{"Title": "Drives", "Drives": drives,
+	type group struct {
+		ID     int64
+		Name   string
+		Drives []store.Drive
+	}
+	var byGroup []group
+	for _, d := range drives { // ListDrives orders by group then name; ungrouped last
+		if n := len(byGroup); n > 0 && byGroup[n-1].ID == d.GroupID {
+			byGroup[n-1].Drives = append(byGroup[n-1].Drives, d)
+			continue
+		}
+		byGroup = append(byGroup, group{ID: d.GroupID, Name: d.GroupName, Drives: []store.Drive{d}})
+	}
+	s.render(w, r, "drives", map[string]any{"Title": "Drives", "Drives": drives, "ByGroup": byGroup,
 		"TotalFiles": files, "TotalClips": clips, "TotalBytes": bytes})
 }
 
@@ -101,6 +122,12 @@ func (s *Server) handleDriveEdit(w http.ResponseWriter, r *http.Request) {
 		strings.TrimSpace(r.FormValue("location")), strings.TrimSpace(r.FormValue("notes"))); err != nil {
 		s.fail(w, r, err, "update drive")
 		return
+	}
+	if _, has := r.Form["group"]; has {
+		if err := s.store.SetDriveGroup(r.Context(), id, r.FormValue("group")); err != nil {
+			s.fail(w, r, err, "update group")
+			return
+		}
 	}
 	http.Redirect(w, r, fmt.Sprintf("/browse/%d", id), http.StatusSeeOther)
 }
@@ -146,6 +173,8 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data["Drives"] = drives
+	groups, _ := s.store.ListGroups(ctx)
+	data["Groups"] = groups
 	facets, err := s.store.Facets(ctx)
 	if err != nil {
 		s.fail(w, r, err, "facets")
@@ -265,8 +294,133 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
+	jobs, err := s.store.ListScanJobs(r.Context())
+	if err != nil {
+		s.fail(w, r, err, "scan jobs")
+		return
+	}
+	type jobView struct {
+		store.ScanJob
+		Running bool
+		Stage   string
+		Done    int
+		Total   int
+	}
+	views := make([]jobView, 0, len(jobs))
+	for _, j := range jobs {
+		v := jobView{ScanJob: j}
+		if s.cfg.Sched != nil {
+			v.Stage, v.Done, v.Total, _, v.Running = s.cfg.Sched.Running(j.ID)
+		}
+		views = append(views, v)
+	}
+	groups, _ := s.store.ListGroups(r.Context())
 	s.render(w, r, "settings", map[string]any{"Title": "Settings", "Backups": s.listBackups(),
+		"DefaultView": s.defaultView(r), "Jobs": views, "Mounts": scanner.Mounts(), "Groups": groups,
+		"SchedEnabled": s.cfg.Sched != nil, "Hostname": hostname(),
 		"Message": r.URL.Query().Get("msg"), "Error": r.URL.Query().Get("err")})
+}
+
+func hostname() string {
+	h, _ := os.Hostname()
+	return h
+}
+
+func (s *Server) handleSettingsView(w http.ResponseWriter, r *http.Request) {
+	v := r.FormValue("view")
+	if v != "list" && v != "columns" {
+		v = "list"
+	}
+	if err := s.store.SetSetting(r.Context(), defaultViewSetting, v); err != nil {
+		s.fail(w, r, err, "save setting")
+		return
+	}
+	// The browser's own cookie would otherwise keep overriding the new default.
+	http.SetCookie(w, &http.Cookie{Name: viewCookie, Value: "", Path: "/browse", MaxAge: -1})
+	http.Redirect(w, r, "/settings?msg=Default+view+saved.", http.StatusSeeOther)
+}
+
+func parseJobForm(r *http.Request) store.ScanJob {
+	interval, _ := strconv.Atoi(r.FormValue("interval"))
+	return store.ScanJob{
+		Path: strings.TrimSpace(r.FormValue("path")), Label: strings.TrimSpace(r.FormValue("label")),
+		IntervalMin: interval, Extract: r.FormValue("extract") != "", Fingerprint: r.FormValue("fingerprint") != "",
+		Enabled: r.FormValue("enabled") != "",
+	}
+}
+
+func (s *Server) handleJobCreate(w http.ResponseWriter, r *http.Request) {
+	j := parseJobForm(r)
+	if j.Path == "" {
+		http.Redirect(w, r, "/settings?err=A+path+on+the+server+is+required.", http.StatusSeeOther)
+		return
+	}
+	if fi, err := os.Stat(j.Path); err != nil || !fi.IsDir() {
+		http.Redirect(w, r, "/settings?err="+url.QueryEscape("That path is not a folder on this server: "+j.Path), http.StatusSeeOther)
+		return
+	}
+	if _, err := s.store.CreateScanJob(r.Context(), j); err != nil {
+		http.Redirect(w, r, "/settings?err="+url.QueryEscape("Could not add: "+err.Error()), http.StatusSeeOther)
+		return
+	}
+	if s.cfg.Sched != nil {
+		s.cfg.Sched.Kick()
+	}
+	http.Redirect(w, r, "/settings?msg=Scan+job+added.#server-scans", http.StatusSeeOther)
+}
+
+func (s *Server) handleJobUpdate(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r, "id")
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	j, err := s.store.GetScanJob(r.Context(), id)
+	if err != nil {
+		s.fail(w, r, err, "scan job")
+		return
+	}
+	f := parseJobForm(r)
+	j.Label, j.IntervalMin, j.Extract, j.Fingerprint, j.Enabled = f.Label, f.IntervalMin, f.Extract, f.Fingerprint, f.Enabled
+	if err := s.store.UpdateScanJob(r.Context(), j); err != nil {
+		s.fail(w, r, err, "update scan job")
+		return
+	}
+	if s.cfg.Sched != nil {
+		s.cfg.Sched.Kick()
+	}
+	http.Redirect(w, r, "/settings?msg=Scan+job+saved.#server-scans", http.StatusSeeOther)
+}
+
+func (s *Server) handleJobRun(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r, "id")
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if s.cfg.Sched == nil {
+		http.Redirect(w, r, "/settings?err=Server+scans+are+not+enabled.", http.StatusSeeOther)
+		return
+	}
+	go func() {
+		if _, err := s.cfg.Sched.RunJob(context.Background(), id); err != nil {
+			s.log.Error("manual scan job", "job", id, "err", err)
+		}
+	}()
+	http.Redirect(w, r, "/settings?msg=Scan+started.#server-scans", http.StatusSeeOther)
+}
+
+func (s *Server) handleJobDelete(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r, "id")
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if err := s.store.DeleteScanJob(r.Context(), id); err != nil {
+		s.fail(w, r, err, "delete scan job")
+		return
+	}
+	http.Redirect(w, r, "/settings?msg=Scan+job+removed.#server-scans", http.StatusSeeOther)
 }
 
 func (s *Server) handleAPIKeys(w http.ResponseWriter, r *http.Request) {

@@ -20,8 +20,11 @@ type column struct {
 
 const viewCookie = "shelf_view"
 
-// browseView resolves the explorer view from the query, then the cookie.
-func browseView(w http.ResponseWriter, r *http.Request) string {
+const defaultViewSetting = "default_view"
+
+// browseView resolves the explorer view: the query, then this browser's
+// cookie, then the server-wide default from Settings, then list.
+func (s *Server) browseView(w http.ResponseWriter, r *http.Request) string {
 	v := r.URL.Query().Get("view")
 	switch v {
 	case "list", "columns":
@@ -31,7 +34,15 @@ func browseView(w http.ResponseWriter, r *http.Request) string {
 	if c, err := r.Cookie(viewCookie); err == nil && (c.Value == "list" || c.Value == "columns") {
 		return c.Value
 	}
-	return "columns"
+	return s.defaultView(r)
+}
+
+// defaultView is the server-wide default from Settings.
+func (s *Server) defaultView(r *http.Request) string {
+	if v, _ := s.store.GetSetting(r.Context(), defaultViewSetting); v == "columns" {
+		return "columns"
+	}
+	return "list"
 }
 
 // handleBrowse renders the explorer page, or a fragment of it:
@@ -92,9 +103,14 @@ func (s *Server) handleBrowse(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err, "scans")
 		return
 	}
-	view := browseView(w, r)
+	groups, err := s.store.ListGroups(ctx)
+	if err != nil {
+		s.fail(w, r, err, "groups")
+		return
+	}
+	view := s.browseView(w, r)
 	data := map[string]any{
-		"Scans": scans,
+		"Scans": scans, "Groups": groups,
 		"Title": d.Name + " / " + p, "Drive": d, "Scan": sc, "View": view,
 		"DirPath": dirPath, "Crumbs": crumbs(dirPath), "Target": target, "IsFile": target.ID != 0 && !target.IsDir,
 	}

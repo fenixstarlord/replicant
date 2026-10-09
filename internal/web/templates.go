@@ -107,7 +107,26 @@ var funcs = template.FuncMap{
 	"add":      func(a, b int) int { return a + b },
 	"sub":      func(a, b int) int { return a - b },
 	"mul":      func(a, b int) int { return a * b },
-	"used":     func(capacity, free int64) int64 { return capacity - free },
+	"interval": func(min int) string {
+		switch {
+		case min <= 0:
+			return "manual"
+		case min%10080 == 0:
+			return "week"
+		case min%1440 == 0:
+			if min == 1440 {
+				return "day"
+			}
+			return strconv.Itoa(min/1440) + " days"
+		case min%60 == 0:
+			if min == 60 {
+				return "hour"
+			}
+			return strconv.Itoa(min/60) + " hours"
+		}
+		return strconv.Itoa(min) + " min"
+	},
+	"used": func(capacity, free int64) int64 { return capacity - free },
 	"pct": func(part, total int64) int {
 		if total <= 0 {
 			return 0

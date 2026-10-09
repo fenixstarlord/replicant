@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-func TestDuplicatesDiffBackupExport(t *testing.T) {
+func TestDiffBackupExport(t *testing.T) {
 	ctx := context.Background()
 	s, err := Open(filepath.Join(t.TempDir(), "h.db"))
 	if err != nil {
@@ -33,17 +33,6 @@ func TestDuplicatesDiffBackupExport(t *testing.T) {
 	bB.Manifest.Volume.UUID, bB.Manifest.Volume.Name = "UUID-B", "B"
 	if _, err := s.Ingest(ctx, bB); err != nil {
 		t.Fatal(err)
-	}
-
-	groups, err := s.Duplicates(ctx, 0, 10)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(groups) != 1 || groups[0].Count != 2 || groups[0].WastedBytes != int64(len("same-content")) || len(groups[0].Copies) != 2 {
-		t.Fatalf("duplicates wrong: %+v", groups)
-	}
-	if groups[0].Copies[0].DriveName != "B" && groups[0].Copies[1].DriveName != "B" {
-		t.Errorf("copies should span drives: %+v", groups[0].Copies)
 	}
 
 	// Second scan of A: one changed, one removed, one added.

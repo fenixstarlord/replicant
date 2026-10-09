@@ -64,3 +64,12 @@
 </table>
 </div>
 {{end}}
+
+{{define "interval_options"}}
+<option value="0" {{if eq . 0}}selected{{end}}>Manual only</option>
+<option value="60" {{if eq . 60}}selected{{end}}>Every hour</option>
+<option value="360" {{if eq . 360}}selected{{end}}>Every 6 hours</option>
+<option value="720" {{if eq . 720}}selected{{end}}>Every 12 hours</option>
+<option value="1440" {{if eq . 1440}}selected{{end}}>Every day</option>
+<option value="10080" {{if eq . 10080}}selected{{end}}>Every week</option>
+{{end}}

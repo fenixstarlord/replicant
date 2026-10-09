@@ -11,8 +11,8 @@ A self-hosted catalog of offline drives full of camera media. Two Go binaries fr
 - `shelf` — macOS CLI. Walks a mounted drive, groups files into clips, runs metadata extractors
   (ffprobe, ARRI `art-cmd`, REDline, sidecar parsers), and writes a `.shelf` scan bundle or pushes
   it to the server.
-- `shelf-server` — Dockerized Go server on a home server. SQLite + FTS5, REST ingest, embedded
-  htmx web UI. Never touches media and needs no vendor tools.
+- `shelf-server` — Go server on a home server. SQLite + FTS5, REST ingest, embedded htmx web UI,
+  and its own scheduled scans of folders mounted on the server (Settings → Server scans).
 
 Working name is **Shelf**; it may be renamed. Grep for the name before hardcoding it anywhere new.
 
@@ -95,8 +95,10 @@ internal/{bundle,scan,clips,extract/{ffprobe,arri,red,braw,sony,ale,bwf},meta,st
 testdata/
 ```
 
-Shared code between CLI and server lives in `internal/bundle` and `internal/meta`. The server
-must not import anything under `internal/extract`.
+Shared code between CLI and server lives in `internal/bundle`, `internal/meta`, and
+`internal/scanner` (the whole walk → hash → group → extract pipeline). The server runs scans of
+its own attached folders through `internal/sched`, so it does import the extractors; a missing
+tool on the server is handled like anywhere else (recorded on the clip, never fatal).
 
 ## Go skills: always load
 
@@ -268,6 +270,14 @@ R3D → BRAW → ARRI, with Canon CRM added to the format table. Re-survey when 
 are attached; this RAID is not representative of the shelf drives.
 
 ## Decisions, continued
+
+- **Server scans (2026-10-09):** `scan_jobs` table + `internal/sched`; one job at a time, 30 s
+  tick, "Scan now" from Settings; `is_partial` applies to server scans the same way.
+- **Groups (2026-10-09):** `drive_groups` + `drives.group_id`; set from the inspector, groups
+  auto-delete when empty; the Drives page sections by group.
+- **Default explorer view** is a server setting (`default_view`, list unless changed) that a
+  browser cookie can override; the Duplicates page was removed (other copies remain on clip and
+  file pages).
 
 - **Partial scans (decided 2026-10-08):** a scan whose root is not the mount point is `is_partial`;
   latest and diffs are tracked per (drive, root); drive aggregates and default browsing prefer the

@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"time"
 
 	"github.com/fenixstarlord/indexserver/internal/store"
@@ -14,26 +13,11 @@ import (
 func (s *Server) historyRoutes() {
 	m := s.mux
 	auth := func(h http.HandlerFunc) http.Handler { return s.requireAuth(h) }
-	m.Handle("GET /duplicates", auth(s.handleDuplicates))
 	m.Handle("GET /scans/{a}/diff/{b}", auth(s.handleDiff))
 	m.Handle("GET /export.csv", auth(s.handleExportCSV))
 	m.Handle("GET /export.ale", auth(s.handleExportALE))
 	m.Handle("POST /settings/backup", auth(s.handleBackup))
 	m.Handle("GET /settings/backup/{name}", auth(s.handleBackupDownload))
-}
-
-func (s *Server) handleDuplicates(w http.ResponseWriter, r *http.Request) {
-	minGB, _ := strconv.ParseFloat(r.URL.Query().Get("min_gb"), 64)
-	groups, err := s.store.Duplicates(r.Context(), int64(minGB*1e9), 200)
-	if err != nil {
-		s.fail(w, r, err, "duplicates")
-		return
-	}
-	var wasted int64
-	for _, g := range groups {
-		wasted += g.WastedBytes
-	}
-	s.render(w, r, "duplicates", map[string]any{"Title": "Duplicates", "Groups": groups, "Wasted": wasted, "MinGB": r.URL.Query().Get("min_gb")})
 }
 
 func (s *Server) handleDiff(w http.ResponseWriter, r *http.Request) {

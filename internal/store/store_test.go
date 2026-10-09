@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -35,7 +36,7 @@ func TestMigrateIsIdempotentAndUsesWAL(t *testing.T) {
 		t.Fatal(err)
 	}
 	var n int
-	if err := s.DB.QueryRow(`SELECT count(*) FROM schema_migrations`).Scan(&n); err != nil || n != 2 {
+	if err := s.DB.QueryRow(`SELECT count(*) FROM schema_migrations`).Scan(&n); err != nil || n != 3 {
 		t.Fatalf("schema_migrations rows = %d, err %v", n, err)
 	}
 	var mode string
@@ -328,5 +329,85 @@ func TestPartialScansTrackedPerRoot(t *testing.T) {
 	s.DB.QueryRow(`SELECT count(*) FROM scans WHERE is_latest = 1`).Scan(&n)
 	if n != 2 {
 		t.Errorf("latest scans = %d, want 2 (one per root)", n)
+	}
+}
+
+func TestGroupsAndScanJobs(t *testing.T) {
+	ctx := context.Background()
+	s, err := Open(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	root := t.TempDir()
+	write(t, root, "a.mov", "a")
+	r, err := s.Ingest(ctx, makeBundle(t, root, time.Now()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SetDriveGroup(ctx, r.DriveID, "Shelf B"); err != nil {
+		t.Fatal(err)
+	}
+	drives, _ := s.ListDrives(ctx)
+	if drives[0].GroupName != "Shelf B" || drives[0].GroupID == 0 {
+		t.Errorf("group not applied: %+v", drives[0])
+	}
+	groups, _ := s.ListGroups(ctx)
+	if len(groups) != 1 || groups[0].Count != 1 {
+		t.Errorf("groups = %+v", groups)
+	}
+	if err := s.SetDriveGroup(ctx, r.DriveID, ""); err != nil {
+		t.Fatal(err)
+	}
+	if groups, _ := s.ListGroups(ctx); len(groups) != 0 {
+		t.Errorf("empty group should be deleted: %+v", groups)
+	}
+
+	id, err := s.CreateScanJob(ctx, ScanJob{Path: "/mnt/raid", Label: "RAID", IntervalMin: 60, Extract: true, Fingerprint: true, Enabled: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	due, _ := s.DueScanJobs(ctx, time.Now())
+	if len(due) != 1 || due[0].ID != id {
+		t.Fatalf("new scheduled job should be due: %+v", due)
+	}
+	now := time.Now()
+	if err := s.MarkScanJobRunning(ctx, id, now); err != nil {
+		t.Fatal(err)
+	}
+	if due, _ := s.DueScanJobs(ctx, now); len(due) != 0 {
+		t.Errorf("running job should not be due")
+	}
+	if err := s.MarkScanJobDone(ctx, id, nil, r.ScanID, 3*time.Second, now); err != nil {
+		t.Fatal(err)
+	}
+	j, _ := s.GetScanJob(ctx, id)
+	if j.LastStatus != "ok" || j.LastScanID != r.ScanID || j.NextRunAt == nil || j.NextRunAt.Sub(now) < 59*time.Minute || j.LastDuration != 3*time.Second {
+		t.Errorf("job after run wrong: %+v", j)
+	}
+	if due, _ := s.DueScanJobs(ctx, now.Add(61*time.Minute)); len(due) != 1 {
+		t.Errorf("job should be due again after the interval")
+	}
+	if err := s.MarkScanJobDone(ctx, id, errors.New("boom"), 0, time.Second, now); err != nil {
+		t.Fatal(err)
+	}
+	if j, _ := s.GetScanJob(ctx, id); j.LastStatus != "error" || j.LastError != "boom" || j.LastScanID != r.ScanID {
+		t.Errorf("error run wrong: %+v", j)
+	}
+	j.IntervalMin, j.Enabled = 0, true
+	if err := s.UpdateScanJob(ctx, j); err != nil {
+		t.Fatal(err)
+	}
+	if j, _ := s.GetScanJob(ctx, id); j.NextRunAt != nil {
+		t.Errorf("manual job should have no next run: %+v", j)
+	}
+	if _, err := s.CreateScanJob(ctx, ScanJob{Path: "/mnt/raid"}); err == nil {
+		t.Error("duplicate path should fail")
+	}
+	if err := s.DeleteScanJob(ctx, id); err != nil {
+		t.Fatal(err)
+	}
+	if jobs, _ := s.ListScanJobs(ctx); len(jobs) != 0 {
+		t.Errorf("job not deleted")
 	}
 }

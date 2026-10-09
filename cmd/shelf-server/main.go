@@ -19,6 +19,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/fenixstarlord/indexserver/internal/bundle"
+	"github.com/fenixstarlord/indexserver/internal/sched"
 	"github.com/fenixstarlord/indexserver/internal/store"
 	"github.com/fenixstarlord/indexserver/internal/web"
 )
@@ -89,12 +90,16 @@ func serve(parent context.Context) error {
 	}
 	log.Info("database ready", "path", filepath.Join(dataDir(), "shelf.db"), "fts5_trigram", "ok")
 
+	scheduler := sched.New(st, log, version)
+	scheduler.Start(ctx)
+
 	handler, err := web.New(ctx, st, web.Config{
 		Password:      os.Getenv("SHELF_PASSWORD"),
 		PasswordHash:  os.Getenv("SHELF_PASSWORD_HASH"),
 		SessionSecret: os.Getenv("SHELF_SESSION_SECRET"),
 		DataDir:       dataDir(),
 		Version:       version,
+		Sched:         scheduler,
 	}, log)
 	if err != nil {
 		return err

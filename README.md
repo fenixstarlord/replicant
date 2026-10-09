@@ -7,7 +7,8 @@ A self-hosted catalog of offline drives full of camera media.
   BRAW + sidecar), and extracts technical and camera metadata with ffprobe, ALE files, BWF/iXML,
   Sony XML, BRAW sidecars, REDline, and ARRI's `art-cmd`.
 - **`shelf-server`** stores every scan in SQLite and serves a web UI to search and browse any
-  drive while it is unplugged, see what changed between scans, and find duplicates.
+  drive while it is unplugged and see what changed between scans. It can also scan folders
+  mounted on the server itself, on demand or on a schedule (Settings → Server scans).
 
 The web UI is a clean daisyUI/Tailwind interface with automatic dark mode. See `docs/design/ui.md`.
 

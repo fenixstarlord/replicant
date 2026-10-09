@@ -25,7 +25,15 @@ type Config struct {
 	SessionSecret string // optional; auto-generated and persisted if empty
 	DataDir       string // where uploads are spooled
 	Version       string
-	MaxUploadSize int64 // bytes; 0 means 4 GiB
+	MaxUploadSize int64     // bytes; 0 means 4 GiB
+	Sched         Scheduler // server-side scans; nil disables the section
+}
+
+// Scheduler is what the settings page needs from the scan scheduler.
+type Scheduler interface {
+	RunJob(ctx context.Context, id int64) (store.IngestResult, error)
+	Running(id int64) (stage string, done, total int, since time.Time, ok bool)
+	Kick()
 }
 
 // Server holds the handlers' shared state.

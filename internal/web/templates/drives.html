@@ -8,7 +8,10 @@
     <div class="stat py-2 px-4"><div class="stat-title">Stored</div><div class="stat-value text-xl">{{bytes .TotalBytes}}</div></div>
   </div>
 </div>
-<div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
+{{$groups := .ByGroup}}
+{{range $groups}}
+{{if .Name}}<h2 class="flex items-center gap-2">{{.Name}} <span class="badge badge-ghost badge-sm">{{len .Drives}}</span></h2>{{else if gt (len $groups) 1}}<h2 class="muted font-normal">Ungrouped</h2>{{end}}
+<div class="overflow-x-auto rounded-box border border-base-300 bg-base-100 mb-4">
 <table class="table table-sm">
 <thead><tr><th>Name</th><th>Label</th><th>Location</th><th>Filesystem</th><th class="num">Capacity</th><th>Used</th><th class="num">Free</th><th class="num">Files</th><th class="num">Clips</th><th class="num">Scans</th><th>Last scan</th><th></th></tr></thead>
 <tbody>
@@ -25,8 +28,9 @@
   <td class="num">{{.ScanCount}}</td>
   <td>{{datetime .LastScannedAt}}</td>
   <td class="text-right"><a href="/search?drive={{.ID}}" class="btn btn-ghost btn-xs">Search</a></td>
-</tr>{{else}}<tr><td colspan="12" class="muted text-center py-8">No drives yet. On the Mac, run <code class="mono">shelf scan /Volumes/NAME</code>.</td></tr>{{end}}
+</tr>{{end}}
 </tbody>
 </table>
 </div>
+{{else}}<p class="muted text-center py-8 rounded-box border border-base-300 bg-base-100">No drives yet. On the Mac, run <code class="mono">shelf scan /Volumes/NAME</code>, or add a server scan under Settings.</p>{{end}}
 {{end}}

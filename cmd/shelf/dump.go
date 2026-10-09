@@ -36,14 +36,14 @@ Nothing is sent anywhere.`,
 				w := bufio.NewWriter(cmd.OutOrStdout())
 				enc := json.NewEncoder(w)
 				if showClips {
-					for i := range res.clips {
-						if err := enc.Encode(&res.clips[i]); err != nil {
+					for i := range res.Clips {
+						if err := enc.Encode(&res.Clips[i]); err != nil {
 							return err
 						}
 					}
 				} else {
-					for i := range res.entries {
-						if err := enc.Encode(&res.entries[i]); err != nil {
+					for i := range res.Entries {
+						if err := enc.Encode(&res.Entries[i]); err != nil {
 							return err
 						}
 					}
@@ -52,9 +52,9 @@ Nothing is sent anywhere.`,
 					return err
 				}
 			}
-			s := scan.Summarize(res.entries)
+			s := scan.Summarize(res.Entries)
 			fmt.Fprintf(stderr, "files %d  dirs %d  packages %d  symlinks %d  errors %d  bytes %d  clips %d  took %s\n",
-				s.Files, s.Dirs, s.Packages, s.Symlinks, s.Errors, s.Bytes, len(res.clips), time.Since(res.started).Round(time.Millisecond))
+				s.Files, s.Dirs, s.Packages, s.Symlinks, s.Errors, s.Bytes, len(res.Clips), time.Since(res.Started).Round(time.Millisecond))
 			for k, n := range s.ByKind {
 				fmt.Fprintf(stderr, "  %-8s %d\n", k, n)
 			}

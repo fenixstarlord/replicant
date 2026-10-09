@@ -4,78 +4,8 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
-	"strings"
 	"time"
 )
-
-// DupGroup is a set of identical files across the latest scans.
-type DupGroup struct {
-	Key         string     `json:"key"` // fingerprint, or name|size
-	Name        string     `json:"name"`
-	Size        int64      `json:"size"`
-	Count       int        `json:"count"`
-	WastedBytes int64      `json:"wasted_bytes"`
-	Copies      []EntryRow `json:"copies"`
-}
-
-// Duplicates groups files in latest scans by fingerprint (or by name and
-// size when no fingerprint exists) and returns groups with more than one
-// member, largest waste first.
-func (s *Store) Duplicates(ctx context.Context, minSize int64, limit int) ([]DupGroup, error) {
-	if limit <= 0 {
-		limit = 200
-	}
-	rows, err := s.DB.QueryContext(ctx, `
-		SELECT key, name, size, n FROM (
-			SELECT coalesce(e.fingerprint, e.name || '|' || e.size) AS key, min(e.name) AS name, e.size AS size, count(*) AS n
-			FROM entries e JOIN scans s ON s.id = e.scan_id
-			WHERE s.is_latest = 1 AND e.is_dir = 0 AND e.is_symlink = 0 AND e.size >= ?
-			GROUP BY key, e.size HAVING n > 1
-		) ORDER BY (n - 1) * size DESC LIMIT ?`, minSize, limit)
-	if err != nil {
-		return nil, err
-	}
-	var groups []DupGroup
-	for rows.Next() {
-		var g DupGroup
-		if err := rows.Scan(&g.Key, &g.Name, &g.Size, &g.Count); err != nil {
-			rows.Close()
-			return nil, err
-		}
-		g.WastedBytes = int64(g.Count-1) * g.Size
-		groups = append(groups, g)
-	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	for i := range groups {
-		g := &groups[i]
-		var q string
-		var args []any
-		if strings.Contains(g.Key, "|") {
-			q = " WHERE s.is_latest = 1 AND e.fingerprint IS NULL AND e.name = ? AND e.size = ? AND e.is_dir = 0"
-			args = []any{g.Name, g.Size}
-		} else {
-			q = " WHERE s.is_latest = 1 AND e.fingerprint = ?"
-			args = []any{g.Key}
-		}
-		crows, err := s.DB.QueryContext(ctx, "SELECT "+entryColumns+entryFrom+q+" ORDER BY d.name, e.path LIMIT 50", args...)
-		if err != nil {
-			return nil, err
-		}
-		for crows.Next() {
-			r, err := scanEntryRow(crows)
-			if err != nil {
-				crows.Close()
-				return nil, err
-			}
-			g.Copies = append(g.Copies, r)
-		}
-		crows.Close()
-	}
-	return groups, nil
-}
 
 // Diff compares two scans by path. It is computed on the fly so any two
 // scans can be compared, not just consecutive ones.

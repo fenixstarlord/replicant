@@ -17,7 +17,7 @@
     <details class="collapse collapse-arrow bg-base-200" {{if gt (len .Form) 2}}open{{end}}>
       <summary class="collapse-title text-sm font-medium min-h-0 py-2">Filters</summary>
       <div class="collapse-content filters pt-2">
-        <label>Drive<select name="drive" class="select select-bordered select-sm"><option value="">Any</option>{{$d := .Form.Get "drive"}}{{range .Drives}}<option value="{{.ID}}" {{if eq $d (printf "%d" .ID)}}selected{{end}}>{{.Name}}</option>{{end}}</select></label>
+        <label>Drive<select name="drive" class="select select-bordered select-sm"><option value="">Any</option>{{$d := .Form.Get "drive"}}{{range .Drives}}<option value="{{.ID}}" {{if eq $d (printf "%d" .ID)}}selected{{end}}>{{.Name}}{{if .GroupName}} ({{.GroupName}}){{end}}</option>{{end}}</select></label>
         <label>Kind<select name="kind" class="select select-bordered select-sm"><option value="">Any</option>{{$k := .Form.Get "kind"}}{{range .Facets.Kinds}}<option {{if eq $k .}}selected{{end}}>{{.}}</option>{{end}}</select></label>
         <label>Codec<select name="codec" class="select select-bordered select-sm"><option value="">Any</option>{{$c := .Form.Get "codec"}}{{range .Facets.Codecs}}<option {{if eq $c .}}selected{{end}}>{{.}}</option>{{end}}</select></label>
         <label>Camera<select name="camera" class="select select-bordered select-sm"><option value="">Any</option>{{$cm := .Form.Get "camera"}}{{range .Facets.Cameras}}<option {{if eq $cm .}}selected{{end}}>{{.}}</option>{{end}}</select></label>
