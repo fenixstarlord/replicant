@@ -1,4 +1,4 @@
-// Package bundle defines the .shelf scan bundle: a zip file holding a
+// Package bundle defines the .replicant scan bundle: a zip file holding a
 // manifest, the scanned entries, and the clips. The CLI writes it and the
 // server reads it, whether the bundle travels as a file or an HTTP body.
 package bundle

@@ -7,7 +7,7 @@ Accepted
 2026-10-08
 
 ## Context
-Shelf's server ships as a single Go binary with the web UI embedded. The plan rules out a JS build
+Replicant's server ships as a single Go binary with the web UI embedded. The plan rules out a JS build
 step at runtime and multi-user features. The UI is mostly dense tables (drives, search results,
 folder trees, metadata) and is often read from a phone. The user asked for a component library so
 pages are consistent and quick to build, and for the look to emulate the Dirtywave M8 tracker: black

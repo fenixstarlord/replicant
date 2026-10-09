@@ -72,7 +72,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/drives", http.StatusSeeOther)
 }
 
-const drivesByCookie = "shelf_drives_by"
+const drivesByCookie = "replicant_drives_by"
 
 // drivesBy resolves which taxonomy the Drives page sections by.
 func drivesBy(w http.ResponseWriter, r *http.Request) store.Taxonomy {
@@ -584,11 +584,11 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, s.cfg.MaxUploadSize)
 	f, _, err := r.FormFile("bundle")
 	if err != nil {
-		http.Redirect(w, r, "/settings?err=choose+a+.shelf+file", http.StatusSeeOther)
+		http.Redirect(w, r, "/settings?err=choose+a+.replicant+file", http.StatusSeeOther)
 		return
 	}
 	defer f.Close()
-	tmp, err := os.CreateTemp(s.cfg.DataDir, "upload-*.shelf")
+	tmp, err := os.CreateTemp(s.cfg.DataDir, "upload-*.replicant")
 	if err != nil {
 		s.fail(w, r, err, "spool")
 		return

@@ -1,16 +1,16 @@
 {{define "content"}}
 <h1>API keys</h1>
-<p class="muted text-sm mt-1">Shelf on your Mac uses a key to push scans. Create one per machine so you can revoke it later. A key carries the server address, so there is one thing to paste.</p>
+<p class="muted text-sm mt-1">Replicant on your Mac uses a key to push scans. Create one per machine so you can revoke it later. A key carries the server address, so there is one thing to paste.</p>
 {{if .Message}}<div role="alert" class="alert alert-success text-sm my-3">{{.Message}}</div>{{end}}
 {{if .NewToken}}
 <div class="card bg-base-100 border-2 border-success my-4"><div class="card-body gap-3">
   <h2 class="card-title text-base mt-0">New key{{if .NewTokenName}} “{{.NewTokenName}}”{{end}} created</h2>
-  <p class="text-sm">It is shown only once. Copy it now and paste it into Shelf on the Mac (Settings → Connection key).</p>
+  <p class="text-sm">It is shown only once. Copy it now and paste it into Replicant on the Mac (Settings → Connection key).</p>
   <div class="join w-full">
     <input id="newkey" class="input input-bordered mono join-item flex-1 min-w-0" readonly value="{{.Connection}}" onclick="this.select()">
     <button type="button" class="btn btn-primary join-item" onclick="navigator.clipboard.writeText(document.getElementById('newkey').value).then(()=>{this.textContent='Copied'})">Copy</button>
   </div>
-  <p class="muted text-sm">The key includes the server address <span class="mono">{{.Address}}</span> ({{.AddressSource}}). From a terminal: <code class="mono">shelf login '{{.Connection}}'</code></p>
+  <p class="muted text-sm">The key includes the server address <span class="mono">{{.Address}}</span> ({{.AddressSource}}). From a terminal: <code class="mono">replicant login '{{.Connection}}'</code></p>
 </div></div>
 {{end}}
 <div class="card bg-base-100 border border-base-300 my-4"><div class="card-body">

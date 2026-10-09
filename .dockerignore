@@ -5,11 +5,11 @@
 bin
 dist
 data
-*.shelf
+*.replicant
 *.db
 *.db-wal
 *.db-shm
-macos/ShelfMenu/.build
+macos/ReplicantMenu/.build
 docs
 *.md
 !README.md

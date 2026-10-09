@@ -107,7 +107,7 @@ func (e *Extractor) Extract(ctx context.Context, root string, c *clips.Clip) (*m
 		in = c.RootPath
 	}
 	abs := filepath.Join(root, filepath.FromSlash(in))
-	outdir, err := os.MkdirTemp("", "shelf-art-*")
+	outdir, err := os.MkdirTemp("", "replicant-art-*")
 	if err != nil {
 		return nil, err
 	}

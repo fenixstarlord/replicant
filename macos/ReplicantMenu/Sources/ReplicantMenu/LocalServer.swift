@@ -2,10 +2,10 @@ import AppKit
 import Combine
 import Foundation
 
-/// Standalone mode: the app bundle also carries `shelf-server`, and this
+/// Standalone mode: the app bundle also carries `replicant-server`, and this
 /// runs it on the loopback interface with authentication off, points the
 /// bundled CLI at it, and stops it on quit. The catalog lives in
-/// ~/Library/Application Support/Shelf.
+/// ~/Library/Application Support/Replicant.
 @MainActor
 final class LocalServer: ObservableObject {
     static let port = 8787
@@ -15,15 +15,15 @@ final class LocalServer: ObservableObject {
     static var isStandalone: Bool { serverURL != nil }
 
     static var serverURL: URL? {
-        guard Bundle.main.object(forInfoDictionaryKey: "ShelfStandalone") as? Bool == true,
-              let u = Bundle.main.url(forAuxiliaryExecutable: "shelf-server"),
+        guard Bundle.main.object(forInfoDictionaryKey: "ReplicantStandalone") as? Bool == true,
+              let u = Bundle.main.url(forAuxiliaryExecutable: "replicant-server"),
               FileManager.default.isExecutableFile(atPath: u.path) else { return nil }
         return u
     }
 
     static var dataDir: URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        return base.appendingPathComponent("Shelf", isDirectory: true)
+        return base.appendingPathComponent("Replicant", isDirectory: true)
     }
 
     @Published private(set) var running = false
@@ -35,8 +35,8 @@ final class LocalServer: ObservableObject {
         guard let exe = Self.serverURL else { return }
         try? FileManager.default.createDirectory(at: Self.dataDir, withIntermediateDirectories: true)
         // The CLI reads its config from the data dir too, so a remote
-        // setup in ~/.config/shelf is left alone.
-        ShelfCLI.environment["SHELF_CONFIG"] = Self.dataDir.appendingPathComponent("config.toml").path
+        // setup in ~/.config/replicant is left alone.
+        ReplicantCLI.environment["REPLICANT_CONFIG"] = Self.dataDir.appendingPathComponent("config.toml").path
         // Stop the server on quit, synchronously: the process is about to exit.
         observer = NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.stop() }
@@ -49,11 +49,11 @@ final class LocalServer: ObservableObject {
         p.executableURL = exe
         p.arguments = ["serve"]
         var env = ProcessInfo.processInfo.environment
-        env["SHELF_DATA_DIR"] = Self.dataDir.path
-        env["SHELF_LISTEN"] = "127.0.0.1:\(Self.port)"
-        env["SHELF_AUTH"] = "open"
-        env["SHELF_PUBLIC_URL"] = Self.url
-        env["SHELF_EXIT_WITH_PARENT"] = "1"
+        env["REPLICANT_DATA_DIR"] = Self.dataDir.path
+        env["REPLICANT_LISTEN"] = "127.0.0.1:\(Self.port)"
+        env["REPLICANT_AUTH"] = "open"
+        env["REPLICANT_PUBLIC_URL"] = Self.url
+        env["REPLICANT_EXIT_WITH_PARENT"] = "1"
         // Homebrew tools (ffprobe) are not on a GUI app's PATH.
         env["PATH"] = (env["PATH"] ?? "/usr/bin:/bin") + ":/opt/homebrew/bin:/usr/local/bin"
         p.environment = env
@@ -89,7 +89,7 @@ final class LocalServer: ObservableObject {
             if let (_, r) = try? await URLSession.shared.data(from: url), (r as? HTTPURLResponse)?.statusCode == 200 {
                 running = true
                 status = "Catalog running at \(Self.url)"
-                let (code, out) = await ShelfCLI.run(["login", Self.url])
+                let (code, out) = await ReplicantCLI.run(["login", Self.url])
                 if code != 0 { status = "Catalog running, but the scanner could not connect: \(out)" }
                 NotificationCenter.default.post(name: .localServerReady, object: nil)
                 return
@@ -115,5 +115,5 @@ final class LocalServer: ObservableObject {
 }
 
 extension Notification.Name {
-    static let localServerReady = Notification.Name("ShelfLocalServerReady")
+    static let localServerReady = Notification.Name("ReplicantLocalServerReady")
 }

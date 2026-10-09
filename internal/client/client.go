@@ -1,4 +1,4 @@
-// Package client talks to a shelf-server over HTTP with an API token.
+// Package client talks to a replicant-server over HTTP with an API token.
 package client
 
 import (
@@ -84,7 +84,7 @@ func (c *Client) Drives(ctx context.Context) ([]store.Drive, error) {
 	return dr.Drives, nil
 }
 
-// Upload streams a .shelf bundle file to the server.
+// Upload streams a .replicant bundle file to the server.
 func (c *Client) Upload(ctx context.Context, path string) (api.IngestResponse, error) {
 	var res api.IngestResponse
 	f, err := os.Open(path)

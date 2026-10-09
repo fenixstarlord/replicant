@@ -53,7 +53,7 @@ struct MenuContent: View {
             Button(toolsCheck.checking ? "Checking tools…" : "↻ Recheck tools") { Task { await toolsCheck.check() } }
                 .disabled(toolsCheck.checking)
         }
-        Button("Quit Shelf") { NSApplication.shared.terminate(nil) }
+        Button("Quit Replicant") { NSApplication.shared.terminate(nil) }
     }
 
     private func showSettings() {

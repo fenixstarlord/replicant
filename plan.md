@@ -1,6 +1,6 @@
 # Drive Catalog — Build Plan
 
-Working name: **Shelf** (rename freely). A self-hosted catalog of offline drives full of camera media. A Mac CLI indexes a mounted drive and pulls technical and camera metadata, including from cinema raw formats. A Dockerized server on a home server stores every scan and makes it searchable and browsable in a web UI.
+Working name: **Replicant** (rename freely). A self-hosted catalog of offline drives full of camera media. A Mac CLI indexes a mounted drive and pulls technical and camera metadata, including from cinema raw formats. A Dockerized server on a home server stores every scan and makes it searchable and browsable in a web UI.
 
 ## Goals
 
@@ -29,12 +29,12 @@ Working name: **Shelf** (rename freely). A self-hosted catalog of offline drives
 ```
  Mac (drive mounted)                        Home server (Docker)
 ┌───────────────────────────┐  HTTP(S) + ┌─────────────────────────────┐
-│ shelf CLI (Go)            │  API token │ shelf-server (Go)           │
+│ replicant CLI (Go)            │  API token │ replicant-server (Go)           │
 │  - walk filesystem        │ ─────────▶ │  - REST API (ingest)        │
 │  - group files into clips │            │  - web UI (Go templates +   │
 │  - run extractors:        │  or bundle │    htmx, embedded)          │
 │    ffprobe, art-cmd,      │ ─ upload ▶ │  - SQLite + FTS5            │
-│    REDline, sidecar parse │            │  /data: shelf.db            │
+│    REDline, sidecar parse │            │  /data: replicant.db            │
 │  - write scan bundle      │            └─────────────────────────────┘
 └───────────────────────────┘
 ```
@@ -44,8 +44,8 @@ All media tooling runs on the Mac. The server never touches media and needs no v
 ### Repo layout (monorepo)
 
 ```
-/cmd/shelf               indexer CLI
-/cmd/shelf-server        server
+/cmd/replicant               indexer CLI
+/cmd/replicant-server        server
 /internal/bundle         scan bundle format, shared by both sides
 /internal/scan           filesystem walk, skip rules, fingerprinting
 /internal/clips          multi-file clip / card-structure detection
@@ -88,8 +88,8 @@ type Extractor interface {
 - Several extractors can match one clip. Results merge in priority order: vendor tool > sidecar > ffprobe. Every field records which source it came from.
 - Each extractor's raw output is stored verbatim (JSON, or text wrapped in JSON) per source, so new fields can be mapped later without rescanning.
 - A missing tool is never fatal. The clip is recorded with whatever other extractors produced, plus a note of which extractor was unavailable.
-- `shelf doctor` lists every extractor, whether its tool was found, and its version.
-- Tool paths are configurable in `~/.config/shelf/config.toml`, with sensible macOS defaults (e.g. REDline inside the REDCINE-X PRO app bundle).
+- `replicant doctor` lists every extractor, whether its tool was found, and its version.
+- Tool paths are configurable in `~/.config/replicant/config.toml`, with sensible macOS defaults (e.g. REDline inside the REDCINE-X PRO app bundle).
 - Bounded worker pool. Per-file timeouts so one bad file can't hang a scan.
 
 ### Per-format plan
@@ -101,7 +101,7 @@ type Extractor interface {
 | ARRIRAW legacy `.ari` / HDE `.arx` | frame sequence | `art-cmd` (supports ARI/ARX single-frame sequences as input) | ALE | Group the sequence into one clip; run `art-cmd` once per clip, not per frame |
 | ARRI ProRes | MOV / MXF | `art-cmd` for camera metadata | ffprobe, ALE | ffprobe gives the technical basics |
 | R3D | `.RDC` folder of `_001.R3D`, `_002.R3D`… | **REDline `--printMeta 2`** (CSV) — free with REDCINE-X PRO | `.RMD` sidecar (XML), ffprobe not useful | One clip per `.RDC`; run on the first segment |
-| BRAW | QuickTime-style `.braw` | **`.sidecar` JSON** (no tool needed) + ffprobe for container basics | Optional helper `shelf-braw` built on the Blackmagic RAW SDK | Blackmagic ships no CLI. The SDK includes an ExtractMetadata sample; build a tiny helper in Phase 5 if ffprobe + sidecar aren't enough |
+| BRAW | QuickTime-style `.braw` | **`.sidecar` JSON** (no tool needed) + ffprobe for container basics | Optional helper `replicant-braw` built on the Blackmagic RAW SDK | Blackmagic ships no CLI. The SDK includes an ExtractMetadata sample; build a tiny helper in Phase 5 if ffprobe + sidecar aren't enough |
 | Sony X-OCN / Sony RAW | MXF in card structure (`XDROOT/Clip`, `PRIVATE/M4ROOT`) | **Clip XML sidecar** (NonRealTimeMeta: device, lens, capture settings) | ffprobe (container, duration, timecode) | ffprobe can read the MXF wrapper but can't decode X-OCN; that's fine since we don't decode |
 | ProRes / H.264 / H.265 / DNx / XAVC | MOV / MP4 / MXF | ffprobe | Sony XML when on a card | |
 | WAV / BWF / AIFF | | ffprobe | Dedicated BWF `bext` + iXML parser (scene, take, tape, notes, timecode) | Production audio carries a lot in iXML |
@@ -139,17 +139,17 @@ Done before extraction, so extractors receive a `Clip` (one or more files) rathe
 
 Folders still appear in the browse tree normally. The clip just becomes the unit for search results and metadata.
 
-## Indexer CLI (`shelf`)
+## Indexer CLI (`replicant`)
 
 ```
-shelf login <server-url>          # paste an API token, saved to ~/.config/shelf/config.toml
-shelf doctor                      # show extractors, tool availability, versions
-shelf scan /Volumes/X             # scan and push to server (default when logged in)
-shelf scan /Volumes/X -o x.shelf  # scan to a bundle file, no network
-shelf scan /Volumes/X --fast      # filesystem only, no metadata extraction
-shelf upload x.shelf              # push a bundle later
-shelf drives                      # list known drives on the server
-shelf dump /Volumes/X [--clip P]  # print what would be indexed as JSON (debugging)
+replicant login <server-url>          # paste an API token, saved to ~/.config/replicant/config.toml
+replicant doctor                      # show extractors, tool availability, versions
+replicant scan /Volumes/X             # scan and push to server (default when logged in)
+replicant scan /Volumes/X -o x.replicant  # scan to a bundle file, no network
+replicant scan /Volumes/X --fast      # filesystem only, no metadata extraction
+replicant upload x.replicant              # push a bundle later
+replicant drives                      # list known drives on the server
+replicant dump /Volumes/X [--clip P]  # print what would be indexed as JSON (debugging)
 ```
 
 ### Scan behavior
@@ -163,7 +163,7 @@ shelf dump /Volumes/X [--clip P]  # print what would be indexed as JSON (debuggi
 - **Progress:** files, bytes, clips extracted, current file, ETA.
 - **Resilience:** a file or clip that fails extraction is still recorded, with the error.
 
-### Scan bundle format (`.shelf`)
+### Scan bundle format (`.replicant`)
 
 A zip file containing:
 
@@ -178,14 +178,14 @@ clips.jsonl     one object per clip: member entries, normalized fields,
 
 Direct push uses the same bundle: the CLI builds it in a temp dir and streams it to `POST /api/scans`. One code path.
 
-## Server (`shelf-server`)
+## Server (`replicant-server`)
 
 ### Config (env vars)
 
-- `SHELF_PASSWORD` (required) or `SHELF_PASSWORD_HASH` (bcrypt).
-- `SHELF_DATA_DIR` (default `/data`).
-- `SHELF_LISTEN` (default `:8080`).
-- `SHELF_SESSION_SECRET` (auto-generated and persisted in the data dir if unset).
+- `REPLICANT_PASSWORD` (required) or `REPLICANT_PASSWORD_HASH` (bcrypt).
+- `REPLICANT_DATA_DIR` (default `/data`).
+- `REPLICANT_LISTEN` (default `:8080`).
+- `REPLICANT_SESSION_SECRET` (auto-generated and persisted in the data dir if unset).
 
 ### Ingest
 
@@ -251,8 +251,8 @@ Mobile-friendly layout, since "which drive is it on?" gets asked from a phone.
 
 - Multi-stage Dockerfile; distroless or alpine final image with just the server binary. Build multi-arch (amd64 + arm64).
 - `docker-compose.yml`: one service, one volume at `/data`, port 8080, `restart: unless-stopped`.
-- Backups: `shelf-server backup <path>` using SQLite `VACUUM INTO`, also a Settings button.
-- Remote access: via **NetBird**. The server listens only on the host's NetBird interface or LAN. No public port, and the app doesn't terminate TLS. The README should document binding to the NetBird IP and point the CLI at the server's NetBird address or name, e.g. `shelf login http://shelf.netbird.cloud:8080`; confirm the actual name format in their setup.
+- Backups: `replicant-server backup <path>` using SQLite `VACUUM INTO`, also a Settings button.
+- Remote access: via **NetBird**. The server listens only on the host's NetBird interface or LAN. No public port, and the app doesn't terminate TLS. The README should document binding to the NetBird IP and point the CLI at the server's NetBird address or name, e.g. `replicant login http://replicant.netbird.cloud:8080`; confirm the actual name format in their setup.
 
 ## Testing
 
@@ -264,23 +264,23 @@ Mobile-friendly layout, since "which drive is it on?" gets asked from a phone.
   - Optional manufacturer sample clips (ARRI, RED, and Blackmagic publish sample footage) for a slow, opt-in integration suite.
 - **Indexer:** walk/skip rules, fingerprinting, clip grouping, each extractor's parser, merge priority, bundle round-trip, read-only guarantee, and a macOS integration test that mounts an `hdiutil` disk image to check UUID capture.
 - **Server:** ingest + rollback, diff correctness across three scans, FTS and filter queries, ALE/CSV export, auth on every route.
-- **End-to-end:** server in a container, `shelf scan` against fixtures, assert via the API.
+- **End-to-end:** server in a container, `replicant scan` against fixtures, assert via the API.
 
 ## Build phases
 
 Each phase ends with something runnable. Commit at the end of each.
 
-1. **Skeleton:** Go module, layout, `shelf dump` (walk + skip rules + stat + fingerprint → JSON), FTS5 trigram check. **Done when:** `shelf dump` on a real drive prints sensible entries quickly. *User attaches real drives here; count files, note folder structures and formats present.*
-2. **Clip grouping + bundle:** R3D/ARRIRAW/Sony card detection, sidecar attachment, bundle writer, `shelf scan -o --fast`. **Done when:** a real drive's bundle shows clips grouped correctly.
-3. **Server core:** schema + migrations, ingest, API tokens, password login, Docker image, compose file. **Done when:** `shelf upload` lands a scan in the DB on the home server.
-4. **Extractors:** extractor framework, `shelf doctor`, then ffprobe → ALE → art-cmd → REDline → Sony XML → BRAW sidecar → BWF/iXML. Capture golden outputs from real media as each one is built. **Done when:** a real drive scan fills codec, resolution, fps, timecode, camera, ISO, WB, and lens for each raw format present.
+1. **Skeleton:** Go module, layout, `replicant dump` (walk + skip rules + stat + fingerprint → JSON), FTS5 trigram check. **Done when:** `replicant dump` on a real drive prints sensible entries quickly. *User attaches real drives here; count files, note folder structures and formats present.*
+2. **Clip grouping + bundle:** R3D/ARRIRAW/Sony card detection, sidecar attachment, bundle writer, `replicant scan -o --fast`. **Done when:** a real drive's bundle shows clips grouped correctly.
+3. **Server core:** schema + migrations, ingest, API tokens, password login, Docker image, compose file. **Done when:** `replicant upload` lands a scan in the DB on the home server.
+4. **Extractors:** extractor framework, `replicant doctor`, then ffprobe → ALE → art-cmd → REDline → Sony XML → BRAW sidecar → BWF/iXML. Capture golden outputs from real media as each one is built. **Done when:** a real drive scan fills codec, resolution, fps, timecode, camera, ISO, WB, and lens for each raw format present.
 5. **Search + browse UI:** drives page, search with filters, tree browser, clip/file detail. **Done when:** a clip can be found by partial name or by "ISO 800 + 25 fps + ALEXA 35" with the drive unplugged. Decide here whether the BRAW SDK helper is needed.
 6. **History + duplicates:** diffs at ingest, history page, scan diff view, duplicates page, other copies on detail.
-7. **Polish:** `shelf login` + direct push, CSV and ALE export, backup command, label/location editing, mobile pass, README.
+7. **Polish:** `replicant login` + direct push, CSV and ALE export, backup command, label/location editing, mobile pass, README.
 
 ## Later
 
-- `shelf-braw` helper on the Blackmagic RAW SDK, if sidecar + ffprobe prove too thin.
+- `replicant-braw` helper on the Blackmagic RAW SDK, if sidecar + ffprobe prove too thin.
 - Dynamic (per-frame) metadata such as lens focus pulls; v1 stores static/start values only.
 - Optional thumbnails via vendor tools, opt-in per drive.
 - A menu-bar app that auto-scans drives when they mount.
@@ -292,7 +292,7 @@ The team works with many camera bodies, and the mix varies by job. So:
 
 - Extractors are built **per format/vendor, not per camera body**. One ARRI extractor covers every ALEXA/AMIRA; one RED extractor covers every R3D camera.
 - Every vendor in the per-format table is in scope for v1. Phase 4 builds them in the order the Phase 1 survey of real drives shows they're most common.
-- Unrecognized formats still get ffprobe plus filesystem data, and the raw output is kept. Add a `shelf scan --report-unknown` summary listing extensions and containers that no extractor fully handled, so gaps show up as new cameras appear.
+- Unrecognized formats still get ffprobe plus filesystem data, and the raw output is kept. Add a `replicant scan --report-unknown` summary listing extensions and containers that no extractor fully handled, so gaps show up as new cameras appear.
 - Keep extractor field mappings data-driven (a mapping table per source), so adding a new camera's field names is a small change, not new code.
 
 ## Open questions

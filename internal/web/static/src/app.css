@@ -1,4 +1,4 @@
-/* Shelf web UI stylesheet source. Built with the standalone Tailwind CLI
+/* Replicant web UI stylesheet source. Built with the standalone Tailwind CLI
    into ../app.css (committed, embedded). See docs/design/ui.md. */
 @import "tailwindcss";
 @plugin "daisyui" {

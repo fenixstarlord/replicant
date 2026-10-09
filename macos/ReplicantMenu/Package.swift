@@ -2,12 +2,12 @@
 import PackageDescription
 
 let package = Package(
-    name: "ShelfMenu",
+    name: "ReplicantMenu",
     platforms: [.macOS(.v14)],
     targets: [
         .executableTarget(
-            name: "ShelfMenu",
-            path: "Sources/ShelfMenu",
+            name: "ReplicantMenu",
+            path: "Sources/ReplicantMenu",
             swiftSettings: [.unsafeFlags(["-parse-as-library"])]
         )
     ]

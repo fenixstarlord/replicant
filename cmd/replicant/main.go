@@ -1,5 +1,5 @@
-// Command shelf indexes a mounted drive of camera media and sends the
-// result to a shelf-server, or writes it to a bundle file.
+// Command replicant indexes a mounted drive of camera media and sends the
+// result to a replicant-server, or writes it to a bundle file.
 package main
 
 import (
@@ -19,7 +19,7 @@ func main() {
 
 func newRootCmd() *cobra.Command {
 	root := &cobra.Command{
-		Use:           "shelf",
+		Use:           "replicant",
 		Short:         "Catalog offline drives of camera media",
 		Version:       version,
 		SilenceUsage:  true,

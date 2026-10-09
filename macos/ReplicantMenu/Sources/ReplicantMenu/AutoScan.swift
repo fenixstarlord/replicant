@@ -30,7 +30,7 @@ final class AutoScanner: ObservableObject {
     @Published private(set) var lastScanned: [String: Date]
     /// External drive names ever mounted while the app ran.
     @Published private(set) var seen: Set<String>
-    /// Drive names in the server's catalog, from `shelf drives --json`.
+    /// Drive names in the server's catalog, from `replicant drives --json`.
     @Published private(set) var catalog: [String] = []
 
     private let defaults = UserDefaults.standard
@@ -98,7 +98,7 @@ final class AutoScanner: ObservableObject {
     /// Asks the server which drives it knows, so unplugged drives can
     /// get rules too.
     func refreshCatalog() async {
-        let (code, out) = await ShelfCLI.run(["drives", "--json"])
+        let (code, out) = await ReplicantCLI.run(["drives", "--json"])
         guard code == 0, let data = out.data(using: .utf8),
               let rows = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return }
         catalog = rows.compactMap { $0["name"] as? String }.sorted()

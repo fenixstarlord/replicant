@@ -1,6 +1,6 @@
 // Package scanner runs the whole indexing pipeline for one root: volume
 // identity, walk, fingerprint, clip grouping, and metadata extraction.
-// The shelf CLI and the server's scheduled scans share it.
+// The replicant CLI and the server's scheduled scans share it.
 package scanner
 
 import (

@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	sessionCookie = "shelf_session"
+	sessionCookie = "replicant_session"
 	sessionTTL    = 30 * 24 * time.Hour
 	secretSetting = "session_secret"
 )

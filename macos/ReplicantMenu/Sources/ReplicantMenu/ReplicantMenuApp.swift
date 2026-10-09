@@ -1,9 +1,9 @@
 import SwiftUI
 
-/// Shelf menu bar app: lists mounted drives, scans one with a click, and
-/// pushes the result to the server through the bundled `shelf` CLI.
+/// Replicant menu bar app: lists mounted drives, scans one with a click, and
+/// pushes the result to the server through the bundled `replicant` CLI.
 @main
-struct ShelfMenuApp: App {
+struct ReplicantMenuApp: App {
     @StateObject private var volumes: VolumeMonitor
     @StateObject private var scans: ScanManager
     @StateObject private var settings: AppSettings

@@ -33,6 +33,9 @@ func FindTool(configured string, name string, candidates ...string) string {
 // under the scan root as an output location; callers pass a temp dir.
 func RunTool(ctx context.Context, bin string, args ...string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, bin, args...)
+	// Never run a vendor tool with the scanned volume as its working
+	// directory: art-cmd, for one, writes art.log into the cwd.
+	cmd.Dir = os.TempDir()
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
@@ -57,6 +60,7 @@ func (e *ToolError) Error() string { return e.Bin + ": " + e.Msg }
 // VersionLine runs bin with args and returns the first non-empty output line.
 func VersionLine(ctx context.Context, bin string, args ...string) string {
 	cmd := exec.CommandContext(ctx, bin, args...)
+	cmd.Dir = os.TempDir()
 	out, _ := cmd.CombinedOutput()
 	for _, line := range strings.Split(string(out), "\n") {
 		if l := strings.TrimSpace(line); l != "" {

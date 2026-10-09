@@ -6,10 +6,10 @@ func TestConnectionStringRoundTrip(t *testing.T) {
 	cases := []struct {
 		server, token, want string
 	}{
-		{"http://100.64.0.5:8080", "shelf_abc", "shelf://shelf_abc@100.64.0.5:8080"},
-		{"http://100.64.0.5:8080/", "shelf_abc", "shelf://shelf_abc@100.64.0.5:8080"},
-		{"https://shelf.example.com", "shelf_x-y_z", "shelfs://shelf_x-y_z@shelf.example.com"},
-		{"http://host:8080/prefix", "shelf_abc", "shelf://shelf_abc@host:8080/prefix"},
+		{"http://100.64.0.5:8080", "replicant_abc", "replicant://replicant_abc@100.64.0.5:8080"},
+		{"http://100.64.0.5:8080/", "replicant_abc", "replicant://replicant_abc@100.64.0.5:8080"},
+		{"https://replicant.example.com", "replicant_x-y_z", "replicants://replicant_x-y_z@replicant.example.com"},
+		{"http://host:8080/prefix", "replicant_abc", "replicant://replicant_abc@host:8080/prefix"},
 	}
 	for _, c := range cases {
 		got, err := ConnectionString(c.server, c.token)
@@ -32,9 +32,9 @@ func TestParseConnectionForms(t *testing.T) {
 		in, server, token string
 		wantErr           bool
 	}{
-		{"shelf://shelf_abc@host:8080", "http://host:8080", "shelf_abc", false},
-		{"  shelfs://shelf_abc@host  ", "https://host", "shelf_abc", false},
-		{"http://shelf_abc@host:8080", "http://host:8080", "shelf_abc", false},
+		{"replicant://replicant_abc@host:8080", "http://host:8080", "replicant_abc", false},
+		{"  replicants://replicant_abc@host  ", "https://host", "replicant_abc", false},
+		{"http://replicant_abc@host:8080", "http://host:8080", "replicant_abc", false},
 		{"http://host:8080", "http://host:8080", "", false},
 		{"http://host:8080/", "http://host:8080", "", false},
 		{"host:8080", "", "", true},
@@ -51,7 +51,7 @@ func TestParseConnectionForms(t *testing.T) {
 
 func TestConnectionStringRejectsBadServer(t *testing.T) {
 	for _, s := range []string{"", "host:8080", "ftp://host"} {
-		if _, err := ConnectionString(s, "shelf_abc"); err == nil {
+		if _, err := ConnectionString(s, "replicant_abc"); err == nil {
 			t.Errorf("ConnectionString(%q) should fail", s)
 		}
 	}

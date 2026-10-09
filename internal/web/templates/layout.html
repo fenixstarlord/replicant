@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{.Title}} · Shelf</title>
+<title>{{.Title}} · Replicant</title>
 <link rel="stylesheet" href="/static/app.css?v={{.Version}}">
 <script src="/static/htmx.min.js?v={{.Version}}" defer></script>
 </head>
@@ -11,7 +11,7 @@
 <header class="bg-base-100 border-b border-base-300">
   <nav class="navbar max-w-screen-2xl mx-auto px-4 flex-wrap gap-y-1">
     <div class="flex flex-wrap items-center gap-x-1">
-      <a href="/drives" class="btn btn-ghost text-lg font-semibold px-2">Shelf</a>
+      <a href="/drives" class="btn btn-ghost text-lg font-semibold px-2">Replicant</a>
       <a href="/drives" class="btn btn-ghost btn-sm {{if eq .Path "/drives"}}btn-active{{end}}">Drives</a>
       <a href="/search" class="btn btn-ghost btn-sm {{if eq .Path "/search"}}btn-active{{end}}">Search</a>
       {{if not .Open}}<a href="/settings/api-keys" class="btn btn-ghost btn-sm {{if eq .Path "/settings/api-keys"}}btn-active{{end}}">API keys</a>{{end}}
@@ -28,6 +28,6 @@
 <main class="max-w-screen-2xl mx-auto p-4 md:p-6">
 {{block "content" .}}{{end}}
 </main>
-<footer class="muted text-xs max-w-screen-2xl mx-auto px-4 pb-6">Shelf {{.Version}}</footer>
+<footer class="muted text-xs max-w-screen-2xl mx-auto px-4 pb-6">Replicant {{.Version}}</footer>
 </body>
 </html>{{end}}

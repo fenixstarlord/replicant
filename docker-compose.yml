@@ -1,23 +1,23 @@
-# Shelf server. Edit the values below, then: docker compose up -d
+# Replicant server. Edit the values below, then: docker compose up -d
 services:
-  shelf:
+  replicant:
     image: ghcr.io/fenixstarlord/indexserver:latest
-    container_name: shelf
+    container_name: replicant
     restart: unless-stopped
     ports:
       - "8080:8080"
     environment:
-      SHELF_PASSWORD: change-me
+      REPLICANT_PASSWORD: change-me
       # The address Macs use to reach this server (baked into API keys).
       # Use the host's NetBird or LAN address; the container cannot detect it.
-      SHELF_PUBLIC_URL: http://100.64.0.5:8080
+      REPLICANT_PUBLIC_URL: http://100.64.0.5:8080
       TZ: America/Los_Angeles
     volumes:
       # Where the catalog lives (database, uploads, backups). host:container
-      - /mnt/rock/apps/shelf:/data
+      - /mnt/rock/apps/replicant:/data
       # Drives for the server to scan itself (Settings -> Server scans).
       # One line per drive, host path first, read-only. Add as many as you like.
       - /mnt/rock/zfsshare/dataset1:/media/dataset1:ro
       - /mnt/rock/zfsshare/dataset2:/media/dataset2:ro
       # Optional: Linux builds of art-cmd / REDline, found on PATH.
-      # - /mnt/rock/apps/shelf-tools:/opt/shelf-tools:ro
+      # - /mnt/rock/apps/replicant-tools:/opt/replicant-tools:ro

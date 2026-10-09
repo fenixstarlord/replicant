@@ -1,8 +1,8 @@
 import Foundation
 import ServiceManagement
 
-/// Settings shared with the `shelf` CLI (server and API key live in
-/// ~/.config/shelf/config.toml, written by `shelf login`) plus the app's
+/// Settings shared with the `replicant` CLI (server and API key live in
+/// ~/.config/replicant/config.toml, written by `replicant login`) plus the app's
 /// own ignore list and launch-at-login flag.
 @MainActor
 final class AppSettings: ObservableObject {
@@ -19,8 +19,8 @@ final class AppSettings: ObservableObject {
     }
 
     static var configURL: URL {
-        if let p = ShelfCLI.environment["SHELF_CONFIG"] ?? ProcessInfo.processInfo.environment["SHELF_CONFIG"], !p.isEmpty { return URL(fileURLWithPath: p) }
-        return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".config/shelf/config.toml")
+        if let p = ReplicantCLI.environment["REPLICANT_CONFIG"] ?? ProcessInfo.processInfo.environment["REPLICANT_CONFIG"], !p.isEmpty { return URL(fileURLWithPath: p) }
+        return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".config/replicant/config.toml")
     }
 
     /// Reads the two keys we care about from the TOML file. The CLI owns

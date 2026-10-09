@@ -67,7 +67,7 @@ func TestAuthRequired(t *testing.T) {
 		}
 	}
 	req := httptest.NewRequest("GET", "/api/drives", nil)
-	req.Header.Set("Authorization", "Bearer shelf_bogus")
+	req.Header.Set("Authorization", "Bearer replicant_bogus")
 	rec := httptest.NewRecorder()
 	s.ServeHTTP(rec, req)
 	if rec.Code != 401 {
@@ -356,7 +356,7 @@ func TestAPIKeyCreateAndRevokeViaUI(t *testing.T) {
 	rec := httptest.NewRecorder()
 	s.ServeHTTP(rec, req)
 	body := rec.Body.String()
-	if rec.Code != 200 || !strings.Contains(body, "shelf://shelf_") || !strings.Contains(body, "MacBook Pro") || !strings.Contains(body, "shown only once") {
+	if rec.Code != 200 || !strings.Contains(body, "replicant://replicant_") || !strings.Contains(body, "MacBook Pro") || !strings.Contains(body, "shown only once") {
 		t.Fatalf("create key: %d %.300s", rec.Code, body)
 	}
 	toks, _ := s.store.ListTokens(context.Background())

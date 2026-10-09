@@ -83,5 +83,5 @@ func (s *Store) Backup(ctx context.Context, path string) error {
 
 // BackupName returns a timestamped backup file name.
 func BackupName(now time.Time) string {
-	return fmt.Sprintf("shelf-%s.db", now.UTC().Format("20060102-150405"))
+	return fmt.Sprintf("replicant-%s.db", now.UTC().Format("20060102-150405"))
 }

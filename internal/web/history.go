@@ -53,7 +53,7 @@ func (s *Server) handleExportCSV(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
-	w.Header().Set("Content-Disposition", `attachment; filename="shelf-clips.csv"`)
+	w.Header().Set("Content-Disposition", `attachment; filename="replicant-clips.csv"`)
 	if err := store.WriteCSV(w, rows); err != nil {
 		s.log.Error("csv export", "err", err)
 	}
@@ -66,7 +66,7 @@ func (s *Server) handleExportALE(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.Header().Set("Content-Disposition", `attachment; filename="shelf-clips.ale"`)
+	w.Header().Set("Content-Disposition", `attachment; filename="replicant-clips.ale"`)
 	if err := store.WriteALE(w, rows); err != nil {
 		s.log.Error("ale export", "err", err)
 	}

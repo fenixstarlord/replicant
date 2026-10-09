@@ -1,7 +1,7 @@
 import AppKit
 import Foundation
 
-/// One extractor as reported by `shelf doctor --json`.
+/// One extractor as reported by `replicant doctor --json`.
 struct ToolStatus: Identifiable, Decodable {
     let name: String
     let version: String?
@@ -77,7 +77,7 @@ final class ToolChecker: ObservableObject {
         if checking { return }
         checking = true
         defer { checking = false }
-        let (code, out) = await ShelfCLI.run(["doctor", "--json"])
+        let (code, out) = await ReplicantCLI.run(["doctor", "--json"])
         guard code == 0, let data = out.data(using: .utf8),
               let report = try? JSONDecoder().decode(DoctorReport.self, from: data) else {
             tools = []

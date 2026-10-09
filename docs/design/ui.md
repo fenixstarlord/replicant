@@ -1,4 +1,4 @@
-# Shelf web UI — design notes
+# Replicant web UI — design notes
 
 Decided 2026-10-09, replacing the Dirtywave M8 emulation in `m8-theme.md` (kept for history).
 
@@ -20,4 +20,4 @@ Decided 2026-10-09, replacing the Dirtywave M8 emulation in `m8-theme.md` (kept 
   segmented controls and pagers, `form-control` labels, `alert` for one-time messages.
 - **Mobile:** navbar wraps, stats stack, detail cards stack, tables scroll horizontally.
 - **API keys:** their own page (`/settings/api-keys`) with a name field, the key shown once with a
-  copy button and the ready-to-paste `shelf login` line, and a revoke per row.
+  copy button and the ready-to-paste `replicant login` line, and a revoke per row.

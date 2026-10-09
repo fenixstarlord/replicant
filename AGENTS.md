@@ -1,4 +1,4 @@
-# AGENTS.md — Shelf (drive catalog)
+# AGENTS.md — Replicant (drive catalog)
 
 Instructions for AI coding agents working in this repo. `CLAUDE.md` imports this file.
 The authoritative design is **[plan.md](plan.md)**. Read it before any non-trivial task. This file
@@ -8,38 +8,38 @@ adds working conventions, environment facts, and the current phase; it does not 
 
 A self-hosted catalog of offline drives full of camera media. Two Go binaries from one module:
 
-- `shelf` — macOS CLI. Walks a mounted drive, groups files into clips, runs metadata extractors
-  (ffprobe, ARRI `art-cmd`, REDline, sidecar parsers), and writes a `.shelf` scan bundle or pushes
+- `replicant` — macOS CLI. Walks a mounted drive, groups files into clips, runs metadata extractors
+  (ffprobe, ARRI `art-cmd`, REDline, sidecar parsers), and writes a `.replicant` scan bundle or pushes
   it to the server.
-- `shelf-server` — Go server on a home server. SQLite + FTS5, REST ingest, embedded htmx web UI,
+- `replicant-server` — Go server on a home server. SQLite + FTS5, REST ingest, embedded htmx web UI,
   and its own scheduled scans of folders mounted on the server (Settings → Server scans).
 
-Working name is **Shelf**; it may be renamed. Grep for the name before hardcoding it anywhere new.
+Working name is **Replicant**; it may be renamed. Grep for the name before hardcoding it anywhere new.
 
 ## Current phase
 
 Track progress here. Update this section at the end of each phase, and commit.
 
 - [x] Phase 1 — Skeleton (2026-10-08). Module, `internal/scan` (walk, skip rules, packages,
-  xxHash64 fingerprint), `shelf dump`, `internal/store` with the FTS5 trigram check (passes on
-  `modernc.org/sqlite`, no cgo needed), `shelf-server` stub with `/healthz`, `./start.sh`, Makefile.
+  xxHash64 fingerprint), `replicant dump`, `internal/store` with the FTS5 trigram check (passes on
+  `modernc.org/sqlite`, no cgo needed), `replicant-server` stub with `/healthz`, `./start.sh`, Makefile.
 - [x] Phase 2 — Clip grouping + bundle (2026-10-08). `internal/clips` (R3D `.RDC`, ARRIRAW
   frame sequences, Sony `XDROOT/Clip` + `M4ROOT/CLIP`, BRAW `.sidecar`, same-stem sidecars),
   `internal/scan.VolumeInfo` (statfs + `diskutil info -plist`), `internal/bundle` zip writer and
-  reader, `shelf scan -o x.shelf --fast`, `shelf dump --clips`. Verified on SSD_RAID: 614k
+  reader, `replicant scan -o x.replicant --fast`, `replicant dump --clips`. Verified on SSD_RAID: 614k
   entries → 19.9k clips in 10 s, 9 MB bundle. Real camera cards still unverified (none on that
   drive); re-check grouping when one is attached.
 - [x] Phase 3 — Server core (2026-10-08). `internal/store`: embedded SQL migrations, one-
   transaction ingest with per-directory totals, path diff against the previous latest scan
-  (`scan_changes`), API tokens (sha256 of `shelf_…`), settings. `internal/web`: bearer-token or
+  (`scan_changes`), API tokens (sha256 of `replicant_…`), settings. `internal/web`: bearer-token or
   HMAC session-cookie auth, `POST /api/scans`, `GET /api/drives`, `GET /api/me`, placeholder
-  login page. CLI: `shelf login`, `upload`, `drives`, and `scan` without `-o` pushes directly.
-  `shelf-server token create|list|revoke`, `shelf-server ingest <file>`. Verified end to end
+  login page. CLI: `replicant login`, `upload`, `drives`, and `scan` without `-o` pushes directly.
+  `replicant-server token create|list|revoke`, `replicant-server ingest <file>`. Verified end to end
   against `./start.sh`: the 614k-entry RAID bundle ingests in 16 s. Docker still deferred.
 - [x] Phase 4 — Extractors (2026-10-08/09). `internal/meta` (normalized fields, priority merge with
   weak fields), `internal/extract` (runner, worker pool, per-clip timeouts, missing tools never
   fatal), extractors: `ffprobe`, `ale`, `bwf` (bext + iXML), `sony-xml`, `braw-sidecar`, `redline`,
-  `art-cmd`. `shelf doctor [--json]`; `shelf scan` extracts unless `--fast`; ingest stores fields,
+  `art-cmd`. `replicant doctor [--json]`; `replicant scan` extracts unless `--fast`; ingest stores fields,
   sources, errors, `clip_raw`.
   **ARRI verified 2026-10-09** with ART CMD 1.0.0: `art-cmd export --input <clip> --duration 1
   --output <tmp>/metadata.json` (0.14 s per clip); mapper in `internal/extract/arri/export.go`
@@ -60,16 +60,16 @@ Track progress here. Update this section at the end of each phase, and commit.
 - [x] Phase 6 — History + duplicates (2026-10-08). Diffs at ingest (`scan_changes`), scan page,
   any-two-scans diff (`/scans/{a}/diff/{b}`, FULL OUTER JOIN by path), duplicates page by
   fingerprint or name+size with wasted bytes, other copies on clip and file pages.
-- [x] Phase 7 — Polish (2026-10-08). `shelf login` + direct push, CSV and ALE export, backup
+- [x] Phase 7 — Polish (2026-10-08). `replicant login` + direct push, CSV and ALE export, backup
   command + Settings button, label/location editing, README, `make dist` (static linux/amd64 and
-  arm64 server binaries + `deploy/shelf-server.service`). Docker image added 2026-10-09.
+  arm64 server binaries + `deploy/replicant-server.service`). Docker image added 2026-10-09.
 
 Each phase ends with something runnable and a commit. Do not start the next phase's work in the
 same change unless asked.
 
 ## Hard rules
 
-1. **Scanning is strictly read-only.** `shelf` must never write to a scanned volume: no temp
+1. **Scanning is strictly read-only.** `replicant` must never write to a scanned volume: no temp
    files, no tool output, no sidecars, no `.DS_Store`-style side effects. Vendor tools get a temp
    dir on the Mac (`os.MkdirTemp`), never a path under the mount. A test asserts the volume is
    unchanged after a scan. Treat any violation as a bug, not a config issue.
@@ -94,7 +94,7 @@ same change unless asked.
 Follow the layout in `plan.md` exactly:
 
 ```
-cmd/shelf, cmd/shelf-server
+cmd/replicant, cmd/replicant-server
 internal/{bundle,scan,clips,extract/{ffprobe,arri,red,braw,sony,ale,bwf},meta,store,web}
 testdata/
 ```
@@ -116,7 +116,7 @@ other installed Go skills.
   package genuinely outgrows it.
 - **Go:** standard library first. Use `log/slog` for logging, `context.Context` on every I/O
   path, `errors.Is/As` with `%w` wrapping. CLI via `spf13/cobra`. Config in
-  `~/.config/shelf/config.toml`.
+  `~/.config/replicant/config.toml`.
 - **Formatting and lint:** `gofmt` and `go vet` must pass. If `golangci-lint` is added, commit
   its config and keep it passing.
 - **Tests:** table-driven, `testing` + `testify` is fine. Each extractor parser is unit-tested
@@ -145,14 +145,14 @@ other installed Go skills.
   and bordered `table-sm` tables, `.kv` definition lists for metadata with the source as a ghost
   badge, em dash for empty values, semantic colours only. The M8 emulation (ADR-001,
   `docs/design/m8-theme.md`) was replaced by ADR-002 on 2026-10-09.
-- **Running the server locally:** `./start.sh` at the repo root builds and runs `shelf-server`
+- **Running the server locally:** `./start.sh` at the repo root builds and runs `replicant-server`
   against a local data dir (`./data`, gitignored) with dev-friendly env defaults
-  (`SHELF_PASSWORD`, `SHELF_DATA_DIR=./data`, `SHELF_LISTEN=:8080`). This is the primary way to
+  (`REPLICANT_PASSWORD`, `REPLICANT_DATA_DIR=./data`, `REPLICANT_LISTEN=:8080`). This is the primary way to
   run the server during development and testing. **Docker comes later**: the Dockerfile and
   compose file are built only after the server has been proven to work via `./start.sh`. Do not
   make `start.sh` depend on Docker.
 - **Commits:** at the end of each phase at minimum. Conventional short subject, body explains why.
-  Don't commit `.shelf` bundles, databases, or anything under `data/`.
+  Don't commit `.replicant` bundles, databases, or anything under `data/`.
 - **Decisions:** record non-obvious architectural decisions as ADRs under `docs/decisions/`
   (`ADR-NNN-title.md`; the `documentation-and-adrs` skill covers the format). ADR-001 covers the
   web UI stack.
@@ -166,9 +166,9 @@ other installed Go skills.
 | Docker | 29.x at `/opt/homebrew/bin/docker` | For the server image and the end-to-end suite. |
 | xxhsum | present | Handy for cross-checking fingerprints in tests. |
 | sqlite3 CLI | present (miniconda) | Ad-hoc DB inspection only. |
-| ARRI Reference Tool CMD (`art-cmd`) | **not installed yet** (2026-10-09) | Only the ART **GUI** app is in `/Applications`; it does not contain `art-cmd`. ART CMD is a separate download. Install per `docs/tools.md`, then re-check with `shelf doctor`. |
+| ARRI Reference Tool CMD (`art-cmd`) | **not installed yet** (2026-10-09) | Only the ART **GUI** app is in `/Applications`; it does not contain `art-cmd`. ART CMD is a separate download. Install per `docs/tools.md`, then re-check with `replicant doctor`. |
 | REDCINE-X PRO / REDline | **not installed yet** (2026-10-09) | `RED Tools.app` in `/Applications` is the iPad app wrapper, not REDCINE-X PRO. Install per `docs/tools.md`; REDline lives inside the REDCINE-X PRO app bundle. |
-| mediainfo | present (Homebrew) | Not used by Shelf. Handy for cross-checks: it reads the ARRICORE descriptor and R3D version. |
+| mediainfo | present (Homebrew) | Not used by Replicant. Handy for cross-checks: it reads the ARRICORE descriptor and R3D version. |
 | Blackmagic RAW SDK | not installed | Only needed if the Phase 5 decision says the `.sidecar` + ffprobe path is too thin. |
 | Arch | Apple Silicon (arm64) | Verify `art-cmd` runs natively; note if it needs Rosetta. |
 
@@ -182,9 +182,9 @@ Once the module exists:
 go build ./... && go vet ./...
 go test ./...
 go test -run Integration -tags integration ./...   # slow, needs hdiutil / real tools
-go run ./cmd/shelf dump /Volumes/<drive> | head
-go run ./cmd/shelf doctor
-./start.sh                                          # run shelf-server locally (dev)
+go run ./cmd/replicant dump /Volumes/<drive> | head
+go run ./cmd/replicant doctor
+./start.sh                                          # run replicant-server locally (dev)
 ./build-css.sh                                      # rebuild internal/web/static/app.css after CSS/template edits
 make dist                                           # linux server binaries + systemd unit in dist/
 docker compose up --build                           # later, once the server is proven
@@ -195,7 +195,7 @@ docker compose up --build                           # later, once the server is 
 Installed via skills.sh (`npx skills add …`). Use them when the task matches:
 
 - `golang-how-to` — meta-router; start here for any Go question.
-- `golang-cli`, `golang-spf13-cobra` — the `shelf` CLI: commands, flags, exit codes, signals.
+- `golang-cli`, `golang-spf13-cobra` — the `replicant` CLI: commands, flags, exit codes, signals.
 - `golang-project-layout`, `golang-naming`, `golang-code-style`, `golang-structs-interfaces`,
   `golang-design-patterns` — structure and idiom.
 - `golang-concurrency`, `golang-context`, `golang-safety` — the extractor worker pool, timeouts,
@@ -214,9 +214,9 @@ Add a skill with `npx skills add <owner/repo> -s <skill> -a claude-code -y` and 
 
 ## Decisions so far (2026-10-08)
 
-- **Name:** Shelf. Binaries `shelf` and `shelf-server`.
+- **Name:** Replicant. Binaries `replicant` and `replicant-server`.
 - **Module path:** `github.com/fenixstarlord/indexserver` (the GitHub repo). Binaries and the
-  product are still called Shelf; imports look like `github.com/fenixstarlord/indexserver/internal/scan`.
+  product are still called Replicant; imports look like `github.com/fenixstarlord/indexserver/internal/scan`.
 - **Home server:** amd64 (x86_64). Still build the image multi-arch (amd64 + arm64) so it also
   runs locally on this Apple Silicon Mac for the end-to-end suite.
 - **UI component library:** DaisyUI on Tailwind, built with the standalone Tailwind CLI, output
@@ -244,7 +244,7 @@ Add a skill with `npx skills add <owner/repo> -s <skill> -a claude-code -y` and 
 
 - Walk: ~70k entries/s. Fingerprint: ~2.8 GB/s on internal SSD, I/O bound on external drives.
 - Ingest of 614k entries: 16 s and ~600 MB of database per scan on `modernc.org/sqlite`. Typical
-  shelf drives (a few thousand files) ingest in well under a second.
+  replicant drives (a few thousand files) ingest in well under a second.
 - **Do not trigram-index full paths.** It cost 35 s and ~2 GB per 600k-entry scan because every
   path repeats its parent prefix. `entries_fts` indexes names only (external-content table over
   `entries.id`); a search term containing `/` falls back to `LIKE` on `entries.path` (~0.1 s over
@@ -253,7 +253,7 @@ Add a skill with `npx skills add <owner/repo> -s <skill> -a claude-code -y` and 
 
 ## Drive survey (Phase 1, 2026-10-08)
 
-`shelf dump --no-fingerprint` on `/Volumes/SSD_RAID` (16 TB HFS+ RAID, mixed work drive, not a
+`replicant dump --no-fingerprint` on `/Volumes/SSD_RAID` (16 TB HFS+ RAID, mixed work drive, not a
 pure camera drive): 614k entries, 13.6 TB, walked in 8.6 s. Counts that matter for Phases 2 and 4:
 
 - Video by extension: mov 5252, mxf 3814, mp4 2542, mts 1978, **crm 108** (Canon Cinema RAW
@@ -276,17 +276,17 @@ are attached; this RAID is not representative of the shelf drives.
 
 ## Menu bar app (2026-10-09)
 
-`macos/ShelfMenu` is a SwiftUI `MenuBarExtra` app (SwiftPM, macOS 14+, built with the Command Line
-Tools; no Xcode project). It does no scanning itself: it runs the bundled Go `shelf` binary
-(`Contents/MacOS/shelf`) as a subprocess (`shelf scan <path>`, `shelf login <url>` with the key on
+`macos/ReplicantMenu` is a SwiftUI `MenuBarExtra` app (SwiftPM, macOS 14+, built with the Command Line
+Tools; no Xcode project). It does no scanning itself: it runs the bundled Go `replicant` binary
+(`Contents/MacOS/replicant`) as a subprocess (`replicant scan <path>`, `replicant login <url>` with the key on
 stdin) and streams its stderr as progress. Server and key therefore live in the CLI's
 `config.toml`; the ignore list, automatic scans (`AutoScan.swift`: a global on-mount
 switch for external drives plus per-drive rules keyed by volume name, on mount via
 `NSWorkspace.didMountNotification` and a 60 s timer for interval rescans, last-scan times in
 UserDefaults) and launch-at-login are app-only (UserDefaults, SMAppService).
-`macos/build-app.sh` (`make app`) builds a universal CLI and app and assembles `dist/Shelf.app`
+`macos/build-app.sh` (`make app`) builds a universal CLI and app and assembles `dist/Replicant.app`
 with an ad-hoc signature. Keep CLI output lines stable; the app shows the last stderr line, and
-reads `shelf doctor --json` to report missing metadata tools with a link to `docs/tools.md`.
+reads `replicant doctor --json` to report missing metadata tools with a link to `docs/tools.md`.
 
 ## Decisions, continued
 
@@ -297,12 +297,12 @@ reads `shelf doctor --json` to report missing metadata tools with a link to `doc
   Drives page toggles between them, creates sets with the + button, and moves drives by
   drag-and-drop (`POST /drives/{id}/group` with `kind`). Empty sets persist until removed.
 - **Connection keys (2026-10-09):** an API key is handed out as one pasteable string,
-  `shelf://<token>@<host>:<port>` (`shelfs://` for https), built by `client.ConnectionString` and
-  read by `client.ParseConnection`; `shelf login <key>` and the menu bar app's single "Connection
+  `replicant://<token>@<host>:<port>` (`replicants://` for https), built by `client.ConnectionString` and
+  read by `client.ParseConnection`; `replicant login <key>` and the menu bar app's single "Connection
   key" field accept it, and the old `login <url> --token` form still works. The address comes from
-  `web.PublicURL`: `SHELF_PUBLIC_URL` > the `public_url` setting (Settings → Server address) > a
-  host in `SHELF_LISTEN` > a detected NetBird interface (`wt0`, or any 100.64.0.0/10 address) >
-  the request's host. Docker cannot see the host's NetBird interface, so set `SHELF_PUBLIC_URL`
+  `web.PublicURL`: `REPLICANT_PUBLIC_URL` > the `public_url` setting (Settings → Server address) > a
+  host in `REPLICANT_LISTEN` > a detected NetBird interface (`wt0`, or any 100.64.0.0/10 address) >
+  the request's host. Docker cannot see the host's NetBird interface, so set `REPLICANT_PUBLIC_URL`
   there. Note: on this Mac NetBird runs in userspace mode and the server does not answer on its
   own NetBird IP from the same machine; other peers reach it fine.
 - **Default explorer view** is a server setting (`default_view`, list unless changed) that a
@@ -313,17 +313,17 @@ reads `shelf doctor --json` to report missing metadata tools with a link to `doc
   latest and diffs are tracked per (drive, root); drive aggregates and default browsing prefer the
   latest full scan (`store.LatestScan`). Migration `0002_partial_scans.sql`.
 - **Home server:** cross-compiled static binary + systemd unit (`make dist`), or the Docker image
-  (2026-10-09): `Dockerfile` (Go builder → Debian slim + ffmpeg, non-root UID 1000, `shelf-server
+  (2026-10-09): `Dockerfile` (Go builder → Debian slim + ffmpeg, non-root UID 1000, `replicant-server
   healthz` as HEALTHCHECK), `docker-compose.yml` (literal values, one `host:/media/name:ro` line per drive), published to GHCR by
-  `.github/workflows/docker.yml` for amd64 + arm64. Vendor tools bind-mount at `/opt/shelf-tools`.
-- **Open mode and the standalone app (2026-10-09):** `SHELF_AUTH=open` disables the password and
-  API keys; `shelf-server` refuses it unless `SHELF_LISTEN` is loopback. `/api/me` reports
-  `auth: "open"` and `shelf login <url>` then saves an empty token. `make standalone` builds
-  `dist/Shelf Standalone.app`, the menu bar app plus a bundled `shelf-server` that
-  `LocalServer.swift` runs on 127.0.0.1:8787 with data in `~/Library/Application Support/Shelf`
-  (`Info.plist` key `ShelfStandalone`; the CLI gets `SHELF_CONFIG` in that folder).
+  `.github/workflows/docker.yml` for amd64 + arm64. Vendor tools bind-mount at `/opt/replicant-tools`.
+- **Open mode and the standalone app (2026-10-09):** `REPLICANT_AUTH=open` disables the password and
+  API keys; `replicant-server` refuses it unless `REPLICANT_LISTEN` is loopback. `/api/me` reports
+  `auth: "open"` and `replicant login <url>` then saves an empty token. `make standalone` builds
+  `dist/Replicant Standalone.app`, the menu bar app plus a bundled `replicant-server` that
+  `LocalServer.swift` runs on 127.0.0.1:8787 with data in `~/Library/Application Support/Replicant`
+  (`Info.plist` key `ReplicantStandalone`; the CLI gets `REPLICANT_CONFIG` in that folder).
 
 ## Open questions (ask the user, don't guess)
 
-- NetBird hostname format for the server, for the README and `shelf login` examples.
+- NetBird hostname format for the server, for the README and `replicant login` examples.
 - Which camera formats are actually present on the user's drives (drives the Phase 4 build order).

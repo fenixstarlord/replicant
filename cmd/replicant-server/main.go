@@ -1,4 +1,4 @@
-// Command shelf-server stores scans from the shelf CLI and serves the
+// Command replicant-server stores scans from the replicant CLI and serves the
 // catalog web UI and API.
 package main
 
@@ -43,14 +43,14 @@ func envOr(key, def string) string {
 	return def
 }
 
-func dataDir() string { return envOr("SHELF_DATA_DIR", "/data") }
+func dataDir() string { return envOr("REPLICANT_DATA_DIR", "/data") }
 
 func openStore() (*store.Store, error) {
 	dir := dataDir()
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, fmt.Errorf("data dir: %w", err)
 	}
-	p := filepath.Join(dir, "shelf.db")
+	p := filepath.Join(dir, "replicant.db")
 	st, err := store.Open(p)
 	if err != nil {
 		return nil, fmt.Errorf("open %s: %w", p, err)
@@ -60,8 +60,8 @@ func openStore() (*store.Store, error) {
 
 func newRootCmd() *cobra.Command {
 	root := &cobra.Command{
-		Use:          "shelf-server",
-		Short:        "Catalog server for shelf scans",
+		Use:          "replicant-server",
+		Short:        "Catalog server for replicant scans",
 		Version:      version,
 		SilenceUsage: true,
 		RunE:         func(cmd *cobra.Command, args []string) error { return serve(cmd.Context()) },
@@ -121,11 +121,11 @@ func loopback(listen string) bool {
 func newHealthzCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:    "healthz",
-		Short:  "Exit 0 if the server on SHELF_LISTEN answers",
+		Short:  "Exit 0 if the server on REPLICANT_LISTEN answers",
 		Hidden: true,
 		Args:   cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			_, port, err := net.SplitHostPort(envOr("SHELF_LISTEN", ":8080"))
+			_, port, err := net.SplitHostPort(envOr("REPLICANT_LISTEN", ":8080"))
 			if err != nil {
 				return err
 			}
@@ -149,7 +149,7 @@ func serve(parent context.Context) error {
 	ctx, stop := signal.NotifyContext(parent, os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	log := slog.Default()
-	if os.Getenv("SHELF_EXIT_WITH_PARENT") == "1" {
+	if os.Getenv("REPLICANT_EXIT_WITH_PARENT") == "1" {
 		// Started by the standalone Mac app: stop when it is gone, even if it
 		// crashed or was killed without a chance to stop us.
 		ctx = exitWithParent(ctx, log)
@@ -163,28 +163,28 @@ func serve(parent context.Context) error {
 	if err := store.CheckFTS5Trigram(ctx, st.DB); err != nil {
 		return err
 	}
-	log.Info("database ready", "path", filepath.Join(dataDir(), "shelf.db"), "fts5_trigram", "ok")
+	log.Info("database ready", "path", filepath.Join(dataDir(), "replicant.db"), "fts5_trigram", "ok")
 
 	scheduler := sched.New(st, log, version)
 	scheduler.Start(ctx)
 
-	listen := envOr("SHELF_LISTEN", ":8080")
-	open := os.Getenv("SHELF_AUTH") == "open"
+	listen := envOr("REPLICANT_LISTEN", ":8080")
+	open := os.Getenv("REPLICANT_AUTH") == "open"
 	if open && !loopback(listen) {
-		return fmt.Errorf("SHELF_AUTH=open needs a loopback listen address (127.0.0.1:port or [::1]:port), got %q", listen)
+		return fmt.Errorf("REPLICANT_AUTH=open needs a loopback listen address (127.0.0.1:port or [::1]:port), got %q", listen)
 	}
 	if open {
 		log.Warn("authentication is off: anyone who can reach this address can read and change the catalog", "listen", listen)
 	}
 	handler, err := web.New(ctx, st, web.Config{
-		Password:      os.Getenv("SHELF_PASSWORD"),
-		PasswordHash:  os.Getenv("SHELF_PASSWORD_HASH"),
-		SessionSecret: os.Getenv("SHELF_SESSION_SECRET"),
+		Password:      os.Getenv("REPLICANT_PASSWORD"),
+		PasswordHash:  os.Getenv("REPLICANT_PASSWORD_HASH"),
+		SessionSecret: os.Getenv("REPLICANT_SESSION_SECRET"),
 		DataDir:       dataDir(),
 		Version:       version,
 		Sched:         scheduler,
 		Listen:        listen,
-		PublicURL:     os.Getenv("SHELF_PUBLIC_URL"),
+		PublicURL:     os.Getenv("REPLICANT_PUBLIC_URL"),
 		Open:          open,
 	}, log)
 	if err != nil {
@@ -213,7 +213,7 @@ func serve(parent context.Context) error {
 }
 
 func newTokenCmd() *cobra.Command {
-	cmd := &cobra.Command{Use: "token", Short: "Manage API tokens for the shelf CLI"}
+	cmd := &cobra.Command{Use: "token", Short: "Manage API tokens for the replicant CLI"}
 	cmd.AddCommand(&cobra.Command{
 		Use:   "create <name>",
 		Short: "Create a token and print it once",
@@ -228,16 +228,16 @@ func newTokenCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			addr, src := web.PublicURL(cmd.Context(), st, os.Getenv("SHELF_PUBLIC_URL"), envOr("SHELF_LISTEN", ":8080"))
+			addr, src := web.PublicURL(cmd.Context(), st, os.Getenv("REPLICANT_PUBLIC_URL"), envOr("REPLICANT_LISTEN", ":8080"))
 			if addr == "" {
 				h, _ := os.Hostname()
-				addr, src = "http://"+h+":"+strings.TrimPrefix(envOr("SHELF_LISTEN", ":8080"), ":"), "hostname"
+				addr, src = "http://"+h+":"+strings.TrimPrefix(envOr("REPLICANT_LISTEN", ":8080"), ":"), "hostname"
 			}
 			conn, err := client.ConnectionString(addr, plain)
 			if err != nil {
 				conn = plain
 			}
-			fmt.Fprintf(cmd.ErrOrStderr(), "key %d (%s) created. It is shown once. On the Mac, paste it into Shelf's Settings or run:\n  shelf login '<key>'\nServer address %s (%s); set SHELF_PUBLIC_URL or Settings → Server address to change it.\n", id, args[0], addr, src)
+			fmt.Fprintf(cmd.ErrOrStderr(), "key %d (%s) created. It is shown once. On the Mac, paste it into Replicant's Settings or run:\n  replicant login '<key>'\nServer address %s (%s); set REPLICANT_PUBLIC_URL or Settings → Server address to change it.\n", id, args[0], addr, src)
 			fmt.Fprintln(cmd.OutOrStdout(), conn)
 			return nil
 		},
@@ -298,7 +298,7 @@ func newTokenCmd() *cobra.Command {
 
 func newIngestCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "ingest <file.shelf>",
+		Use:   "ingest <file.replicant>",
 		Short: "Import a bundle file directly into the database (no HTTP)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

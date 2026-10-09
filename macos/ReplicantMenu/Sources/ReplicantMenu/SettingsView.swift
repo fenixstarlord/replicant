@@ -33,7 +33,7 @@ struct SettingsView: View {
                         if !settings.hasToken { Text("(no key saved)").foregroundStyle(.orange) }
                     }
                 }
-                TextField("Connection key", text: $connection, prompt: Text("shelf://shelf_…@host:8080"))
+                TextField("Connection key", text: $connection, prompt: Text("replicant://replicant_…@host:8080"))
                     .textFieldStyle(.roundedBorder)
                     .onSubmit { Task { await save() } }
                 HStack {
@@ -41,7 +41,7 @@ struct SettingsView: View {
                         .disabled(busy || connection.trimmingCharacters(in: .whitespaces).isEmpty)
                     if !message.isEmpty { Text(message).font(.caption).foregroundStyle(message.hasPrefix("OK") ? .green : .red) }
                 }
-                Text("Create a key on the server under API keys and paste it here; it includes the server address. Settings are stored in ~/.config/shelf/config.toml, shared with the shelf command.")
+                Text("Create a key on the server under API keys and paste it here; it includes the server address. Settings are stored in ~/.config/replicant/config.toml, shared with the replicant command.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             }
@@ -80,7 +80,7 @@ struct SettingsView: View {
                 if !toolsCheck.checked {
                     Text("Checking…").foregroundStyle(.secondary)
                 } else if toolsCheck.tools.isEmpty {
-                    Text("Could not run the bundled shelf command.").foregroundStyle(.red)
+                    Text("Could not run the bundled replicant command.").foregroundStyle(.red)
                 } else {
                     ForEach(toolsCheck.tools.filter(\.isExternal)) { t in
                         HStack {
@@ -143,7 +143,7 @@ struct SettingsView: View {
             guard let saved = savedToken() else { message = "Paste the whole key from the server's API keys page"; return }
             stdin = saved + "\n"
         }
-        let (code, out) = await ShelfCLI.run(["login", value], stdin: stdin)
+        let (code, out) = await ReplicantCLI.run(["login", value], stdin: stdin)
         settings.reload()
         message = code == 0 ? "OK: " + out.trimmingCharacters(in: .whitespacesAndNewlines) : out.trimmingCharacters(in: .whitespacesAndNewlines)
         if code == 0 { connection = "" }

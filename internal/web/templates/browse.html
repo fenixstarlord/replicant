@@ -130,10 +130,10 @@ function applyInspector(open) {
 }
 function toggleInspector() {
   const open = !document.getElementById('workspace').classList.contains('inspector-open');
-  try { localStorage.setItem('shelf.inspector', open ? '1' : '0'); } catch (e) {}
+  try { localStorage.setItem('replicant.inspector', open ? '1' : '0'); } catch (e) {}
   applyInspector(open);
 }
-(function () { let open = true; try { open = localStorage.getItem('shelf.inspector') !== '0'; } catch (e) {} applyInspector(open); })();
+(function () { let open = true; try { open = localStorage.getItem('replicant.inspector') !== '0'; } catch (e) {} applyInspector(open); })();
 function twirl(btn) {
   const tr = btn.closest('tr'), path = tr.dataset.path;
   if (tr.dataset.open) {

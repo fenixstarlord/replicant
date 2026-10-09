@@ -42,7 +42,7 @@ const (
 	PriorityProbe   = 30
 )
 
-// Status is an extractor's availability, for `shelf doctor` and the manifest.
+// Status is an extractor's availability, for `replicant doctor` and the manifest.
 type Status struct {
 	Name      string `json:"name"`
 	Version   string `json:"version,omitempty"`

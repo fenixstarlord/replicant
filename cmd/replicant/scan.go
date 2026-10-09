@@ -103,18 +103,18 @@ func newScanCmd() *cobra.Command {
 	)
 	cmd := &cobra.Command{
 		Use:   "scan <path>",
-		Short: "Scan a mounted drive and write or push a .shelf bundle",
+		Short: "Scan a mounted drive and write or push a .replicant bundle",
 		Long: `Walk a mounted volume read-only, fingerprint files, group them into clips,
-extract metadata, and write the result as a .shelf bundle. With -o the bundle
+extract metadata, and write the result as a .replicant bundle. With -o the bundle
 is written to a file; without it the bundle is pushed to the server configured
-by 'shelf login'.`,
+by 'replicant login'.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var c *client.Client
 			if output == "" {
 				var err error
 				if c, err = loadClient(); err != nil {
-					return fmt.Errorf("%w (or pass -o <file.shelf> to write a bundle instead)", err)
+					return fmt.Errorf("%w (or pass -o <file.replicant> to write a bundle instead)", err)
 				}
 			}
 			res, err := runScan(cmd, args[0], &f)
@@ -122,7 +122,7 @@ by 'shelf login'.`,
 				return err
 			}
 			if c != nil {
-				tmp, err := os.CreateTemp("", "shelf-push-*.shelf")
+				tmp, err := os.CreateTemp("", "replicant-push-*.replicant")
 				if err != nil {
 					return err
 				}
@@ -150,7 +150,7 @@ by 'shelf login'.`,
 // place, so a failed scan never leaves a half-written bundle.
 func writeBundleFile(path string, m bundle.Manifest, entries []scan.Entry, cl []clips.Clip) error {
 	dir := filepath.Dir(path)
-	tmp, err := os.CreateTemp(dir, ".shelf-*.tmp")
+	tmp, err := os.CreateTemp(dir, ".replicant-*.tmp")
 	if err != nil {
 		return err
 	}

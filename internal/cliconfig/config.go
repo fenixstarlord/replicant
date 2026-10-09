@@ -1,5 +1,5 @@
-// Package cliconfig reads and writes the shelf CLI's config file at
-// ~/.config/shelf/config.toml.
+// Package cliconfig reads and writes the replicant CLI's config file at
+// ~/.config/replicant/config.toml.
 package cliconfig
 
 import (
@@ -13,7 +13,7 @@ import (
 
 // Config is the on-disk configuration.
 type Config struct {
-	Server string `toml:"server"` // e.g. http://shelf.netbird.cloud:8080
+	Server string `toml:"server"` // e.g. http://replicant.netbird.cloud:8080
 	Token  string `toml:"token"`  // API token from the server
 	Tools  Tools  `toml:"tools"`
 }
@@ -26,9 +26,9 @@ type Tools struct {
 	REDline    string   `toml:"redline"`
 }
 
-// Path returns the config file path, honouring SHELF_CONFIG.
+// Path returns the config file path, honouring REPLICANT_CONFIG.
 func Path() (string, error) {
-	if p := os.Getenv("SHELF_CONFIG"); p != "" {
+	if p := os.Getenv("REPLICANT_CONFIG"); p != "" {
 		return p, nil
 	}
 	dir, err := os.UserConfigDir()
@@ -40,7 +40,7 @@ func Path() (string, error) {
 	if home, err := os.UserHomeDir(); err == nil {
 		dir = filepath.Join(home, ".config")
 	}
-	return filepath.Join(dir, "shelf", "config.toml"), nil
+	return filepath.Join(dir, "replicant", "config.toml"), nil
 }
 
 // Load reads the config. A missing file yields an empty config, not an error.

@@ -2,9 +2,9 @@ import AppKit
 import Foundation
 import UserNotifications
 
-/// Finds the bundled `shelf` CLI.
-enum ShelfCLI {
-    /// Extra environment for every CLI run (the standalone app sets SHELF_CONFIG).
+/// Finds the bundled `replicant` CLI.
+enum ReplicantCLI {
+    /// Extra environment for every CLI run (the standalone app sets REPLICANT_CONFIG).
     nonisolated(unsafe) static var environment: [String: String] = [:]
 
     static func apply(to p: Process) {
@@ -15,21 +15,21 @@ enum ShelfCLI {
     }
 
     static var url: URL? {
-        if let u = Bundle.main.url(forAuxiliaryExecutable: "shelf"), FileManager.default.isExecutableFile(atPath: u.path) { return u }
+        if let u = Bundle.main.url(forAuxiliaryExecutable: "replicant"), FileManager.default.isExecutableFile(atPath: u.path) { return u }
         let exe = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath()
-        // Development: swift run from macos/ShelfMenu with the Go binary in ../../bin/shelf.
+        // Development: swift run from macos/ReplicantMenu with the Go binary in ../../bin/replicant.
         let candidates = [
-            exe.deletingLastPathComponent().appendingPathComponent("shelf"),
-            exe.deletingLastPathComponent().appendingPathComponent("../../../../bin/shelf").standardized,
-            URL(fileURLWithPath: "/usr/local/bin/shelf"),
-            URL(fileURLWithPath: "/opt/homebrew/bin/shelf"),
+            exe.deletingLastPathComponent().appendingPathComponent("replicant"),
+            exe.deletingLastPathComponent().appendingPathComponent("../../../../bin/replicant").standardized,
+            URL(fileURLWithPath: "/usr/local/bin/replicant"),
+            URL(fileURLWithPath: "/opt/homebrew/bin/replicant"),
         ]
         return candidates.first { FileManager.default.isExecutableFile(atPath: $0.path) }
     }
 
     /// Runs the CLI to completion, returning exit code and combined output.
     static func run(_ args: [String], stdin: String? = nil) async -> (Int32, String) {
-        guard let url else { return (127, "shelf CLI not found") }
+        guard let url else { return (127, "replicant CLI not found") }
         return await withCheckedContinuation { cont in
             let p = Process()
             p.executableURL = url
@@ -63,7 +63,7 @@ struct ScanRecord: Identifiable {
     let summary: String
 }
 
-/// Runs scans one at a time through `shelf scan <path>` and reports progress.
+/// Runs scans one at a time through `replicant scan <path>` and reports progress.
 @MainActor
 final class ScanManager: ObservableObject {
     @Published private(set) var current: String? = nil      // display name
@@ -96,14 +96,14 @@ final class ScanManager: ObservableObject {
         let name = url.lastPathComponent
         current = name
         status = "Starting…"
-        guard let cli = ShelfCLI.url else {
-            finish(url, name: name, ok: false, summary: "shelf CLI not found")
+        guard let cli = ReplicantCLI.url else {
+            finish(url, name: name, ok: false, summary: "replicant CLI not found")
             return
         }
         let p = Process()
         p.executableURL = cli
         p.arguments = ["scan", url.path]
-        ShelfCLI.apply(to: p)
+        ReplicantCLI.apply(to: p)
         let errPipe = Pipe(), outPipe = Pipe()
         p.standardError = errPipe
         p.standardOutput = outPipe

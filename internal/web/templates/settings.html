@@ -5,9 +5,9 @@
 <div class="grid md:grid-cols-2 gap-6 mt-4">
 <div class="card bg-base-100 border border-base-300"><div class="card-body">
   <h2 class="card-title text-base mt-0">Upload a scan</h2>
-  <p class="muted text-sm">Bundles come from <code class="mono">shelf scan /Volumes/NAME -o name.shelf</code> on the Mac.</p>
+  <p class="muted text-sm">Bundles come from <code class="mono">replicant scan /Volumes/NAME -o name.replicant</code> on the Mac.</p>
   <form method="post" action="/settings/upload" enctype="multipart/form-data" class="flex gap-2 items-center flex-wrap">
-    <input type="file" name="bundle" accept=".shelf,application/zip" class="file-input file-input-bordered file-input-sm">
+    <input type="file" name="bundle" accept=".replicant,application/zip" class="file-input file-input-bordered file-input-sm">
     <button class="btn btn-primary btn-sm">Upload</button>
   </form>
 </div></div>
@@ -23,7 +23,7 @@
 <div class="card bg-base-100 border border-base-300"><div class="card-body">
   <p class="muted text-sm">The address baked into new API keys, so a Mac can reach this server after pasting a key. Currently <span class="mono">{{.Address}}</span> ({{.AddressSource}}).</p>
   {{if .AddressLocked}}
-  <p class="text-sm">Set by <code class="mono">SHELF_PUBLIC_URL</code> in the server's environment; change it there.</p>
+  <p class="text-sm">Set by <code class="mono">REPLICANT_PUBLIC_URL</code> in the server's environment; change it there.</p>
   {{else}}
   <form method="post" action="/settings/address" class="flex items-end gap-2 flex-wrap">
     <label class="form-control flex-1 min-w-64"><span class="label-text">Address</span><input id="address-input" class="input input-bordered input-sm w-full mono" name="address" value="{{.AddressSaved}}" placeholder="auto-detect" list="address-candidates"></label>
@@ -37,7 +37,7 @@
   </div>
   <datalist id="address-candidates">{{range .Addresses}}<option value="http://{{.IP}}:{{$.Port}}">{{.Label}}</option>{{end}}</datalist>
   {{end}}
-  <p class="muted text-sm">Leave it empty to auto-detect: a NetBird interface is preferred, then the address this page was opened with. Running in Docker, the container cannot see the host's NetBird interface, so set the address here or with <code class="mono">SHELF_PUBLIC_URL</code>.</p>
+  <p class="muted text-sm">Leave it empty to auto-detect: a NetBird interface is preferred, then the address this page was opened with. Running in Docker, the container cannot see the host's NetBird interface, so set the address here or with <code class="mono">REPLICANT_PUBLIC_URL</code>.</p>
   {{end}}
 </div></div>
 
@@ -55,7 +55,7 @@
 </div></div>
 
 <h2 id="server-scans">Server scans</h2>
-<p class="muted text-sm">Folders on this server{{if .Hostname}} ({{.Hostname}}){{end}} that the server scans itself, on demand or on a schedule. Metadata extraction uses whatever tools are installed on the server; run <code class="mono">shelf doctor</code> there to check.</p>
+<p class="muted text-sm">Folders on this server{{if .Hostname}} ({{.Hostname}}){{end}} that the server scans itself, on demand or on a schedule. Metadata extraction uses whatever tools are installed on the server; run <code class="mono">replicant doctor</code> there to check.</p>
 <div class="overflow-x-auto rounded-box border border-base-300 bg-base-100 my-3">
 <table class="table table-sm">
 <thead><tr><th>Path</th><th>Label</th><th>Every</th><th>Options</th><th>Last run</th><th>Next run</th><th></th></tr></thead>
@@ -100,7 +100,7 @@
   <p class="muted">Create either with the + button on the Drives page and drag drives in, or type a name in a drive's inspector. A drive can be in one group and belong to one client.</p>
 </div></div>
 
-<p class="muted text-sm mt-6">API keys for the <code class="mono">shelf</code> CLI are managed on the <a href="/settings/api-keys" class="link">API keys</a> page.</p>
+<p class="muted text-sm mt-6">API keys for the <code class="mono">replicant</code> CLI are managed on the <a href="/settings/api-keys" class="link">API keys</a> page.</p>
 
 <dialog id="job-editor" class="modal modal-side">
   <form method="post" class="modal-box flex flex-col gap-3" id="job-editor-form">

@@ -28,8 +28,8 @@ type Config struct {
 	MaxUploadSize int64     // bytes; 0 means 4 GiB
 	Sched         Scheduler // server-side scans; nil disables the section
 	Listen        string    // listen address, for the port in connection strings
-	PublicURL     string    // SHELF_PUBLIC_URL: address clients use; overrides detection
-	Open          bool      // SHELF_AUTH=open: no password, no API keys (loopback only; see main)
+	PublicURL     string    // REPLICANT_PUBLIC_URL: address clients use; overrides detection
+	Open          bool      // REPLICANT_AUTH=open: no password, no API keys (loopback only; see main)
 }
 
 // Scheduler is what the settings page needs from the scan scheduler.
@@ -51,7 +51,7 @@ type Server struct {
 // New builds the HTTP handler.
 func New(ctx context.Context, st *store.Store, cfg Config, log *slog.Logger) (*Server, error) {
 	if cfg.Password == "" && cfg.PasswordHash == "" && !cfg.Open {
-		return nil, errors.New("SHELF_PASSWORD or SHELF_PASSWORD_HASH must be set (or SHELF_AUTH=open on a loopback address)")
+		return nil, errors.New("REPLICANT_PASSWORD or REPLICANT_PASSWORD_HASH must be set (or REPLICANT_AUTH=open on a loopback address)")
 	}
 	if cfg.MaxUploadSize == 0 {
 		cfg.MaxUploadSize = 4 << 30
@@ -164,7 +164,7 @@ func (s *Server) handleDrives(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, api.DrivesResponse{Drives: drives})
 }
 
-// handleIngest accepts a .shelf bundle as the raw request body or as a
+// handleIngest accepts a .replicant bundle as the raw request body or as a
 // multipart form with a "bundle" file, spools it to disk, and ingests it.
 func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, s.cfg.MaxUploadSize)
@@ -183,7 +183,7 @@ func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "data dir: "+err.Error())
 		return
 	}
-	tmp, err := os.CreateTemp(s.cfg.DataDir, "upload-*.shelf")
+	tmp, err := os.CreateTemp(s.cfg.DataDir, "upload-*.replicant")
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "spool: "+err.Error())
 		return

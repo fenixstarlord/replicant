@@ -1,4 +1,4 @@
-# shelf-server image: a static Go binary on Debian slim with ffmpeg, so the
+# replicant-server image: a static Go binary on Debian slim with ffmpeg, so the
 # server can extract metadata from folders mounted into the container.
 # Multi-arch (amd64 + arm64); built and published by .github/workflows/docker.yml.
 
@@ -13,24 +13,24 @@ COPY . .
 ARG TARGETOS TARGETARCH VERSION=dev
 RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
-    go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/shelf-server ./cmd/shelf-server
+    go build -trimpath -ldflags "-s -w -X main.version=${VERSION}" -o /out/replicant-server ./cmd/replicant-server
 
 FROM debian:bookworm-slim AS runtime
 # ffmpeg supplies ffprobe. Vendor tools (art-cmd, REDline) are not
-# redistributable; bind-mount them under /opt/shelf-tools (on PATH).
+# redistributable; bind-mount them under /opt/replicant-tools (on PATH).
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ffmpeg ca-certificates tzdata \
     && rm -rf /var/lib/apt/lists/* \
-    && groupadd --gid 1000 shelf && useradd --uid 1000 --gid shelf --home /data --no-create-home shelf \
-    && mkdir -p /data /media /opt/shelf-tools && chown shelf:shelf /data
-COPY --from=builder /out/shelf-server /usr/local/bin/shelf-server
-ENV SHELF_DATA_DIR=/data \
-    SHELF_LISTEN=:8080 \
-    PATH=/opt/shelf-tools:/opt/shelf-tools/bin:$PATH
-USER shelf
+    && groupadd --gid 1000 replicant && useradd --uid 1000 --gid replicant --home /data --no-create-home replicant \
+    && mkdir -p /data /media /opt/replicant-tools && chown replicant:replicant /data
+COPY --from=builder /out/replicant-server /usr/local/bin/replicant-server
+ENV REPLICANT_DATA_DIR=/data \
+    REPLICANT_LISTEN=:8080 \
+    PATH=/opt/replicant-tools:/opt/replicant-tools/bin:$PATH
+USER replicant
 WORKDIR /data
 VOLUME ["/data"]
 EXPOSE 8080
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s CMD ["shelf-server", "healthz"]
-ENTRYPOINT ["shelf-server"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s CMD ["replicant-server", "healthz"]
+ENTRYPOINT ["replicant-server"]
 CMD ["serve"]

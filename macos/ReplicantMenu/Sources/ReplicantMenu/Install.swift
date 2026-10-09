@@ -40,7 +40,7 @@ enum ToolInstaller {
         var pkg = source
         var temp: URL? = nil
         if source.pathExtension.lowercased() == "zip" {
-            let dir = fm.temporaryDirectory.appendingPathComponent("shelf-art-\(UUID().uuidString)")
+            let dir = fm.temporaryDirectory.appendingPathComponent("replicant-art-\(UUID().uuidString)")
             try fm.createDirectory(at: dir, withIntermediateDirectories: true)
             temp = dir
             let p = Process()

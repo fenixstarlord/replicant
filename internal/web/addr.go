@@ -12,10 +12,10 @@ import (
 // The address clients should use to reach this server. It is baked into
 // connection strings on the API keys page. Precedence:
 //
-//  1. SHELF_PUBLIC_URL (Config.PublicURL), for Docker and other setups where
+//  1. REPLICANT_PUBLIC_URL (Config.PublicURL), for Docker and other setups where
 //     the container cannot see the host's interfaces.
 //  2. The "public_url" setting saved on the Settings page.
-//  3. A host given in SHELF_LISTEN (e.g. 100.64.0.5:8080).
+//  3. A host given in REPLICANT_LISTEN (e.g. 100.64.0.5:8080).
 //  4. The NetBird (or other mesh) interface, if the server has one.
 //  5. The host the browser used for this request.
 
@@ -120,14 +120,14 @@ func listenHost(listen string) string {
 // mesh interface is present; source says where the value came from.
 func PublicURL(ctx context.Context, st settingsReader, publicURL, listen string) (u, source string) {
 	if v := strings.TrimRight(publicURL, "/"); v != "" {
-		return v, "SHELF_PUBLIC_URL"
+		return v, "REPLICANT_PUBLIC_URL"
 	}
 	if v, _ := st.GetSetting(ctx, publicURLSetting); strings.TrimSpace(v) != "" {
 		return strings.TrimRight(strings.TrimSpace(v), "/"), "Settings"
 	}
 	port := listenPort(listen)
 	if h := listenHost(listen); h != "" {
-		return "http://" + net.JoinHostPort(h, port), "SHELF_LISTEN"
+		return "http://" + net.JoinHostPort(h, port), "REPLICANT_LISTEN"
 	}
 	for _, a := range detectAddresses() {
 		if a.Kind == "netbird" {

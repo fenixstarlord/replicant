@@ -1,14 +1,14 @@
 # Metadata tools
 
-Shelf reads as much as it can from media files and their sidecars by itself. For some camera
+Replicant reads as much as it can from media files and their sidecars by itself. For some camera
 formats the only way to get camera metadata is the manufacturer's own tool. Those tools are not
-part of Shelf; install them on the Mac that runs the scans and Shelf will find them.
+part of Replicant; install them on the Mac that runs the scans and Replicant will find them.
 
-`shelf doctor` (or the Tools section in the menu bar app's Settings) shows which are available.
+`replicant doctor` (or the Tools section in the menu bar app's Settings) shows which are available.
 A missing tool never stops a scan: the clip is still catalogued with whatever the other sources
 provide, and the missing tool is noted on the clip.
 
-| Tool | Status in `shelf doctor` | Formats | What it adds | Where to get it |
+| Tool | Status in `replicant doctor` | Formats | What it adds | Where to get it |
 |---|---|---|---|---|
 | **ffprobe** (part of FFmpeg) | `ffprobe` | MOV, MP4, MXF, MTS, BRAW, Canon CRM, WAV, and most delivery formats | Container, codec, resolution, frame rate, bit depth, duration, embedded timecode, audio channels and rate, creation date | `brew install ffmpeg`, or <https://ffmpeg.org/download.html> |
 | **ARRI Reference Tool command line** (`art-cmd`) | `art-cmd` | ARRIRAW (`.ari`, `.arx`, MXF), ARRICORE, ARRI ProRes | Camera model and serial, exposure index, white balance and tint, shutter, sensor mode, lens and focus data, look file, reel, scene and take | Free from ARRI with an ARRI account: <https://www.arri.com/en/learn-help/learn-help-camera-system/tools/arri-reference-tool>. Download the **Command-Line** package (`ARRIReferenceTool_CMD_…_macos_universal_data.zip`), separate from the ART desktop app. See “Installing the ARRI command-line tool” below. |
@@ -36,19 +36,19 @@ With the menu bar app:
 By hand: unzip, move the folder to `/Applications/ARRI Reference Tool CMD`, then clear the
 quarantine flag once with `xattr -dr com.apple.quarantine "/Applications/ARRI Reference Tool CMD"`
 (the tool is signed by ARRI but not notarized, so macOS refuses it until then), and run
-`shelf doctor`.
+`replicant doctor`.
 
-Shelf calls it as `art-cmd export --input <clip> --duration 1 --output <temp>/metadata.json`,
+Replicant calls it as `art-cmd export --input <clip> --duration 1 --output <temp>/metadata.json`,
 which writes the clip's static metadata (plus one frame of dynamic metadata) and nothing else.
 ARRIRAW frame sequences are passed as their folder. The tool only ever writes to a temporary
 folder on the Mac, never to the drive.
 
 ## Installing REDline
 
-Install REDCINE-X PRO from RED's downloads page. REDline comes with it; Shelf looks for it inside
+Install REDCINE-X PRO from RED's downloads page. REDline comes with it; Replicant looks for it inside
 the install folder (see below).
 
-## Where Shelf looks
+## Where Replicant looks
 
 | Tool | Default locations tried, in order |
 |---|---|
@@ -56,7 +56,7 @@ the install folder (see below).
 | art-cmd | `/Applications/ARRI Reference Tool CMD/bin/art-cmd`, `~/Applications/ARRI Reference Tool CMD/bin/art-cmd`, `/Applications/art-cmd/bin/art-cmd`, `/usr/local/bin/art-cmd`, `/opt/homebrew/bin/art-cmd`, then the PATH |
 | REDline | `/Applications/REDCINE-X PRO/REDline`, `/Applications/REDCINE-X PRO.app/Contents/MacOS/REDline`, `/Applications/REDline/REDline`, `/usr/local/bin/REDline`, then the PATH |
 
-If a tool is installed somewhere else, set its path in `~/.config/shelf/config.toml`:
+If a tool is installed somewhere else, set its path in `~/.config/replicant/config.toml`:
 
 ```toml
 [tools]
@@ -65,7 +65,7 @@ art_cmd = "/Applications/ARRI Reference Tool CMD/bin/art-cmd"
 redline = "/Applications/REDCINE-X PRO/REDline"
 ```
 
-Then run `shelf doctor` again. The menu bar app reads the same file; use Recheck in its Settings.
+Then run `replicant doctor` again. The menu bar app reads the same file; use Recheck in its Settings.
 
 ## On the server
 

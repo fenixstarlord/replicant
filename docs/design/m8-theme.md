@@ -1,4 +1,4 @@
-# Shelf web UI — Dirtywave M8 look
+# Replicant web UI — Dirtywave M8 look
 
 The web UI emulates the lo-fi look of the Dirtywave M8 tracker: black background, a small bitmap
 font, a handful of saturated accent colours, uppercase labels, flat 1-pixel rules, nothing rounded,

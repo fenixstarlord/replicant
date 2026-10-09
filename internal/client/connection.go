@@ -9,8 +9,8 @@ import (
 // A connection string carries the server address and the API token in one
 // pasteable value so a client can be set up with a single copy and paste:
 //
-//	shelf://shelf_abc123@100.64.0.5:8080        (http)
-//	shelfs://shelf_abc123@shelf.example.com     (https)
+//	replicant://replicant_abc123@100.64.0.5:8080        (http)
+//	replicants://replicant_abc123@replicant.example.com     (https)
 //
 // A plain http(s) URL with the token in the user part is accepted too.
 
@@ -22,9 +22,9 @@ func ConnectionString(server, token string) (string, error) {
 	}
 	switch u.Scheme {
 	case "http":
-		u.Scheme = "shelf"
+		u.Scheme = "replicant"
 	case "https":
-		u.Scheme = "shelfs"
+		u.Scheme = "replicants"
 	default:
 		return "", fmt.Errorf("server URL must be http or https, got %q", server)
 	}
@@ -40,12 +40,12 @@ func ParseConnection(s string) (server, token string, err error) {
 	s = strings.TrimSpace(s)
 	u, err := url.Parse(s)
 	if err != nil || u.Host == "" {
-		return "", "", fmt.Errorf("expected shelf://key@host:port or http://host:port, got %q", s)
+		return "", "", fmt.Errorf("expected replicant://key@host:port or http://host:port, got %q", s)
 	}
 	switch u.Scheme {
-	case "shelf":
+	case "replicant":
 		u.Scheme = "http"
-	case "shelfs":
+	case "replicants":
 		u.Scheme = "https"
 	case "http", "https":
 	default:

@@ -26,7 +26,7 @@ func loadClient() (*client.Client, error) {
 		return nil, err
 	}
 	if cfg.Server == "" {
-		return nil, errors.New("not logged in: run `shelf login <key>` first")
+		return nil, errors.New("not logged in: run `replicant login <key>` first")
 	}
 	return client.New(cfg.Server, cfg.Token)
 }
@@ -36,12 +36,12 @@ func newLoginCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "login <connection-key | server-url>",
 		Short: "Save the server address and an API key",
-		Long: `Store the server URL and an API key in ~/.config/shelf/config.toml.
+		Long: `Store the server URL and an API key in ~/.config/replicant/config.toml.
 
 Create a key on the server's API keys page. It looks like
-  shelf://shelf_abc123@100.64.0.5:8080
+  replicant://replicant_abc123@100.64.0.5:8080
 and carries the server address, so this is enough:
-  shelf login 'shelf://shelf_abc123@100.64.0.5:8080'
+  replicant login 'replicant://replicant_abc123@100.64.0.5:8080'
 
 A plain server URL also works; the key is then read from --token, or
 prompted for without echo.`,
@@ -55,7 +55,7 @@ prompted for without echo.`,
 				token = embedded
 			}
 			if token == "" {
-				// A server with authentication off (SHELF_AUTH=open, the
+				// A server with authentication off (REPLICANT_AUTH=open, the
 				// standalone app) needs no key; ask only if it wants one.
 				if c, err := client.New(server, ""); err == nil {
 					if me, err := c.Me(cmd.Context()); err == nil && me.Auth == "open" {
@@ -124,7 +124,7 @@ func promptSecret(cmd *cobra.Command, prompt string) (string, error) {
 
 func newUploadCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "upload <file.shelf>",
+		Use:   "upload <file.replicant>",
 		Short: "Push a previously written bundle to the server",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

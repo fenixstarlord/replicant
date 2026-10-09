@@ -9,12 +9,12 @@ import (
 
 func TestLoadSaveRoundTrip(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "cfg", "config.toml")
-	t.Setenv("SHELF_CONFIG", p)
+	t.Setenv("REPLICANT_CONFIG", p)
 	c, err := Load()
 	if err != nil || c.Server != "" {
 		t.Fatalf("missing file should load empty: %+v %v", c, err)
 	}
-	want := Config{Server: "http://x:8080", Token: "shelf_abc", Tools: Tools{FFprobe: "/opt/ffprobe"}}
+	want := Config{Server: "http://x:8080", Token: "replicant_abc", Tools: Tools{FFprobe: "/opt/ffprobe"}}
 	if err := Save(want); err != nil {
 		t.Fatal(err)
 	}

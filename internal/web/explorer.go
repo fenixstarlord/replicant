@@ -18,7 +18,7 @@ type column struct {
 	Selected string // path of the selected child, if any
 }
 
-const viewCookie = "shelf_view"
+const viewCookie = "replicant_view"
 
 const defaultViewSetting = "default_view"
 

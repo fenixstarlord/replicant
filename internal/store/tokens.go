@@ -11,7 +11,7 @@ import (
 )
 
 // TokenPrefix marks API tokens so they are recognisable in logs and configs.
-const TokenPrefix = "shelf_"
+const TokenPrefix = "replicant_"
 
 // Token is an API token row (never the secret itself).
 type Token struct {
