@@ -299,6 +299,9 @@ func TestPagesRender(t *testing.T) {
 		t.Errorf("location not shown on clip page")
 	}
 	// Static assets are served.
+	if code, body := get(t, s, c, "/favicon.ico"); code != 200 || len(body) < 1000 {
+		t.Errorf("favicon: %d, %d bytes", code, len(body))
+	}
 	if code, body := get(t, s, c, "/static/app.css"); code != 200 || !strings.Contains(body, "silk") {
 		t.Errorf("static css = %d", code)
 	}

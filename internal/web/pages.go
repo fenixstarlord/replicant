@@ -30,6 +30,10 @@ func (s *Server) pageRoutes() {
 		panic(err)
 	}
 	m.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(static)))
+	// Browsers ask for /favicon.ico without reading the page head.
+	m.HandleFunc("GET /favicon.ico", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFileFS(w, r, static, "favicon.ico")
+	})
 	m.Handle("GET /drives", auth(s.handleDrivesPage))
 	m.Handle("GET /drives/{id}", auth(s.handleDrivePage))
 	m.Handle("POST /drives/{id}", auth(s.handleDriveEdit))
