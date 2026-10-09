@@ -5,7 +5,12 @@
     <h1>{{.Drive.Name}}{{if .Drive.Label}} <span class="muted font-normal">· {{.Drive.Label}}</span>{{end}}{{if .Drive.GroupName}} <span class="badge badge-ghost align-middle">{{.Drive.GroupName}}</span>{{end}}{{if .Drive.ClientName}} <span class="badge badge-outline align-middle">{{.Drive.ClientName}}</span>{{end}}</h1>
     <p class="muted text-sm">Scan #{{.Scan.ID}} · {{datetime .Scan.ScannedAt}}{{if .Scan.IsLatest}} · latest{{else}} · <span class="text-warning">old scan</span>{{end}}{{if .Scan.IsPartial}} · <span class="text-warning">partial scan of {{.Scan.Root}}</span>{{end}} · {{if .Drive.Location}}{{.Drive.Location}}{{else}}location not set{{end}}</p>
   </div>
-  <div class="flex gap-2 items-center">
+  <div class="flex gap-2 items-center flex-wrap">
+    {{with .ScanState}}{{if .Connected}}
+      {{if .Running}}<span class="btn btn-sm btn-disabled gap-2"><span class="loading loading-spinner loading-xs"></span>Scanning… {{.Stage}}{{if .Total}} {{.Done}}/{{.Total}}{{end}}</span>
+      {{else}}<form method="post" action="/drives/{{$d}}/scan"><button class="btn btn-sm btn-primary" title="Connected at {{.MountPath}}; scan it on this server now">Scan now</button></form>{{end}}
+      <span class="badge badge-success badge-outline" title="Mounted at {{.MountPath}}">connected</span>
+    {{end}}{{end}}
     <div class="join">
       <a href="/browse/{{$d}}/{{.DirPath}}?scan={{$s}}&view=columns" class="join-item btn btn-sm {{if eq .View "columns"}}btn-active{{end}}" title="Column view">▥ Columns</a>
       <a href="/browse/{{$d}}/{{.DirPath}}?scan={{$s}}&view=list" class="join-item btn btn-sm {{if eq .View "list"}}btn-active{{end}}" title="List view">☰ List</a>
@@ -14,6 +19,8 @@
   </div>
 </div>
 
+{{if .Message}}<div role="alert" class="alert alert-success text-sm my-2">{{.Message}}{{if .ScanState.Connected}} Reload to follow progress; the new scan appears in the history when it finishes.{{end}}</div>{{end}}
+{{if .Error}}<div role="alert" class="alert alert-error text-sm my-2">{{.Error}}</div>{{end}}
 <div id="workspace" class="workspace">
 <div class="min-w-0">
 <div class="breadcrumbs text-sm mono"><ul>

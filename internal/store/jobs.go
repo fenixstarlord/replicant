@@ -73,6 +73,11 @@ func (s *Store) ListScanJobs(ctx context.Context) ([]ScanJob, error) {
 	return out, rows.Err()
 }
 
+// GetScanJobByPath returns the job for a path, or sql.ErrNoRows.
+func (s *Store) GetScanJobByPath(ctx context.Context, path string) (ScanJob, error) {
+	return scanJob(s.DB.QueryRowContext(ctx, "SELECT "+jobColumns+" WHERE path = ?", strings.TrimSpace(path)))
+}
+
 // GetScanJob returns one job.
 func (s *Store) GetScanJob(ctx context.Context, id int64) (ScanJob, error) {
 	return scanJob(s.DB.QueryRowContext(ctx, "SELECT "+jobColumns+" WHERE id = ?", id))

@@ -43,6 +43,7 @@ type Server struct {
 	secret []byte
 	log    *slog.Logger
 	mux    *http.ServeMux
+	mounts *mountCache
 }
 
 // New builds the HTTP handler.
@@ -60,7 +61,7 @@ func New(ctx context.Context, st *store.Store, cfg Config, log *slog.Logger) (*S
 	if err != nil {
 		return nil, fmt.Errorf("session secret: %w", err)
 	}
-	s := &Server{cfg: cfg, store: st, secret: secret, log: log, mux: http.NewServeMux()}
+	s := &Server{cfg: cfg, store: st, secret: secret, log: log, mux: http.NewServeMux(), mounts: newMountCache()}
 	s.routes()
 	return s, nil
 }

@@ -33,6 +33,7 @@ func (s *Server) pageRoutes() {
 	m.Handle("GET /drives/{id}", auth(s.handleDrivePage))
 	m.Handle("POST /drives/{id}", auth(s.handleDriveEdit))
 	m.Handle("POST /drives/{id}/group", auth(s.handleDriveMove))
+	m.Handle("POST /drives/{id}/scan", auth(s.handleDriveScanNow))
 	m.Handle("POST /drives/groups", auth(s.handleGroupCreate))
 	m.Handle("POST /drives/groups/{id}/delete", auth(s.handleGroupDelete))
 	m.Handle("GET /search", auth(s.handleSearch))
