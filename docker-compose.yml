@@ -4,6 +4,9 @@ services:
     image: ghcr.io/fenixstarlord/indexserver:latest
     container_name: replicant
     restart: unless-stopped
+    # The image runs as UID/GID 1000. On TrueNAS SCALE, run as the apps user
+    # instead so the datasets below can keep their usual owner:
+    # user: "568:568"
     ports:
       - "8080:8080"
     environment:

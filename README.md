@@ -140,8 +140,8 @@ Those show up under Settings → Server scans. Vendor tools are not in the image
 file). Image `ghcr.io/fenixstarlord/indexserver:latest`, port 8080, environment `REPLICANT_PASSWORD`
 and `REPLICANT_PUBLIC_URL` (the NetBird address of the NAS, e.g. `http://100.64.0.5:8080`), host-path
 storage: a dataset such as `/mnt/rock/apps/replicant` at `/data`, and each media dataset at its own
-path under `/media`, read-only. The container runs as UID/GID 1000; give the data dataset that owner or set the app's
-user accordingly. The container cannot see the host's NetBird interface, hence `REPLICANT_PUBLIC_URL`.
+path under `/media`, read-only. The container runs as UID/GID 1000 by default; on TrueNAS uncomment `user: "568:568"` in the
+compose file to run as the apps user, and give the data dataset that owner. The container cannot see the host's NetBird interface, hence `REPLICANT_PUBLIC_URL`.
 
 ### Standalone app (no server)
 
