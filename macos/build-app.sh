@@ -33,6 +33,15 @@ echo "building menu bar app (${ARCHS[*]:-native})"
 BIN=$(cd macos/ReplicantMenu && swift build -c release ${ARCHS[@]+"${ARCHS[@]}"} --show-bin-path)
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+# App icon: drawn by macos/icon/make-icon.swift (no font or image assets).
+ICONSET=dist/AppIcon.iconset
+if [[ ! -f dist/AppIcon.icns ]]; then
+  rm -rf "$ICONSET" && mkdir -p "$ICONSET"
+  swift macos/icon/make-icon.swift "$ICONSET" 2>&1 | grep -v warning || true
+  rm -f "$ICONSET/preview.png"
+  iconutil -c icns "$ICONSET" -o dist/AppIcon.icns
+fi
+cp dist/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 cp "$BIN/ReplicantMenu" "$APP/Contents/MacOS/ReplicantMenu"
 cp dist/replicant "$APP/Contents/MacOS/replicant"
 EXTRA_PLIST=""
@@ -54,6 +63,7 @@ ${EXTRA_PLIST}
   <key>CFBundleShortVersionString</key><string>${VERSION}</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleExecutable</key><string>ReplicantMenu</string>
+  <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>LSUIElement</key><${UI_ELEMENT}/>
   <key>NSHighResolutionCapable</key><true/>
