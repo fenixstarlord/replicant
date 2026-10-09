@@ -91,6 +91,20 @@ final class ToolChecker: ObservableObject {
 
     func openDocs() { NSWorkspace.shared.open(docsURL) }
 
+    @Published var installMessage: String = ""
+
+    /// Installs the ARRI CLI package the user picks, then rechecks.
+    func installARRI() async {
+        guard let src = ToolInstaller.chooseARRIPackage() else { return }
+        do {
+            let bin = try ToolInstaller.installARRI(from: src)
+            installMessage = "Installed to \(bin.deletingLastPathComponent().deletingLastPathComponent().path)"
+        } catch {
+            installMessage = error.localizedDescription
+        }
+        await check()
+    }
+
     /// Clears the quarantine flag from a blocked tool's package and rechecks.
     func allow(_ t: ToolStatus) async {
         guard let path = t.path else { return }

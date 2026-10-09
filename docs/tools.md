@@ -22,17 +22,21 @@ Devices and similar recorders), Sony clip XML (XDROOT and M4ROOT cards), and Bla
 
 ARRI ships `art-cmd` as a zip (`ARRIReferenceTool_CMD_<version>_macos_universal_data.zip`), not an
 installer. Unzipped, it is a portable folder with `bin/art-cmd`, `bin/look-builder`, the `lib/`
-folder the tool needs beside it, and `doc/` with the manual. Keep the folder together.
+folder the tool needs beside it, and `doc/` with the manual.
 
-1. Unzip it and move the folder to `/Applications/ARRI Reference Tool CMD` (or
-   `~/Applications/ARRI Reference Tool CMD`). Shelf looks there by default.
-2. macOS marks everything a browser downloads with a quarantine flag. The tool is signed by ARRI
-   but not notarized, so macOS refuses to load its libraries until the flag is cleared; running
-   it shows “libArriImageSdk… Not Opened”. The menu bar app handles this: open Settings, and
-   next to the ARRI tool click **Allow it to run**. (From a terminal the equivalent is
-   `xattr -dr com.apple.quarantine "/Applications/ARRI Reference Tool CMD"`.)
+With the menu bar app:
 
-3. Check with `shelf doctor` (or Recheck in the menu bar app). `art-cmd` should show its version.
+1. Download the Command-Line package from ARRI (the Download link in Settings opens the page).
+2. In Settings, next to the ARRI tool, click **Install…** and choose the download: the unzipped
+   folder or the zip itself.
+3. The app copies the package to `/Applications/ARRI Reference Tool CMD` (or `~/Applications` if
+   that isn't writable), clears macOS's download quarantine so the tool can load its libraries,
+   and rechecks. The row turns green with the tool's version.
+
+By hand: unzip, move the folder to `/Applications/ARRI Reference Tool CMD`, then clear the
+quarantine flag once with `xattr -dr com.apple.quarantine "/Applications/ARRI Reference Tool CMD"`
+(the tool is signed by ARRI but not notarized, so macOS refuses it until then), and run
+`shelf doctor`.
 
 Shelf calls it as `art-cmd export --input <clip> --duration 1 --output <temp>/metadata.json`,
 which writes the clip's static metadata (plus one frame of dynamic metadata) and nothing else.

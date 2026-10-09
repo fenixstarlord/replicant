@@ -57,6 +57,14 @@ struct SettingsView: View {
                                 } else if let v = t.version, !v.isEmpty {
                                     Text(t.displayName)
                                     Text(v).font(.caption).foregroundStyle(.orange)
+                                } else if t.name == "art-cmd" {
+                                    Text(t.displayName)
+                                    Text("Not installed · needed for \(t.formats)").font(.caption).foregroundStyle(.secondary)
+                                    HStack {
+                                        if let url = t.vendorURL { Link("Download", destination: url) }
+                                        Button("Install…") { Task { await toolsCheck.installARRI() } }.controlSize(.small)
+                                    }
+                                    Text("Download the Command-Line package from ARRI, then click Install and choose the download.").font(.caption).foregroundStyle(.secondary)
                                 } else if let url = t.vendorURL {
                                     Link(t.displayName, destination: url)
                                     Text("Not installed · needed for \(t.formats) · click to download").font(.caption).foregroundStyle(.secondary)
@@ -71,6 +79,7 @@ struct SettingsView: View {
                     Text("Built in: " + toolsCheck.tools.filter { !$0.isExternal }.map(\.formats).joined(separator: ", "))
                         .font(.caption).foregroundStyle(.secondary)
                 }
+                if !toolsCheck.installMessage.isEmpty { Text(toolsCheck.installMessage).font(.caption) }
                 HStack {
                     Button(toolsCheck.checking ? "Checking…" : "↻ Recheck") { Task { await toolsCheck.check() } }.disabled(toolsCheck.checking)
                     Button("Install notes…") { toolsCheck.openDocs() }
