@@ -46,7 +46,12 @@ func (e *Extractor) Available(ctx context.Context) (bool, string) {
 	if e.bin == "" {
 		return false, ""
 	}
-	return true, extract.VersionLine(ctx, e.bin, "--version")
+	// REDline has no --version; its usage banner carries the version.
+	v := extract.VersionLine(ctx, e.bin, "--version")
+	if strings.Contains(v, "Unknown command") || v == "" {
+		v = "found"
+	}
+	return true, v
 }
 
 func (e *Extractor) Matches(c *clips.Clip) bool { return c.Kind == clips.KindR3D }

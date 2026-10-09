@@ -28,11 +28,13 @@ import (
 // with no installer, so these are the conventional places to unpack or
 // link it (see docs/tools.md). PATH is searched last.
 var DefaultPaths = []string{
+	"/Applications/ARRI Reference Tool CMD/bin/art-cmd",
+	"~/Applications/ARRI Reference Tool CMD/bin/art-cmd",
 	"/Applications/ARRI Reference Tool CMD/art-cmd",
-	"/Applications/ARRI/ARRI Reference Tool CMD/art-cmd",
+	"/Applications/art-cmd/bin/art-cmd",
 	"/usr/local/bin/art-cmd",
 	"/opt/homebrew/bin/art-cmd",
-	"/opt/arri/art-cmd/art-cmd",
+	"/opt/arri/art-cmd/bin/art-cmd",
 }
 
 // DefaultArgs is the metadata-only export from the ART CMD 1.0.0 user
@@ -41,7 +43,8 @@ var DefaultPaths = []string{
 // document and skips audio and look files. {input} and {outdir} are
 // substituted; the file name keeps the extractor's JSON lookup simple.
 // Override via config `tools.art_cmd_args`.
-var DefaultArgs = []string{"export", "--input", "{input}", "--output", "{outdir}/metadata.json"}
+// --duration 1 keeps the per-frame block to a single frame.
+var DefaultArgs = []string{"export", "--input", "{input}", "--duration", "1", "--output", "{outdir}/metadata.json"}
 
 // clipNameRe matches ARRI clip names: A001C001_..., A_0001C001_..., B021C004_...
 var clipNameRe = regexp.MustCompile(`(?i)^[A-Z]_?\d{3,4}C\d{3}_`)
@@ -57,7 +60,16 @@ func (e *Extractor) Name() string  { return "art-cmd" }
 func (e *Extractor) Priority() int { return extract.PriorityVendor }
 
 func (e *Extractor) Available(ctx context.Context) (bool, string) {
-	e.bin = extract.FindTool(e.Path, "art-cmd", DefaultPaths...)
+	paths := make([]string, 0, len(DefaultPaths))
+	for _, p := range DefaultPaths {
+		if strings.HasPrefix(p, "~/") {
+			if home, err := os.UserHomeDir(); err == nil {
+				p = filepath.Join(home, p[2:])
+			}
+		}
+		paths = append(paths, p)
+	}
+	e.bin = extract.FindTool(e.Path, "art-cmd", paths...)
 	if e.bin == "" {
 		return false, ""
 	}
@@ -81,7 +93,12 @@ func (e *Extractor) Matches(c *clips.Clip) bool {
 }
 
 func (e *Extractor) Extract(ctx context.Context, root string, c *clips.Clip) (*meta.Result, error) {
-	abs := filepath.Join(root, filepath.FromSlash(c.PrimaryFile()))
+	// A frame sequence is given as its folder; art-cmd reads the frames.
+	in := c.PrimaryFile()
+	if c.Kind == clips.KindARRIRAW {
+		in = c.RootPath
+	}
+	abs := filepath.Join(root, filepath.FromSlash(in))
 	outdir, err := os.MkdirTemp("", "shelf-art-*")
 	if err != nil {
 		return nil, err
