@@ -278,7 +278,8 @@ Tools; no Xcode project). It does no scanning itself: it runs the bundled Go `sh
 stdin) and streams its stderr as progress. Server and key therefore live in the CLI's
 `config.toml`; the ignore list and launch-at-login are app-only (UserDefaults, SMAppService).
 `macos/build-app.sh` (`make app`) builds a universal CLI and app and assembles `dist/Shelf.app`
-with an ad-hoc signature. Keep CLI output lines stable; the app shows the last stderr line.
+with an ad-hoc signature. Keep CLI output lines stable; the app shows the last stderr line, and
+reads `shelf doctor --json` to report missing metadata tools with a link to `docs/tools.md`.
 
 ## Decisions, continued
 

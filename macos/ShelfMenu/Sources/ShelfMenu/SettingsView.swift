@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject var volumes: VolumeMonitor
     @EnvironmentObject var settings: AppSettings
+    @EnvironmentObject var toolsCheck: ToolChecker
     @State private var server = ""
     @State private var token = ""
     @State private var message = ""
@@ -33,6 +34,31 @@ struct SettingsView: View {
                     TextField("Add a drive name to ignore", text: $newIgnore)
                     Button("Add") { settings.setIgnored(newIgnore.trimmingCharacters(in: .whitespaces), true); newIgnore = "" }
                         .disabled(newIgnore.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+            Section("Metadata tools") {
+                if !toolsCheck.checked {
+                    Text("Checking…").foregroundStyle(.secondary)
+                } else if toolsCheck.tools.isEmpty {
+                    Text("Could not run the bundled shelf command.").foregroundStyle(.red)
+                } else {
+                    ForEach(toolsCheck.tools.filter(\.isExternal)) { t in
+                        HStack {
+                            Image(systemName: t.available ? "checkmark.circle.fill" : "xmark.circle.fill")
+                                .foregroundStyle(t.available ? .green : .red)
+                            VStack(alignment: .leading) {
+                                Text(t.displayName)
+                                Text(t.available ? (t.version ?? "found") : "not installed · \(t.formats)").font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                        }
+                    }
+                    Text("Built in: " + toolsCheck.tools.filter { !$0.isExternal }.map(\.formats).joined(separator: ", "))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                HStack {
+                    Button("Recheck") { Task { await toolsCheck.check() } }
+                    Button("Where to get them…") { toolsCheck.openDocs() }
                 }
             }
             Section {

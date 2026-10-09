@@ -5,6 +5,7 @@ struct MenuContent: View {
     @EnvironmentObject var volumes: VolumeMonitor
     @EnvironmentObject var scans: ScanManager
     @EnvironmentObject var settings: AppSettings
+    @EnvironmentObject var toolsCheck: ToolChecker
     @Environment(\.openSettings) private var openSettings
 
     var body: some View {
@@ -17,6 +18,11 @@ struct MenuContent: View {
         }
         if settings.server.isEmpty || !settings.hasToken {
             Button("Set up server and API key…") { openSettings() }
+            Divider()
+        }
+        if !toolsCheck.missing.isEmpty {
+            Text("Missing metadata tools: \(toolsCheck.missing.map(\.name).joined(separator: ", "))")
+            Button("How to install them…") { toolsCheck.openDocs() }
             Divider()
         }
         let visible = volumes.volumes.filter { !settings.isIgnored($0) }

@@ -7,6 +7,7 @@ struct ShelfMenuApp: App {
     @StateObject private var volumes = VolumeMonitor()
     @StateObject private var scans = ScanManager()
     @StateObject private var settings = AppSettings()
+    @StateObject private var toolsCheck = ToolChecker()
 
     var body: some Scene {
         MenuBarExtra {
@@ -14,6 +15,7 @@ struct ShelfMenuApp: App {
                 .environmentObject(volumes)
                 .environmentObject(scans)
                 .environmentObject(settings)
+                .environmentObject(toolsCheck)
         } label: {
             Image(systemName: scans.isScanning ? "externaldrive.badge.timemachine" : "externaldrive")
         }
@@ -24,6 +26,7 @@ struct ShelfMenuApp: App {
                 .environmentObject(volumes)
                 .environmentObject(scans)
                 .environmentObject(settings)
+                .environmentObject(toolsCheck)
         }
     }
 }

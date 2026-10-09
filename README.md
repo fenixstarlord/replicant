@@ -45,6 +45,7 @@ shelf dump /Volumes/X [--clips]        print what would be indexed as JSON lines
 ```
 
 Scans never write to the scanned volume. Vendor tools get a temp directory on the Mac.
+Which tools are needed for which formats, and where to get them: `docs/tools.md`.
 
 Metadata extraction uses external tools where a format needs one: ffprobe, ARRI's `art-cmd` and
 RED's `REDline`. All are optional; a missing tool is noted on the affected clips. Installation
