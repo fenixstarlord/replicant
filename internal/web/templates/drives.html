@@ -27,11 +27,11 @@
 </div>
 <div class="overflow-x-auto rounded-box border border-base-300 bg-base-100 min-h-14">
 <table class="table">
-<thead><tr><th class="w-8"></th><th>Name</th><th>Label</th><th>Location</th><th>Filesystem</th><th class="num">Capacity</th><th>Used</th><th class="num">Free</th><th class="num">Files</th><th class="num">Clips</th><th class="num">Scans</th><th>Last scan</th></tr></thead>
+<thead><tr><th class="w-8"></th><th>Name</th><th>Label</th><th>Location</th><th>Filesystem</th><th class="num">Capacity</th><th>Used</th><th class="num">Free</th><th class="num">Files</th><th class="num">Clips</th><th class="num">Scans</th><th>Last scan</th><th class="w-8"></th></tr></thead>
 <tbody>
 {{range .Drives}}<tr class="hover drive-row" draggable="true" data-drive-id="{{.ID}}" ondragstart="dragDrive(event)" ondragend="dragEnd(event)">
-  <td class="muted cursor-grab">{{template "icon_grip"}}</td>
-  <td class="whitespace-nowrap"><a href="/search?drive={{.ID}}" class="btn btn-ghost btn-sm btn-circle mr-1 align-middle" title="Search this drive" aria-label="Search this drive">{{template "icon_search"}}</a><a href="/browse/{{.ID}}" class="link link-hover font-medium inline-flex items-center gap-2 align-middle">{{template "icon_drive"}}{{.Name}}</a></td>
+  <td><a href="/search?drive={{.ID}}" class="btn btn-ghost btn-sm btn-circle" title="Search this drive" aria-label="Search this drive">{{template "icon_search"}}</a></td>
+  <td><a href="/browse/{{.ID}}" class="link link-hover font-medium inline-flex items-center gap-2">{{template "icon_drive"}}{{.Name}}</a></td>
   <td>{{or .Label "—"}}</td>
   <td>{{or .Location "—"}}</td>
   <td class="muted">{{.FSType}}</td>
@@ -42,7 +42,8 @@
   <td class="num">{{n .ClipCount}}</td>
   <td class="num">{{.ScanCount}}</td>
   <td>{{datetime .LastScannedAt}}</td>
-</tr>{{else}}<tr><td colspan="12" class="muted text-center py-4">Drop a drive here.</td></tr>{{end}}
+  <td class="muted cursor-grab text-right" title="Drag to move">{{template "icon_grip"}}</td>
+</tr>{{else}}<tr><td colspan="13" class="muted text-center py-4">Drop a drive here.</td></tr>{{end}}
 </tbody>
 </table>
 </div>
