@@ -50,12 +50,31 @@ func openStore() (*store.Store, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, fmt.Errorf("data dir: %w", err)
 	}
+	if err := checkWritable(dir); err != nil {
+		return nil, err
+	}
 	p := filepath.Join(dir, "replicant.db")
 	st, err := store.Open(p)
 	if err != nil {
 		return nil, fmt.Errorf("open %s: %w", p, err)
 	}
 	return st, nil
+}
+
+// checkWritable turns SQLite's "unable to open database file (14)" into a
+// message that says what to do: the usual cause in Docker is a bind-mounted
+// data folder owned by another user.
+func checkWritable(dir string) error {
+	f, err := os.CreateTemp(dir, ".write-test-*")
+	if err == nil {
+		f.Close()
+		os.Remove(f.Name())
+		return nil
+	}
+	return fmt.Errorf("the data directory %s is not writable by this process (uid %d, gid %d): %w\n"+
+		"On the host, give the folder to that user, e.g. `chown -R %d:%d <host path mounted at %s>`, "+
+		"or run the container as the folder's owner (compose: user: \"<uid>:<gid>\")",
+		dir, os.Getuid(), os.Getgid(), err, os.Getuid(), os.Getgid(), dir)
 }
 
 func newRootCmd() *cobra.Command {
