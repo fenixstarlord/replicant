@@ -117,20 +117,30 @@ The image is a static `shelf-server` on Debian slim with ffmpeg (for ffprobe), p
 `ghcr.io/fenixstarlord/indexserver` for amd64 and arm64 by the GitHub workflow on every push to
 `main` (`latest`) and on `v*` tags. `make docker` builds it locally.
 
+Edit `docker-compose.yml` (password, `SHELF_PUBLIC_URL`, and the paths), then:
+
 ```bash
-cp .env.example .env     # set SHELF_PASSWORD and SHELF_PUBLIC_URL
 docker compose up -d     # http://<host>:8080
 ```
 
-`docker-compose.yml` mounts `./data` at `/data` (database, uploads, backups) and `./media` at
-`/media` read-only for server-side scans. Vendor tools are not in the image; Linux builds of
-`art-cmd` or `REDline` can be bind-mounted at `/opt/shelf-tools`, which is on `PATH`.
+Volumes are plain `host:container` lines. `/data` holds the catalog. Each drive the server
+should scan itself gets its own line under `/media`, read-only:
+
+```yaml
+    volumes:
+      - /mnt/rock/apps/shelf:/data
+      - /mnt/rock/zfsshare/dataset1:/media/dataset1:ro
+      - /mnt/rock/zfsshare/dataset2:/media/dataset2:ro
+```
+
+Those show up under Settings → Server scans. Vendor tools are not in the image; Linux builds of
+`art-cmd` or `REDline` can be mounted at `/opt/shelf-tools`, which is on `PATH`.
 
 **TrueNAS SCALE:** Apps → Discover Apps → Custom App (or "Install via YAML" and paste the compose
 file). Image `ghcr.io/fenixstarlord/indexserver:latest`, port 8080, environment `SHELF_PASSWORD`
 and `SHELF_PUBLIC_URL` (the NetBird address of the NAS, e.g. `http://100.64.0.5:8080`), host-path
-storage: a dataset such as `/mnt/pool/apps/shelf` at `/data`, and your media datasets at `/media`
-read-only. The container runs as UID/GID 1000; give the data dataset that owner or set the app's
+storage: a dataset such as `/mnt/rock/apps/shelf` at `/data`, and each media dataset at its own
+path under `/media`, read-only. The container runs as UID/GID 1000; give the data dataset that owner or set the app's
 user accordingly. The container cannot see the host's NetBird interface, hence `SHELF_PUBLIC_URL`.
 
 ### Standalone app (no server)

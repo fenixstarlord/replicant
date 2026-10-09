@@ -1,31 +1,23 @@
-# Shelf server. Copy .env.example to .env (or set the variables in the
-# TrueNAS app form) and run: docker compose up -d
+# Shelf server. Edit the values below, then: docker compose up -d
 services:
   shelf:
-    image: ghcr.io/fenixstarlord/indexserver:${SHELF_TAG:-latest}
-    build:
-      context: .
-      args:
-        VERSION: ${SHELF_VERSION:-dev}
+    image: ghcr.io/fenixstarlord/indexserver:latest
     container_name: shelf
     restart: unless-stopped
     ports:
-      - "${SHELF_PORT:-8080}:8080"
+      - "8080:8080"
     environment:
-      SHELF_PASSWORD: ${SHELF_PASSWORD:?set SHELF_PASSWORD in .env}
-      # The address Macs use to reach this server, baked into API keys.
-      # A container cannot see the host's NetBird interface, so set it.
-      SHELF_PUBLIC_URL: ${SHELF_PUBLIC_URL:-}
-      TZ: ${TZ:-UTC}
+      SHELF_PASSWORD: change-me
+      # The address Macs use to reach this server (baked into API keys).
+      # Use the host's NetBird or LAN address; the container cannot detect it.
+      SHELF_PUBLIC_URL: http://100.64.0.5:8080
+      TZ: America/Los_Angeles
     volumes:
-      # Database, uploads and backups.
-      - ${SHELF_DATA:-./data}:/data
-      # Folders the server scans itself (Settings -> Server scans). Read-only.
-      - ${SHELF_MEDIA:-./media}:/media:ro
+      # Where the catalog lives (database, uploads, backups). host:container
+      - /mnt/rock/apps/shelf:/data
+      # Drives for the server to scan itself (Settings -> Server scans).
+      # One line per drive, host path first, read-only. Add as many as you like.
+      - /mnt/rock/zfsshare/dataset1:/media/dataset1:ro
+      - /mnt/rock/zfsshare/dataset2:/media/dataset2:ro
       # Optional: Linux builds of art-cmd / REDline, found on PATH.
-      # - /mnt/pool/apps/shelf-tools:/opt/shelf-tools:ro
-    healthcheck:
-      test: ["CMD", "shelf-server", "healthz"]
-      interval: 30s
-      timeout: 5s
-      start_period: 10s
+      # - /mnt/rock/apps/shelf-tools:/opt/shelf-tools:ro

@@ -314,7 +314,7 @@ reads `shelf doctor --json` to report missing metadata tools with a link to `doc
   latest full scan (`store.LatestScan`). Migration `0002_partial_scans.sql`.
 - **Home server:** cross-compiled static binary + systemd unit (`make dist`), or the Docker image
   (2026-10-09): `Dockerfile` (Go builder → Debian slim + ffmpeg, non-root UID 1000, `shelf-server
-  healthz` as HEALTHCHECK), `docker-compose.yml` + `.env.example`, published to GHCR by
+  healthz` as HEALTHCHECK), `docker-compose.yml` (literal values, one `host:/media/name:ro` line per drive), published to GHCR by
   `.github/workflows/docker.yml` for amd64 + arm64. Vendor tools bind-mount at `/opt/shelf-tools`.
 - **Open mode and the standalone app (2026-10-09):** `SHELF_AUTH=open` disables the password and
   API keys; `shelf-server` refuses it unless `SHELF_LISTEN` is loopback. `/api/me` reports
