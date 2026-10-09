@@ -75,7 +75,7 @@ Windows applications, so ARRI and RED camera metadata comes from scans made on t
 
 ## Status of the vendor extractors
 
-The `art-cmd` and `redline` extractors are written against the tools' documented output but have
-not yet been verified against a real installation. The first scan with either tool installed will
-show whether their output maps correctly; the raw output is stored on every clip either way, so
-nothing is lost if a field needs remapping later.
+Both vendor extractors are verified against real installations and real clips (2026-10-09):
+`art-cmd` 1.0.0 on ALEXA 35 ARRICORE, and REDline (REDCINE-X PRO) on a V-RAPTOR [X] R3D. The raw
+tool output is stored on every clip, so a field that a newer camera or tool version names
+differently can be remapped later without rescanning.

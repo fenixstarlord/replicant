@@ -1,35 +1,30 @@
 // Package red extracts R3D metadata with REDline, the command-line tool
-// shipped free with REDCINE-X PRO.
-//
-// The exact output of `REDline --printMeta` has not yet been captured
-// from a real install (see docs/design and AGENTS.md); the parser below
-// handles "Key: Value" lines and will be pinned to golden output when
-// the tool is installed.
+// shipped with REDCINE-X PRO. Verified against REDline from REDCINE-X
+// PRO on a V-RAPTOR [X] clip (testdata/golden/red).
 package red
 
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/fenixstarlord/indexserver/internal/clips"
 	"github.com/fenixstarlord/indexserver/internal/extract"
 	"github.com/fenixstarlord/indexserver/internal/meta"
 )
 
-// DefaultPaths are where REDline is found. The macOS REDCINE-X PRO
-// installer puts the app under /Applications/REDCINE-X Professional/ with
-// REDline inside the bundle; on Linux the standalone REDline archive is
-// unpacked by hand (see docs/tools.md). PATH is searched last.
+// DefaultPaths are where REDCINE-X PRO installs REDline on macOS.
 var DefaultPaths = []string{
 	"/Applications/REDCINE-X Professional/REDCINE-X PRO.app/Contents/MacOS/REDline",
 	"/Applications/REDCINE-X PRO.app/Contents/MacOS/REDline",
 	"/Applications/REDCINE-X PRO/REDline",
 	"/Applications/REDline/REDline",
 	"/usr/local/bin/REDline",
-	"/opt/REDline/REDline",
 }
 
 // Extractor runs REDline. Path may be empty to use the defaults.
@@ -57,113 +52,169 @@ func (e *Extractor) Available(ctx context.Context) (bool, string) {
 	return true, v
 }
 
-func (e *Extractor) Matches(c *clips.Clip) bool { return c.Kind == clips.KindR3D }
+// Matches accepts .RDC clips and loose R3D segments.
+func (e *Extractor) Matches(c *clips.Clip) bool {
+	if c.Kind == clips.KindR3D {
+		return true
+	}
+	return strings.EqualFold(path.Ext(c.PrimaryFile()), ".r3d")
+}
 
 func (e *Extractor) Extract(ctx context.Context, root string, c *clips.Clip) (*meta.Result, error) {
 	abs := filepath.Join(root, filepath.FromSlash(c.PrimaryFile()))
-	out, err := extract.RunTool(ctx, e.bin, "--i", abs, "--printMeta", "1")
-	if err != nil {
+	// --useMeta reads the clip's own settings; without it REDline prints
+	// its defaults for ISO, Kelvin and friends.
+	out, err := extract.RunTool(ctx, e.bin, "--i", abs, "--useMeta", "--printMeta", "1")
+	kv := ParseKV(string(out))
+	// REDline exits non-zero after printing (it has no output job to run);
+	// the metadata is still complete when the clip block is present.
+	if err != nil && kv["Clip Name"] == "" {
 		return nil, err
 	}
-	kv := ParseKV(string(out))
-	raw, _ := json.Marshal(map[string]any{"printMeta": kv, "output": string(out)})
+	raw, _ := json.Marshal(map[string]any{"printMeta": kv})
 	return &meta.Result{Fields: Map(kv), Raw: raw}, nil
 }
 
-// ParseKV reads "Key: Value" lines into a map.
+// ParseKV reads REDline's "Key:<tab>Value" lines into a map, skipping the
+// log banner. Keys may themselves contain ": " (e.g. "LGG Lift: Red").
 func ParseKV(s string) map[string]string {
 	kv := map[string]string{}
 	for _, line := range strings.Split(s, "\n") {
-		k, v, ok := strings.Cut(line, ":")
-		if !ok {
+		line = strings.TrimRight(line, "\r")
+		if line == "" || strings.HasPrefix(line, "[") {
 			continue
 		}
-		k, v = strings.TrimSpace(k), strings.TrimSpace(v)
-		if k != "" && v != "" {
+		k, v, ok := strings.Cut(line, ":\t")
+		if !ok {
+			if k, v, ok = strings.Cut(line, ":"); !ok {
+				continue
+			}
+		}
+		k = strings.TrimSuffix(strings.TrimSpace(k), ":")
+		v = strings.TrimSpace(v)
+		if k == "" || v == "" {
+			continue
+		}
+		if _, dup := kv[k]; !dup { // first occurrence wins (Aperture, Focal Length repeat)
 			kv[k] = v
 		}
 	}
 	return kv
 }
 
-// Map converts REDline keys to fields. Keys are matched case-insensitively
-// against several known spellings.
+func num(kv map[string]string, key string) (float64, bool) {
+	v := strings.TrimSpace(kv[key])
+	v = strings.TrimPrefix(strings.TrimPrefix(v, "F"), "T")
+	v = strings.TrimSuffix(strings.TrimSuffix(v, "mm"), "°")
+	f, err := strconv.ParseFloat(strings.TrimSpace(v), 64)
+	return f, err == nil
+}
+
+func round1(x float64) float64 { return float64(int64(x*10+0.5)) / 10 }
+
+// Map converts REDline keys to fields.
 func Map(kv map[string]string) meta.Fields {
 	var f meta.Fields
-	get := func(keys ...string) string {
-		for _, k := range keys {
-			for kk, v := range kv {
-				if strings.EqualFold(kk, k) {
-					return v
-				}
-			}
-		}
-		return ""
-	}
-	num := func(s string) (float64, bool) {
-		s = strings.TrimSpace(strings.TrimRight(s, "mmKkKfpsFPS°"))
-		x, err := strconv.ParseFloat(strings.Fields(s + " ")[0], 64)
-		return x, err == nil
-	}
 	f.Codec = meta.Str("R3D")
+	f.Container = meta.Str("r3d")
 	f.CameraMake = meta.Str("RED")
-	f.ClipName = meta.Str(get("Clip Name", "Reel ID", "Clip"))
-	f.Reel = meta.Str(get("Reel ID", "Reel"))
-	f.CameraModel = meta.Str(get("Camera Type", "Camera Model", "Camera"))
-	f.CameraSerial = meta.Str(get("Camera PIN", "Camera Serial", "Serial"))
-	f.Firmware = meta.Str(get("Firmware Version", "Firmware"))
-	f.TCStart = meta.Str(get("Start Absolute Timecode", "Start Edge Timecode", "Timecode", "Start TC"))
-	f.TCEnd = meta.Str(get("End Absolute Timecode", "End Edge Timecode", "End TC"))
-	f.Lens = meta.Str(get("Lens Name", "Lens", "Lens Model"))
-	f.SensorMode = meta.Str(get("Record Format", "Format", "Sensor Mode"))
-	f.ColorGamma = meta.Str(get("Color Space", "Gamma Curve"))
-	f.Look = meta.Str(get("Look", "LUT"))
-	f.ND = meta.Str(get("ND Filter", "ND"))
-	f.FocusDistance = meta.Str(get("Focus Distance", "Focus"))
-	if v, ok := num(get("Frame Width", "Width")); ok {
-		f.Width = meta.Int(int64(v))
+	if rc := kv["REDCODE"]; rc != "" {
+		f.CodecDetail = meta.Str("REDCODE " + rc)
 	}
-	if v, ok := num(get("Frame Height", "Height")); ok {
-		f.Height = meta.Int(int64(v))
+	f.ClipName = meta.Str(kv["ReelID"])
+	f.Reel = meta.Str(kv["CamReelID"])
+	f.CameraIndex = meta.Str(kv["Camera"])
+	f.CameraModel = meta.Str(kv["Camera Model"])
+	f.CameraSerial = meta.Str(kv["Camera PIN"])
+	f.Firmware = meta.Str(kv["Firmware Version"])
+	f.TCStart = meta.Str(kv["Abs TC"])
+	f.TCEnd = meta.Str(kv["End Abs TC"])
+	f.Scene = meta.Str(kv["Scene"])
+	f.Take = meta.Str(kv["Take"])
+	if c := strings.ToLower(kv["Circle"]); c != "" {
+		f.Circled = meta.Bool(c == "yes" || c == "true" || c == "1")
 	}
-	if v, ok := num(get("FPS", "Frame Rate", "Record FPS")); ok {
+	f.Look = meta.Str(kv["Look Name"])
+	if w, ok := num(kv, "Frame Width"); ok {
+		f.Width = meta.Int(int64(w))
+	}
+	if h, ok := num(kv, "Frame Height"); ok {
+		f.Height = meta.Int(int64(h))
+	}
+	if f.Width != nil && f.Height != nil {
+		mode := fmt.Sprintf("%dx%d", *f.Width, *f.Height)
+		if sn := kv["Sensor Name"]; sn != "" {
+			mode += " " + sn
+		}
+		f.SensorMode = meta.Str(mode)
+	}
+	if v, ok := num(kv, "FPS"); ok {
 		f.FPS = meta.Float(v)
 	}
-	if v, ok := num(get("Sensor FPS", "Capture FPS")); ok {
+	if v, ok := num(kv, "Record FPS"); ok {
 		f.CaptureFPS = meta.Float(v)
 	}
-	if v, ok := num(get("Total Frames", "Frame Count", "Frames")); ok {
+	if v, ok := num(kv, "Total Frames"); ok {
 		f.FrameCount = meta.Int(int64(v))
+		if f.FPS != nil && *f.FPS > 0 {
+			f.DurationS = meta.Float(v / *f.FPS)
+		}
 	}
-	if v, ok := num(get("ISO")); ok {
+	if v, ok := num(kv, "ISO"); ok {
 		f.ISO = meta.Int(int64(v))
 	}
-	if v, ok := num(get("Color Temp", "Color Temperature", "Kelvin")); ok {
+	if v, ok := num(kv, "Kelvin"); ok {
 		f.WBKelvin = meta.Int(int64(v))
 	}
-	if v, ok := num(get("Tint")); ok {
+	if v, ok := num(kv, "Tint"); ok {
 		f.Tint = meta.Float(v)
 	}
-	if v, ok := num(get("Shutter Angle", "Shutter (deg)")); ok {
-		f.ShutterAngle = meta.Float(v)
+	if v, ok := num(kv, "Shutter (deg)"); ok {
+		f.ShutterAngle = meta.Float(round1(v))
 	}
-	if v := get("Shutter", "Exposure Time"); v != "" {
-		f.ShutterSpeed = meta.Str(v)
+	if v, ok := num(kv, "Shutter (1/sec)"); ok {
+		f.ShutterSpeed = meta.Str("1/" + strconv.FormatFloat(v, 'f', -1, 64))
 	}
-	if v, ok := num(get("Focal Length")); ok {
+	if v, ok := num(kv, "ND Stops"); ok && v > 0 {
+		f.ND = meta.Str(fmt.Sprintf("%.2f stops", v))
+	}
+	lens := kv["Lens Name"]
+	if lens == "" {
+		lens = kv["Lens"]
+	}
+	if b := kv["Lens Brand"]; b != "" && lens != "" && !strings.Contains(lens, b) {
+		lens = b + " " + lens
+	}
+	f.Lens = meta.Str(lens)
+	if v, ok := num(kv, "Focal Length"); ok {
 		f.FocalMM = meta.Float(v)
 	}
-	if v, ok := num(strings.TrimPrefix(strings.TrimPrefix(get("Aperture", "T-Stop", "F-Stop"), "T"), "f")); ok {
+	if v, ok := num(kv, "Aperture"); ok {
 		f.TStop = meta.Float(v)
 	}
-	if v := get("Compression", "REDCODE"); v != "" {
-		f.CodecDetail = meta.Str(v)
+	if v, ok := num(kv, "Focus Distance"); ok && v > 0 {
+		f.FocusDistance = meta.Str(fmt.Sprintf("%.2f m", v/1000))
 	}
-	if v, ok := num(get("Anamorphic", "Pixel Aspect Ratio")); ok && v > 0 && v != 1 {
+	if v, ok := num(kv, "Camera Audio Channels"); ok && v > 0 {
+		f.AudioChannels = meta.Int(int64(v))
+	}
+	if v, ok := num(kv, "Pixel Aspect Ratio"); ok && v > 0 && v != 1 {
 		f.Squeeze = meta.Float(v)
 	}
-	if f.FPS != nil && f.FrameCount != nil {
-		f.DurationS = meta.Float(float64(*f.FrameCount) / *f.FPS)
+	switch kv["Clip Current Image Pipeline"] {
+	case "IPP2":
+		f.ColorGamma = meta.Str("REDWideGamutRGB/Log3G10")
+	default:
+		if cs, gs := kv["Color Space"], kv["Gamma Space"]; cs != "" || gs != "" {
+			f.ColorGamma = meta.Str("colorspace " + cs + "/gamma " + gs)
+		}
+	}
+	if d, t := kv["Date"], kv["Timestamp"]; len(d) == 8 {
+		if ts, err := time.Parse("20060102 150405", d+" "+fmt.Sprintf("%06s", t)); err == nil {
+			f.RecordedAt = meta.Time(ts)
+		} else if ts, err := time.Parse("20060102", d); err == nil {
+			f.RecordedAt = meta.Time(ts)
+		}
 	}
 	return f
 }

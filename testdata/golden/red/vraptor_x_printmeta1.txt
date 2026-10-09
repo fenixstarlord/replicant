@@ -1,0 +1,200 @@
+Clip Name:	A014_0510JN__A014_A002_05102I_001.R3D
+File Path:	/Volumes/SSD_RAID/Resolve Cloud/OWTS_Episode1/S01-E01-Bora/E1_2024/E1-Bora - 2024_05_09/A014/A014 Footage/A014_0510JN__A014_A002_05102I_001.R3D
+File Name:	A014_0510JN__A014_A002_05102I_001.R3D
+Original File Name:	A014_A002_05102I_001.R3D
+ReelID:	A014_A002_05102I
+AltReelID:	A014A002
+CamReelID:	A014
+Camera:	A
+Camera Model:	V-RAPTOR [X] 8K VV
+Camera Model ID:	26
+Camera Network Name:	
+Camera PIN:	VRPBX000094
+Camera Position:	A
+Dropped Frame Count:	0
+Media Serial Number:	J11AGCXABGC1824
+Sensor Name:	V-RAPTOR [X] VV
+Sensor ID:	21
+Sensor OLPF Interchangeable:	0
+Sensor OLPF Name:	
+Sensor Sensitivity Id:	
+Sensor Sensitivity Name:	
+Monitor Sharpness:	
+Reel:	014
+Clip:	002
+UUID:	31F11945-4A32-40D8-9041-3A6BA36ADA20
+Date:	20240510
+Timestamp:	023639
+Frame Width:	8192
+Frame Height:	4320
+FPS:	23.976024627685547
+Record FPS:	23.97599983215332
+Total Frames:	335
+Abs TC:	16:31:28:18
+Edge TC:	01:01:39:04
+End Abs TC:	16:31:42:16
+End Edge TC:	01:01:53:02
+Color Space:	25
+Gamma Space:	34
+Kelvin:	5600
+Tint:	0
+ISO:	250
+Exposure:	0
+Saturation:	1
+Contrast:	0
+Brightness:	0
+Red Gain:	1
+Green Gain:	1
+Blue Gain:	1
+Luma Curve: Black X:	0.00000
+Luma Curve: Black Y:	0.00000
+Luma Curve: Toe X:	0.25000
+Luma Curve: Toe Y:	0.25000
+Luma Curve: Mid X:	0.50000
+Luma Curve: Mid Y:	0.50000
+Luma Curve: Knee X:	0.75000
+Luma Curve: Knee Y:	0.75000
+Luma Curve: White X:	1.00000
+Luma Curve: White Y:	1.00000
+Shutter (ms):	42
+Shutter (1/sec):	24
+Shutter (deg):	360.30023193359375
+Firmware Version:	1.7.0
+Firmware Revision:	37224512
+Camera Audio Channels:	4
+File Segments:	1
+Flip Horizontal:	
+Flip Vertical:	
+Rotation:	0.000000
+HDR Mode:	No HDR
+HDR Stops Over:	
+HDR Blend Mode:	Off
+HDR Blend Bias:	Off
+Aperture:	F4.8
+Focal Length:	100mm
+Focus Distance:	2190mm
+Lens Mount:	P/L
+Lens:	
+Lens Brand:	Carl Zeiss AG
+Lens Name:	Supreme Prime 100/T1.5
+Lens Owner:	Carl Zeiss AG
+Lens Serial Number:	Z50103025
+Lens Focus Distance:	2190mm
+Lens Focus Distance Near:	2170mm
+Lens Focus Distance Far:	2210mm
+Lens Cooke /i Static:	NSZ50103025OCarl Zeiss AG                  LPN100M100UBT92  B1.61
+Clip In:	0
+Clip Out:	334
+Notes:	
+Owner:	
+Project:	
+Scene:	
+Shot:	
+Take:	002
+Unit:	
+Production Name:	owts
+Location:	
+Director Of Photography:	ian takahashi
+Director:	andrew huff
+Camera Operator:	ian takahashi
+Circle:	
+Copyright:	
+Script Notes:	
+Camera Notes:	
+Edit Notes:	
+Post Notes:	
+Lens:	
+Lens Height:	
+ND Stops:	3.6700000762939453
+Motion Mount Shutter Type:	ND Only (0)
+Aperture:	F4.8
+Focal Length:	100mm
+Focal Distance:	
+Filter:	
+Scene Description:	
+Audio Timecode:	
+Audio:	
+Audio Slate:	
+Video Slate:	
+Frame Guide X:	0.031253814697265625
+Frame Guide Y:	0
+Frame Guide Width:	0.9375
+Frame Guide Height:	1
+Aspect Ratio:	1.8962962627410889
+Aspect Ratio Numerator:	1.8962962627410889
+Aspect Ratio Denominator:	1
+Frame Guide Name:	
+Genlock Setting:	Not Genlocked
+Jamsync Setting:	External Clock
+Linked Camera Setup:	Not Linked
+Pixel Aspect Ratio:	1
+Stereo Setup:	Not Stereo
+REDCODE:	MQ
+Look Name:	
+DRX:	0
+FLUT:	0
+Shadow:	0
+LGG: Lift: Red:	0
+LGG Lift: Green:	0
+LGG Lift: Blue:	0
+LGG Gamma: Red:	1
+LGG Gamma: Green:	1
+LGG Gamma: Blue:	1
+LGG Gain: Red:	1
+LGG Gain: Green:	1
+LGG Gain: Blue:	1
+Red Curve: Black X:	0.00000
+Red Curve: Black Y:	0.00000
+Red Curve: Toe X:	0.25000
+Red Curve: Toe Y:	0.25000
+Red Curve: Mid X:	0.50000
+Red Curve: Mid Y:	0.50000
+Red Curve: Knee X:	0.75000
+Red Curve: Knee Y:	0.75000
+Red Curve: White X:	1.00000
+Red Curve: White Y:	1.00000
+Green Curve: Black X:	0.00000
+Green Curve: Black Y:	0.00000
+Green Curve: Toe X:	0.25000
+Green Curve: Toe Y:	0.25000
+Green Curve: Mid X:	0.50000
+Green Curve: Mid Y:	0.50000
+Green Curve: Knee X:	0.75000
+Green Curve: Knee Y:	0.75000
+Green Curve: White X:	1.00000
+Green Curve: White Y:	1.00000
+Blue Curve: Black X:	0.00000
+Blue Curve: Black Y:	0.00000
+Blue Curve: Toe X:	0.25000
+Blue Curve: Toe Y:	0.25000
+Blue Curve: Mid X:	0.50000
+Blue Curve: Mid Y:	0.50000
+Blue Curve: Knee X:	0.75000
+Blue Curve: Knee Y:	0.75000
+Blue Curve: White X:	1.00000
+Blue Curve: White Y:	1.00000
+Clip Current Image Pipeline:	IPP2
+Clip Original Image Pipeline:	IPP2
+Exposure Adjust:	0
+Roll Off:	3
+Output Tone Map:	1
+Flashing Pixel Adjustment:	1
+CDL Enabled::	false
+CDL Slope: Red:	1
+CDL Slope: Green:	1
+CDL Slope: Blue:	1
+CDL Offset: Red:	0
+CDL Offset: Green:	0
+CDL Offset: Blue:	0
+CDL Power: Red:	1
+CDL Power: Green:	1
+CDL Power: Blue:	1
+CDL Saturation:	1
+Camera 3D LUT:	
+3D LUT:	
+3D LUT Enabled:	false
+Bypass IPP2 Output Transform:	false
+Detail:	High
+OLPF Compensation:	Off
+Denoise:	Off
+WAV Filename:	

@@ -36,7 +36,7 @@ Track progress here. Update this section at the end of each phase, and commit.
   login page. CLI: `shelf login`, `upload`, `drives`, and `scan` without `-o` pushes directly.
   `shelf-server token create|list|revoke`, `shelf-server ingest <file>`. Verified end to end
   against `./start.sh`: the 614k-entry RAID bundle ingests in 16 s. Docker still deferred.
-- [~] Phase 4 — Extractors (2026-10-08/09). `internal/meta` (normalized fields, priority merge with
+- [x] Phase 4 — Extractors (2026-10-08/09). `internal/meta` (normalized fields, priority merge with
   weak fields), `internal/extract` (runner, worker pool, per-clip timeouts, missing tools never
   fatal), extractors: `ffprobe`, `ale`, `bwf` (bext + iXML), `sony-xml`, `braw-sidecar`, `redline`,
   `art-cmd`. `shelf doctor [--json]`; `shelf scan` extracts unless `--fast`; ingest stores fields,
@@ -45,8 +45,11 @@ Track progress here. Update this section at the end of each phase, and commit.
   --output <tmp>/metadata.json` (0.14 s per clip); mapper in `internal/extract/arri/export.go`
   against `testdata/golden/arri/alexa35_arricore_metadata.json`. On the ALEXA 35 card: 74 clips,
   0 errors, art-cmd wins camera/exposure/lens/colour, ALE supplies duration and frame count.
-  **Open:** `redline` mapper still unverified against real `--printMeta` output; Sony XML and
-  BRAW sidecar parsers tested on synthetic samples only.
+  **RED verified 2026-10-09** with REDline from REDCINE-X PRO: `REDline --i <seg> --useMeta
+  --printMeta 1` (~0.9 s per clip; `--useMeta` is required or ISO/Kelvin are defaults; the tool
+  exits 1 after printing, which the extractor tolerates). Mapper against
+  `testdata/golden/red/vraptor_x_printmeta1.txt`; loose R3D segments outside `.RDC` also match.
+  Still synthetic-only: Sony XML and BRAW sidecar parsers (no real samples on hand).
 - [x] Phase 5 — Search + browse UI (2026-10-08). `internal/store/query.go` (clip search with every
   plan filter, file search, browse listing, detail, history, copies, facets), `internal/web` pages:
   login, drives (inline label/location), drive (scan history, diff picker, exports), search
