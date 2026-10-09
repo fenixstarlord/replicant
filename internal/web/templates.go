@@ -105,6 +105,7 @@ var funcs = template.FuncMap{
 	"basename": path.Base,
 	"add":      func(a, b int) int { return a + b },
 	"sub":      func(a, b int) int { return a - b },
+	"mul":      func(a, b int) int { return a * b },
 	"used":     func(capacity, free int64) int64 { return capacity - free },
 	"pct": func(part, total int64) int {
 		if total <= 0 {

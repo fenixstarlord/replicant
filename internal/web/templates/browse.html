@@ -1,25 +1,89 @@
 {{define "content"}}
-<h1><a href="/drives/{{.Drive.ID}}" class="link link-hover">{{.Drive.Name}}</a></h1>
-<p class="muted text-sm">Scan #{{.Scan.ID}} · {{datetime .Scan.ScannedAt}}{{if .Scan.IsLatest}} · latest{{else}} · <span class="text-warning">old scan</span>{{end}}{{if .Scan.IsPartial}} · <span class="text-warning">partial scan of {{.Scan.Root}}</span>{{end}} · {{if .Drive.Location}}{{.Drive.Location}}{{else}}location not set{{end}}</p>
+{{$d := .Drive.ID}}{{$s := .Scan.ID}}
+<div class="flex items-start justify-between gap-4 flex-wrap">
+  <div>
+    <h1><a href="/drives/{{.Drive.ID}}" class="link link-hover">{{.Drive.Name}}</a></h1>
+    <p class="muted text-sm">Scan #{{.Scan.ID}} · {{datetime .Scan.ScannedAt}}{{if .Scan.IsLatest}} · latest{{else}} · <span class="text-warning">old scan</span>{{end}}{{if .Scan.IsPartial}} · <span class="text-warning">partial scan of {{.Scan.Root}}</span>{{end}} · {{if .Drive.Location}}{{.Drive.Location}}{{else}}location not set{{end}}</p>
+  </div>
+  <div class="join">
+    <a href="/browse/{{$d}}/{{.DirPath}}?scan={{$s}}&view=columns" class="join-item btn btn-sm {{if eq .View "columns"}}btn-active{{end}}" title="Column view">▥ Columns</a>
+    <a href="/browse/{{$d}}/{{.DirPath}}?scan={{$s}}&view=list" class="join-item btn btn-sm {{if eq .View "list"}}btn-active{{end}}" title="List view">☰ List</a>
+  </div>
+</div>
 <div class="breadcrumbs text-sm mono"><ul>
-  <li><a href="/browse/{{.Drive.ID}}?scan={{.Scan.ID}}">/</a></li>
-  {{$d := .Drive.ID}}{{$s := .Scan.ID}}{{range .Crumbs}}<li><a href="/browse/{{$d}}/{{.Path}}?scan={{$s}}">{{.Name}}</a></li>{{end}}
+  <li><a href="/browse/{{$d}}?scan={{$s}}">{{.Drive.Name}}</a></li>
+  {{range .Crumbs}}<li><a href="/browse/{{$d}}/{{.Path}}?scan={{$s}}">{{.Name}}</a></li>{{end}}
+  {{if .IsFile}}<li>{{.Target.Name}}</li>{{end}}
 </ul></div>
 <p class="muted text-sm mb-2">{{n .Dir.DirFileCount}} files · {{bytes .Dir.DirTotalSize}}</p>
+
+<div id="explorer" hx-boost="true" hx-target="#explorer" hx-select="#explorer" hx-swap="outerHTML show:none">
+{{if eq .View "columns"}}
+<div class="flex overflow-x-auto rounded-box border border-base-300 bg-base-100 explorer-columns">
+  {{range .Columns}}
+  <ul class="menu menu-sm flex-nowrap w-64 shrink-0 border-r border-base-300 max-h-[70vh] overflow-y-auto p-1">
+    {{$sel := .Selected}}
+    {{range .Entries}}
+    <li><a href="/browse/{{$d}}/{{.Path}}?scan={{$s}}" class="{{if eq .Path $sel}}menu-active{{end}} {{if .Error}}text-error{{end}} flex justify-between gap-2" title="{{.Name}}">
+      <span class="truncate">{{if .IsDir}}<span class="muted">▸ </span>{{end}}{{.Name}}</span>
+      <span class="muted text-xs shrink-0">{{if .IsDir}}{{if .ClipID}}{{.ClipKind}}{{else}}{{n .DirFileCount}}{{end}}{{else}}{{bytes .Size}}{{end}}</span>
+    </a></li>
+    {{else}}<li class="muted p-2 text-sm">Empty folder</li>{{end}}
+  </ul>
+  {{end}}
+  {{if .IsFile}}{{$e := .Target}}
+  <div class="w-80 shrink-0 p-4 text-sm">
+    <div class="font-semibold break-all">{{$e.Name}}</div>
+    <div class="muted mb-3"><span class="badge badge-ghost badge-xs">{{$e.Kind}}</span>{{if $e.IsSymlink}} <span class="badge badge-ghost badge-xs">link</span>{{end}}</div>
+    <dl class="kv">
+      <dt>Size</dt><dd>{{bytes $e.Size}}</dd>
+      <dt>Modified</dt><dd>{{datetime $e.ModTime}}</dd>
+      {{if not $e.BirthTime.IsZero}}<dt>Created</dt><dd>{{datetime $e.BirthTime}}</dd>{{end}}
+      {{if $e.Fingerprint}}<dt>Fingerprint</dt><dd class="mono text-xs">{{$e.Fingerprint}}</dd>{{end}}
+      {{if $e.ClipID}}<dt>Clip</dt><dd><a href="/clips/{{$e.ClipID}}" class="link" hx-boost="false">{{$e.ClipKind}} clip</a></dd>{{end}}
+      {{if .Copies}}<dt>Copies</dt><dd>{{len .Copies}} elsewhere</dd>{{end}}
+    </dl>
+    <div class="mt-3 flex gap-2"><a href="/files/{{$e.ID}}" class="btn btn-sm btn-primary" hx-boost="false">Details</a>{{if $e.ClipID}}<a href="/clips/{{$e.ClipID}}" class="btn btn-sm" hx-boost="false">Clip</a>{{end}}</div>
+  </div>
+  {{end}}
+</div>
+{{else}}
 <div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
-<table class="table table-sm">
-<thead><tr><th>Name</th><th>Kind</th><th class="num">Size</th><th class="num">Files</th><th>Modified</th><th>Clip</th><th>Fingerprint</th></tr></thead>
+<table class="table table-sm explorer-list">
+<thead><tr><th>Name</th><th>Kind</th><th class="num">Size</th><th class="num">Files</th><th>Modified</th><th>Clip</th></tr></thead>
 <tbody>
-{{range .Entries}}<tr class="hover {{if .Error}}text-error{{end}}">
-  <td>{{if .IsDir}}{{if .ClipID}}<a href="/clips/{{.ClipID}}" class="link link-hover font-medium">{{.Name}}/</a>{{else}}<a href="/browse/{{$d}}/{{.Path}}?scan={{$s}}" class="link link-hover font-medium">{{.Name}}/</a>{{end}}{{else}}<a href="/files/{{.ID}}" class="link link-hover">{{.Name}}</a>{{end}}{{if .IsSymlink}} <span class="badge badge-ghost badge-xs">link</span>{{end}}{{if .IsPackage}} <span class="badge badge-ghost badge-xs">package</span>{{end}}</td>
+{{template "browse_rows" .}}
+</tbody>
+</table>
+</div>
+{{end}}
+</div>
+<script>
+// Keep the deepest column in view, like Finder.
+function scrollColumns() { const c = document.querySelector('.explorer-columns'); if (c) c.scrollLeft = c.scrollWidth; }
+scrollColumns();
+document.body.addEventListener('htmx:afterSettle', scrollColumns);
+function twirl(btn) {
+  const tr = btn.closest('tr'), path = tr.dataset.path;
+  if (tr.dataset.open) {
+    let n = tr.nextElementSibling;
+    while (n && n.dataset.path && n.dataset.path.startsWith(path + '/')) { const x = n; n = n.nextElementSibling; x.remove(); }
+    delete tr.dataset.open; btn.textContent = '▸'; return;
+  }
+  tr.dataset.open = '1'; btn.textContent = '▾';
+  htmx.ajax('GET', tr.dataset.children, { target: tr, swap: 'afterend' });
+}
+</script>
+{{end}}
+
+{{define "browse_rows"}}
+{{$d := .Drive.ID}}{{$s := .Scan.ID}}{{$depth := .Depth}}
+{{range .Entries}}<tr class="hover {{if .Error}}text-error{{end}}" data-path="{{.Path}}" data-children="/browse/{{$d}}/{{.Path}}?scan={{$s}}&frag=rows&depth={{$depth}}">
+  <td><span class="inline-block" style="width:{{mul $depth 20}}px"></span>{{if .IsDir}}<button type="button" class="btn btn-ghost btn-xs w-6 px-0 mr-1" onclick="twirl(this)" aria-label="Expand">▸</button>{{else}}<span class="inline-block w-6 mr-1"></span>{{end}}{{if .IsDir}}{{if .ClipID}}<a href="/clips/{{.ClipID}}" class="link link-hover font-medium" hx-boost="false">{{.Name}}/</a>{{else}}<a href="/browse/{{$d}}/{{.Path}}?scan={{$s}}" class="link link-hover font-medium">{{.Name}}/</a>{{end}}{{else}}<a href="/files/{{.ID}}" class="link link-hover" hx-boost="false">{{.Name}}</a>{{end}}{{if .IsSymlink}} <span class="badge badge-ghost badge-xs">link</span>{{end}}{{if .IsPackage}} <span class="badge badge-ghost badge-xs">package</span>{{end}}</td>
   <td><span class="badge badge-ghost badge-xs">{{.Kind}}</span></td>
   <td class="num">{{if .IsDir}}{{bytes .DirTotalSize}}{{else}}{{bytes .Size}}{{end}}</td>
   <td class="num">{{if .IsDir}}{{n .DirFileCount}}{{else}}<span class="muted">—</span>{{end}}</td>
   <td>{{datetime .ModTime}}</td>
-  <td>{{if .ClipID}}<a href="/clips/{{.ClipID}}" class="link link-hover">{{.ClipKind}}</a>{{else}}<span class="muted">—</span>{{end}}</td>
-  <td class="muted mono">{{or .Fingerprint "—"}}</td>
-</tr>{{else}}<tr><td colspan="7" class="muted text-center py-6">Empty folder.</td></tr>{{end}}
-</tbody>
-</table>
-</div>
+  <td>{{if .ClipID}}<a href="/clips/{{.ClipID}}" class="link link-hover" hx-boost="false">{{.ClipKind}}</a>{{else}}<span class="muted">—</span>{{end}}</td>
+</tr>{{else}}{{if eq $depth 0}}<tr><td colspan="6" class="muted text-center py-6">Empty folder.</td></tr>{{end}}{{end}}
 {{end}}

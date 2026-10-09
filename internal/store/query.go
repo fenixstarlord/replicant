@@ -677,21 +677,36 @@ type Change struct {
 	NewSize int64  `json:"new_size"`
 }
 
-// ScanChanges lists a scan's recorded differences from the previous scan.
-func (s *Store) ScanChanges(ctx context.Context, scanID int64, limit int) ([]Change, error) {
+// ScanChanges lists a scan's recorded differences from the previous scan,
+// optionally filtered to one change type ("added", "removed", "changed").
+// It returns the page and the total count for the filter.
+func (s *Store) ScanChanges(ctx context.Context, scanID int64, change string, limit, offset int) ([]Change, int, error) {
+	w := &where{}
+	w.add("scan_id = ?", scanID)
+	if change != "" {
+		w.add("change = ?", change)
+	}
+	var total int
+	if err := s.DB.QueryRowContext(ctx, "SELECT count(*) FROM scan_changes"+w.sql(), w.args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	if limit <= 0 {
+		limit = 500
+	}
+	args := append(append([]any{}, w.args...), limit, offset)
 	rows, err := s.DB.QueryContext(ctx, `SELECT path, change, coalesce(old_size,0), coalesce(new_size,0)
-		FROM scan_changes WHERE scan_id = ? ORDER BY change, path LIMIT ?`, scanID, limit)
+		FROM scan_changes`+w.sql()+` ORDER BY change, path LIMIT ? OFFSET ?`, args...)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer rows.Close()
 	var out []Change
 	for rows.Next() {
 		var c Change
 		if err := rows.Scan(&c.Path, &c.Change, &c.OldSize, &c.NewSize); err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		out = append(out, c)
 	}
-	return out, rows.Err()
+	return out, total, rows.Err()
 }

@@ -52,7 +52,7 @@
   <td><a href="/scans/{{.ID}}" class="link link-hover font-medium">#{{.ID}}</a>{{if .IsLatest}} <span class="badge badge-success badge-xs">latest</span>{{end}}{{if .IsPartial}} <span class="badge badge-warning badge-xs" title="{{.Root}}">partial</span>{{end}}</td>
   <td>{{datetime .ScannedAt}}</td><td class="muted">{{datetime .IngestedAt}}</td>
   <td class="num">{{n .FileCount}}</td><td class="num">{{n .ClipCount}}</td><td class="num">{{bytes .TotalBytes}}</td>
-  <td class="num text-success">+{{n .Added}}</td><td class="num text-error">−{{n .Removed}}</td><td class="num text-warning">~{{n .Changed}}</td>
+  <td class="num"><a href="/scans/{{.ID}}?change=added" class="link link-hover text-success" title="Show added files">+{{n .Added}}</a></td><td class="num"><a href="/scans/{{.ID}}?change=removed" class="link link-hover text-error" title="Show removed files">−{{n .Removed}}</a></td><td class="num"><a href="/scans/{{.ID}}?change=changed" class="link link-hover text-warning" title="Show changed files">~{{n .Changed}}</a></td>
   <td class="muted mono">{{.ScannerVersion}}</td>
   <td class="text-right"><a href="/browse/{{.DriveID}}?scan={{.ID}}" class="btn btn-ghost btn-xs">Browse</a></td>
 </tr>{{end}}

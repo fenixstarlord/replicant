@@ -244,8 +244,12 @@ func TestPagesRender(t *testing.T) {
 		{"/search?camera=ALEXA+35&fps=24&iso_min=800&iso_max=800", []string{"1 clips", "A001C001"}},
 		{"/search?q=zzz", []string{"0 clips", "No clips match"}},
 		{"/search?mode=files&q=notes", []string{"1 files", "notes.txt"}},
-		{fmt.Sprintf("/browse/%d", res.DriveID), []string{"A001/", "notes.txt"}},
-		{fmt.Sprintf("/browse/%d/A001", res.DriveID), []string{"A001C001.mxf", "file"}},
+		{fmt.Sprintf("/browse/%d", res.DriveID), []string{"A001", "notes.txt", "Columns", "List"}},
+		{fmt.Sprintf("/browse/%d/A001?view=columns", res.DriveID), []string{"A001C001.mxf", "menu-active"}},
+		{fmt.Sprintf("/browse/%d/A001/A001C001.mxf?view=columns", res.DriveID), []string{"Details", "00000000deadbeef", "file clip"}},
+		{fmt.Sprintf("/browse/%d?view=list", res.DriveID), []string{"A001/", "twirl(this)", "notes.txt"}},
+		{fmt.Sprintf("/scans/%d?change=added", res.ScanID), []string{"Added (2)", "tab-active", "first scan of this root", "Browse the scan"}},
+		{fmt.Sprintf("/scans/%d?change=removed", res.ScanID), []string{"No removed files"}},
 		{fmt.Sprintf("/clips/%d", clipID), []string{"A001C001", "ARRICORE", ">ale<", "08:46:50:00", "Raw extractor output", "location not set"}},
 		{fmt.Sprintf("/files/%d", entryID), []string{"A001C001.mxf", "00000000deadbeef", "file clip"}},
 		{fmt.Sprintf("/scans/%d", res.ScanID), []string{"Scan #", "Changes since the previous scan"}},
@@ -364,5 +368,44 @@ func TestAPIKeyCreateAndRevokeViaUI(t *testing.T) {
 	}
 	if toks, _ := s.store.ListTokens(context.Background()); len(toks) != 0 {
 		t.Errorf("token not revoked")
+	}
+}
+
+func TestBrowseFragmentsAndViewCookie(t *testing.T) {
+	s, c, res := seedPages(t)
+	// Twirl-out rows come back without the page chrome, indented one level.
+	req := httptest.NewRequest("GET", fmt.Sprintf("/browse/%d/A001?scan=%d&frag=rows&depth=0", res.DriveID, res.ScanID), nil)
+	req.AddCookie(c)
+	rec := httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+	body := rec.Body.String()
+	if rec.Code != 200 || strings.Contains(body, "<html") || !strings.Contains(body, "A001C001.mxf") || !strings.Contains(body, "width:20px") {
+		t.Errorf("rows fragment: %d %.300s", rec.Code, body)
+	}
+	// Choosing a view sets a cookie that later requests honour.
+	req = httptest.NewRequest("GET", fmt.Sprintf("/browse/%d?view=list", res.DriveID), nil)
+	req.AddCookie(c)
+	rec = httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+	var vc *http.Cookie
+	for _, ck := range rec.Result().Cookies() {
+		if ck.Name == viewCookie {
+			vc = ck
+		}
+	}
+	if vc == nil || vc.Value != "list" {
+		t.Fatalf("view cookie not set: %v", rec.Result().Cookies())
+	}
+	req = httptest.NewRequest("GET", fmt.Sprintf("/browse/%d", res.DriveID), nil)
+	req.AddCookie(c)
+	req.AddCookie(vc)
+	rec = httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+	if !strings.Contains(rec.Body.String(), "twirl(this)") {
+		t.Errorf("list view not remembered")
+	}
+	// Drive page counts link to filtered change lists.
+	if _, body := get(t, s, c, fmt.Sprintf("/drives/%d", res.DriveID)); !strings.Contains(body, fmt.Sprintf("/scans/%d?change=added", res.ScanID)) {
+		t.Errorf("drive page lacks change links")
 	}
 }

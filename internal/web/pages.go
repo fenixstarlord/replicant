@@ -183,48 +183,6 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	s.render(w, r, "search", data)
 }
 
-func (s *Server) handleBrowse(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	driveID, err := pathID(r, "drive")
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-	d, err := s.store.GetDrive(ctx, driveID)
-	if err != nil {
-		s.fail(w, r, err, "drive")
-		return
-	}
-	var sc store.Scan
-	if sid, _ := strconv.ParseInt(r.URL.Query().Get("scan"), 10, 64); sid > 0 {
-		sc, err = s.store.GetScan(ctx, sid)
-	} else {
-		sc, err = s.store.LatestScan(ctx, driveID)
-	}
-	if err != nil {
-		s.fail(w, r, err, "scan")
-		return
-	}
-	p := strings.Trim(r.PathValue("path"), "/")
-	rows, err := s.store.ListDir(ctx, sc.ID, p)
-	if err != nil {
-		s.fail(w, r, err, "list dir")
-		return
-	}
-	var dir store.EntryRow
-	if p != "" {
-		dir, err = s.store.EntryByPath(ctx, sc.ID, p)
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
-			s.fail(w, r, err, "dir")
-			return
-		}
-	} else {
-		dir = store.EntryRow{IsDir: true, DirTotalSize: sc.TotalBytes, DirFileCount: int64(sc.FileCount)}
-	}
-	s.render(w, r, "browse", map[string]any{"Title": d.Name + " / " + p, "Drive": d, "Scan": sc, "Dir": dir,
-		"DirPath": p, "Entries": rows, "Crumbs": crumbs(p)})
-}
-
 func (s *Server) handleClip(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id, err := pathID(r, "id")
@@ -294,12 +252,24 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err, "scan")
 		return
 	}
-	changes, err := s.store.ScanChanges(ctx, id, 500)
+	change := r.URL.Query().Get("change")
+	if change != "added" && change != "removed" && change != "changed" {
+		change = ""
+	}
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	if page < 1 {
+		page = 1
+	}
+	const per = 500
+	changes, total, err := s.store.ScanChanges(ctx, id, change, per, (page-1)*per)
 	if err != nil {
 		s.fail(w, r, err, "changes")
 		return
 	}
-	s.render(w, r, "scan", map[string]any{"Title": fmt.Sprintf("Scan #%d", id), "Scan": sc, "Changes": changes})
+	// A first scan of a root records counts only: every file was added.
+	firstScan := sc.Added > 0 && sc.Removed == 0 && sc.Changed == 0 && total == 0 && change != "removed" && change != "changed"
+	s.render(w, r, "scan", map[string]any{"Title": fmt.Sprintf("Scan #%d", id), "Scan": sc, "Changes": changes,
+		"Change": change, "Total": total, "Page": page, "Pages": (total + per - 1) / per, "Form": r.URL.Query(), "FirstScan": firstScan})
 }
 
 func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {

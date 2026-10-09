@@ -5,9 +5,9 @@
   <div class="stat"><div class="stat-title">Files</div><div class="stat-value text-2xl">{{n $s.FileCount}}</div><div class="stat-desc">{{n $s.DirCount}} folders</div></div>
   <div class="stat"><div class="stat-title">Clips</div><div class="stat-value text-2xl">{{n $s.ClipCount}}</div></div>
   <div class="stat"><div class="stat-title">Size</div><div class="stat-value text-2xl">{{bytes $s.TotalBytes}}</div></div>
-  <div class="stat"><div class="stat-title">Added</div><div class="stat-value text-2xl text-success">+{{n $s.Added}}</div></div>
-  <div class="stat"><div class="stat-title">Removed</div><div class="stat-value text-2xl text-error">−{{n $s.Removed}}</div></div>
-  <div class="stat"><div class="stat-title">Changed</div><div class="stat-value text-2xl text-warning">~{{n $s.Changed}}</div></div>
+  <a class="stat hover:bg-base-200" href="/scans/{{$s.ID}}?change=added"><div class="stat-title">Added</div><div class="stat-value text-2xl text-success">+{{n $s.Added}}</div></a>
+  <a class="stat hover:bg-base-200" href="/scans/{{$s.ID}}?change=removed"><div class="stat-title">Removed</div><div class="stat-value text-2xl text-error">−{{n $s.Removed}}</div></a>
+  <a class="stat hover:bg-base-200" href="/scans/{{$s.ID}}?change=changed"><div class="stat-title">Changed</div><div class="stat-value text-2xl text-warning">~{{n $s.Changed}}</div></a>
 </div>
 <div class="card bg-base-100 border border-base-300"><div class="card-body">
 <dl class="kv">
@@ -19,8 +19,17 @@
 </dl>
 <div><a href="/browse/{{$s.DriveID}}?scan={{$s.ID}}" class="btn btn-primary btn-sm">Browse this scan</a></div>
 </div></div>
-<h2>Changes since the previous scan</h2>
+<h2 id="changes">Changes since the previous scan</h2>
+<div role="tablist" class="tabs tabs-box tabs-sm mb-2 inline-flex">
+  <a role="tab" class="tab {{if eq .Change ""}}tab-active{{end}}" href="/scans/{{$s.ID}}#changes">All</a>
+  <a role="tab" class="tab {{if eq .Change "added"}}tab-active{{end}}" href="/scans/{{$s.ID}}?change=added#changes">Added ({{n $s.Added}})</a>
+  <a role="tab" class="tab {{if eq .Change "removed"}}tab-active{{end}}" href="/scans/{{$s.ID}}?change=removed#changes">Removed ({{n $s.Removed}})</a>
+  <a role="tab" class="tab {{if eq .Change "changed"}}tab-active{{end}}" href="/scans/{{$s.ID}}?change=changed#changes">Changed ({{n $s.Changed}})</a>
+</div>
+{{if .FirstScan}}<div role="alert" class="alert alert-info text-sm mb-2">This is the first scan of this root, so all {{n $s.Added}} files count as added. <a href="/browse/{{$s.DriveID}}?scan={{$s.ID}}" class="link">Browse the scan</a> to see them.</div>{{end}}
+<p class="muted text-sm mb-2">{{n .Total}} {{if .Change}}{{.Change}} files{{else}}changes{{end}}{{if gt .Pages 1}} · page {{.Page}} of {{.Pages}}{{end}}</p>
 <div class="overflow-x-auto rounded-box border border-base-300 bg-base-100"><table class="table table-sm"><thead><tr><th>Change</th><th>Path</th><th class="num">Old</th><th class="num">New</th></tr></thead><tbody>
-{{range .Changes}}<tr class="hover"><td><span class="badge badge-xs {{if eq .Change "added"}}badge-success{{else if eq .Change "removed"}}badge-error{{else}}badge-warning{{end}}">{{.Change}}</span></td><td class="mono">{{.Path}}</td><td class="num">{{if .OldSize}}{{bytes .OldSize}}{{else}}—{{end}}</td><td class="num">{{if .NewSize}}{{bytes .NewSize}}{{else}}—{{end}}</td></tr>{{else}}<tr><td colspan="4" class="muted text-center py-6">No changes recorded (first scan or identical).</td></tr>{{end}}
+{{range .Changes}}<tr class="hover"><td><span class="badge badge-xs {{if eq .Change "added"}}badge-success{{else if eq .Change "removed"}}badge-error{{else}}badge-warning{{end}}">{{.Change}}</span></td><td class="mono"><a href="/browse/{{$s.DriveID}}/{{.Path}}?scan={{$s.ID}}" class="link link-hover">{{.Path}}</a></td><td class="num">{{if .OldSize}}{{bytes .OldSize}}{{else}}—{{end}}</td><td class="num">{{if .NewSize}}{{bytes .NewSize}}{{else}}—{{end}}</td></tr>{{else}}<tr><td colspan="4" class="muted text-center py-6">{{if .Change}}No {{.Change}} files in this scan.{{else}}No changes recorded (first scan or identical).{{end}}</td></tr>{{end}}
 </tbody></table></div>
+{{template "pager" .}}
 {{end}}
