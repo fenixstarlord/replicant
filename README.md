@@ -128,9 +128,9 @@ should scan itself gets its own line under `/media`, read-only:
 
 ```yaml
     volumes:
-      - /mnt/rock/apps/replicant:/data
-      - /mnt/rock/zfsshare/dataset1:/media/dataset1:ro
-      - /mnt/rock/zfsshare/dataset2:/media/dataset2:ro
+      - /path/to/replicant-data:/data
+      - /path/to/dataset1:/media/dataset1:ro
+      - /path/to/dataset2:/media/dataset2:ro
 ```
 
 Those show up under Settings → Server scans. Vendor tools are not in the image; Linux builds of
@@ -139,7 +139,7 @@ Those show up under Settings → Server scans. Vendor tools are not in the image
 **TrueNAS SCALE:** Apps → Discover Apps → Custom App (or "Install via YAML" and paste the compose
 file). Image `ghcr.io/fenixstarlord/replicant:latest`, port 8080, environment `REPLICANT_PASSWORD`
 and `REPLICANT_PUBLIC_URL` (the NetBird address of the NAS, e.g. `http://100.64.0.5:8080`), host-path
-storage: a dataset such as `/mnt/rock/apps/replicant` at `/data`, and each media dataset at its own
+storage: a dataset such as `/mnt/<pool>/apps/replicant` at `/data`, and each media dataset at its own
 path under `/media`, read-only. The container runs as UID/GID 1000 by default; on TrueNAS uncomment `user: "568:568"` in the
 compose file to run as the apps user, and give the data dataset that owner. The container cannot see the host's NetBird interface, hence `REPLICANT_PUBLIC_URL`.
 
