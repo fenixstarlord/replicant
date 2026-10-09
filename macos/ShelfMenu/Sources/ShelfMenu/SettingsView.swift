@@ -44,25 +44,23 @@ struct SettingsView: View {
                 }
             }
             Section("Automatic scans") {
-                Toggle("Scan a drive when it is mounted", isOn: $autoScan.onMount)
-                Picker("Rescan mounted drives", selection: $autoScan.intervalHours) {
-                    ForEach(AutoScanner.intervals, id: \.hours) { Text($0.label).tag($0.hours) }
-                }
-                Toggle("Include internal drives", isOn: $autoScan.includeInternal)
-                Text("Ignored drives and the startup disk are never scanned automatically. Interval scans start with any mounted drive this app has not scanned yet, then repeat on schedule; scans queue one at a time.")
+                Toggle("Scan any external drive when it is mounted", isOn: $autoScan.allOnMount)
+                Text("Applies to every external drive except ignored ones. Per-drive rules below add interval scans, or on-mount scans for internal drives.")
                     .font(.caption).foregroundStyle(.secondary)
-                let due = volumes.volumes.filter { autoScan.eligible($0) }
-                if autoScan.intervalHours > 0, !due.isEmpty {
-                    ForEach(due) { v in
-                        LabeledContent(v.name) {
-                            if let last = autoScan.lastScanned[v.url.path] {
-                                Text("scanned \(last.formatted(.relative(presentation: .named)))").foregroundStyle(.secondary)
-                            } else {
-                                Text("not scanned yet · next check").foregroundStyle(.secondary)
-                            }
-                        }.font(.caption)
-                    }
+            }
+            Section("Per-drive rules") {
+                let listed = volumes.volumes.filter { autoScan.allowed($0) }
+                if listed.isEmpty && autoScan.unmountedRuleNames.isEmpty {
+                    Text("No drives mounted.").foregroundStyle(.secondary)
                 }
+                ForEach(listed) { v in
+                    AutoScanRow(name: v.name, path: v.url.path, isInternal: v.isInternal, mounted: true)
+                }
+                ForEach(autoScan.unmountedRuleNames, id: \.self) { name in
+                    AutoScanRow(name: name, path: nil, isInternal: false, mounted: false)
+                }
+                Text("On mount: scan when the drive appears. Interval: rescan while it stays mounted, counted from its last scan; a drive never scanned by this app is scanned at the next check. Scans queue one at a time.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
             Section("Metadata tools") {
                 if !toolsCheck.checked {
@@ -148,5 +146,40 @@ struct SettingsView: View {
             }
         }
         return nil
+    }
+}
+
+/// One drive's automatic scan rule.
+struct AutoScanRow: View {
+    @EnvironmentObject var autoScan: AutoScanner
+    let name: String
+    let path: String?
+    let isInternal: Bool
+    let mounted: Bool
+
+    var body: some View {
+        let rule = autoScan.rule(for: name)
+        HStack {
+            VStack(alignment: .leading) {
+                Text(mounted ? name : "\(name) (not mounted)")
+                if let path, let last = autoScan.lastScanned[path] {
+                    Text("scanned \(last.formatted(.relative(presentation: .named)))").font(.caption).foregroundStyle(.secondary)
+                } else if mounted, rule.intervalHours > 0 {
+                    Text("not scanned yet · next check").font(.caption).foregroundStyle(.secondary)
+                } else if isInternal {
+                    Text("internal").font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            Spacer()
+            Toggle("On mount", isOn: Binding(get: { rule.onMount }, set: { var r = rule; r.onMount = $0; autoScan.setRule(r, for: name) }))
+                .toggleStyle(.checkbox)
+            Picker("", selection: Binding(get: { rule.intervalHours }, set: { var r = rule; r.intervalHours = $0; autoScan.setRule(r, for: name) })) {
+                ForEach(AutoScanner.intervals, id: \.hours) { Text($0.label).tag($0.hours) }
+            }
+            .labelsHidden().frame(width: 150)
+            if !mounted {
+                Button("Remove") { autoScan.setRule(AutoScanRule(), for: name) }.controlSize(.small)
+            }
+        }
     }
 }
