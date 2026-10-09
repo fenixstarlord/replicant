@@ -27,8 +27,8 @@ jobs:
       - name: Zip the app bundles
         run: |
           cd dist
-          ditto -c -k --keepParent "Replicant.app" "Replicant-${GITHUB_REF_NAME}-macos.zip"
-          ditto -c -k --keepParent "Replicant Standalone.app" "Replicant-Standalone-${GITHUB_REF_NAME}-macos.zip"
+          ditto -c -k --keepParent "Replicant.app" "replicant-client-${GITHUB_REF_NAME}-macos.zip"
+          ditto -c -k --keepParent "Replicant Standalone.app" "replicant-standalone-${GITHUB_REF_NAME}-macos.zip"
           ls -la *.zip
       - uses: actions/upload-artifact@v4
         with:
@@ -70,7 +70,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cat > notes.md <<'EOF'
-          **macOS** (universal, macOS 14+): `Replicant-*-macos.zip` is the menu bar client that pushes scans to a server; `Replicant-Standalone-*-macos.zip` runs its own catalog on the Mac, no server needed. The apps are not notarized: right-click → Open on first launch. Install ffmpeg (`brew install ffmpeg`) for ffprobe metadata.
+          **macOS** (universal, macOS 14+): `replicant-client-*-macos.zip` is the menu bar client that pushes scans to a server; `replicant-standalone-*-macos.zip` runs its own catalog on the Mac, no server needed. The apps are not notarized: right-click → Open on first launch. Install ffmpeg (`brew install ffmpeg`) for ffprobe metadata.
 
           **Server**: `docker pull ghcr.io/fenixstarlord/replicant:${GITHUB_REF_NAME#v}` (or `latest`), or the Linux binaries below with the systemd unit.
           EOF
