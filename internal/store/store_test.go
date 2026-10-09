@@ -36,7 +36,7 @@ func TestMigrateIsIdempotentAndUsesWAL(t *testing.T) {
 		t.Fatal(err)
 	}
 	var n int
-	if err := s.DB.QueryRow(`SELECT count(*) FROM schema_migrations`).Scan(&n); err != nil || n != 4 {
+	if err := s.DB.QueryRow(`SELECT count(*) FROM schema_migrations`).Scan(&n); err != nil || n != 5 {
 		t.Fatalf("schema_migrations rows = %d, err %v", n, err)
 	}
 	var mode string

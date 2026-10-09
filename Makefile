@@ -34,7 +34,7 @@ dist:
 	cp deploy/replicant-server.service dist/
 	@ls -la dist/
 
-# macOS menu bar app with the replicant CLI bundled inside (dist/Replicant.app).
+# macOS menu bar app with the replicant CLI bundled inside (dist/Replicant Client.app).
 app:
 	./macos/build-app.sh
 

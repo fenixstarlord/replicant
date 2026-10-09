@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -86,12 +87,27 @@ func (c *Client) Drives(ctx context.Context) ([]store.Drive, error) {
 
 // Upload streams a .replicant bundle file to the server.
 func (c *Client) Upload(ctx context.Context, path string) (api.IngestResponse, error) {
+	return c.UploadActivity(ctx, path, 0)
+}
+
+// UploadActivity uploads a bundle and, when activity is set, closes that
+// activity on the server with the stored scan.
+func (c *Client) UploadActivity(ctx context.Context, path string, activity int64) (api.IngestResponse, error) {
 	var res api.IngestResponse
 	f, err := os.Open(path)
 	if err != nil {
 		return res, err
 	}
 	defer f.Close()
-	err = c.do(ctx, http.MethodPost, api.PathScans, f, "application/zip", &res)
+	target := api.PathScans
+	if activity > 0 {
+		target += "?" + api.ActivityQuery + "=" + strconv.FormatInt(activity, 10)
+	}
+	err = c.do(ctx, http.MethodPost, target, f, "application/zip", &res)
 	return res, err
+}
+
+func mustJSON(v any) string {
+	b, _ := json.Marshal(v)
+	return string(b)
 }

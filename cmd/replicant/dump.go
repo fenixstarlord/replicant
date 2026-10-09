@@ -28,7 +28,7 @@ Nothing is sent anywhere.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			stderr := cmd.ErrOrStderr()
-			res, err := runScan(cmd, args[0], &f)
+			res, err := runScan(cmd, args[0], &f, nil)
 			if err != nil {
 				return err
 			}

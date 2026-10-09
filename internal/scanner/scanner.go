@@ -6,6 +6,7 @@ package scanner
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -123,6 +124,7 @@ func (r *Result) Manifest() bundle.Manifest {
 		ScannerVersion: r.opts.Version,
 		ScannedAt:      r.Started.UTC(),
 		Root:           r.Root,
+		Host:           hostname(),
 		Volume:         r.Volume,
 		Options: bundle.Options{
 			Fast: r.opts.Fast, Fingerprint: r.opts.Fingerprint, FullHash: r.opts.FullHash,
@@ -151,4 +153,9 @@ func (r *Result) MetaStats() (withMeta, withErrors int) {
 		}
 	}
 	return
+}
+
+func hostname() string {
+	h, _ := os.Hostname()
+	return h
 }

@@ -11,6 +11,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/fenixstarlord/replicant/internal/api"
 	"github.com/fenixstarlord/replicant/internal/bundle"
 	"github.com/fenixstarlord/replicant/internal/cliconfig"
 	"github.com/fenixstarlord/replicant/internal/client"
@@ -53,8 +54,9 @@ func (f *scanFlags) options(tools cliconfig.Tools) scanner.Options {
 	}
 }
 
-// runScan runs the shared pipeline with terminal progress.
-func runScan(cmd *cobra.Command, root string, f *scanFlags) (*scanner.Result, error) {
+// runScan runs the shared pipeline with terminal progress. rep, if not
+// nil, also sends progress to the server.
+func runScan(cmd *cobra.Command, root string, f *scanFlags, rep *client.ActivityReporter) (*scanner.Result, error) {
 	ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	stderr := cmd.ErrOrStderr()
@@ -64,6 +66,7 @@ func runScan(cmd *cobra.Command, root string, f *scanFlags) (*scanner.Result, er
 	}
 	hashPrinter := progressPrinter(stderr)
 	progress := func(p scanner.Progress) {
+		rep.Progress(p.Stage, p.Done, p.Total)
 		switch p.Stage {
 		case "walk":
 			fmt.Fprintf(stderr, "walked %d entries\n", p.Done)
@@ -77,9 +80,15 @@ func runScan(cmd *cobra.Command, root string, f *scanFlags) (*scanner.Result, er
 	}
 	res, err := scanner.Run(ctx, root, f.options(cfg.Tools), progress)
 	if err != nil {
+		if ctx.Err() != nil {
+			rep.Finish("cancelled", "")
+		} else {
+			rep.Finish("error", err.Error())
+		}
 		return nil, err
 	}
 	v := res.Volume
+	rep.Describe(v.Name, v.UUID)
 	fmt.Fprintf(stderr, "volume %q uuid=%s fs=%s mount=%s\n", v.Name, v.UUID, v.FSType, v.MountPoint)
 	fmt.Fprintf(stderr, "grouped %d clips: %v\n", len(res.Clips), clips.Summary(res.Clips))
 	if !f.fast {
@@ -117,7 +126,17 @@ by 'replicant login'.`,
 					return fmt.Errorf("%w (or pass -o <file.replicant> to write a bundle instead)", err)
 				}
 			}
-			res, err := runScan(cmd, args[0], &f)
+			var rep *client.ActivityReporter
+			if c != nil {
+				abs, _ := filepath.Abs(args[0])
+				host, _ := os.Hostname()
+				var aerr error
+				rep, aerr = client.NewActivityReporter(cmd.Context(), c, api.ActivityStart{Host: host, DriveName: filepath.Base(abs), Root: abs})
+				if aerr != nil {
+					fmt.Fprintf(cmd.ErrOrStderr(), "note: could not report progress to the server: %v\n", aerr)
+				}
+			}
+			res, err := runScan(cmd, args[0], &f, rep)
 			if err != nil {
 				return err
 			}
@@ -131,12 +150,18 @@ by 'replicant login'.`,
 				output = tmp.Name()
 			}
 			if err := writeBundleFile(output, res.Manifest(), res.Entries, res.Clips); err != nil {
+				rep.Finish("error", err.Error())
 				return err
 			}
 			st, _ := os.Stat(output)
 			fmt.Fprintf(cmd.ErrOrStderr(), "wrote %s (%d bytes) in %s\n", output, st.Size(), time.Since(res.Started).Round(time.Millisecond))
 			if c != nil {
-				return uploadBundle(cmd, c, output)
+				rep.Progress("upload", 0, 0)
+				if err := uploadBundleActivity(cmd, c, output, rep.ID()); err != nil {
+					rep.Finish("error", err.Error())
+					return err
+				}
+				return nil
 			}
 			return nil
 		},

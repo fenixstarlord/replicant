@@ -284,7 +284,7 @@ stdin) and streams its stderr as progress. Server and key therefore live in the 
 switch for external drives plus per-drive rules keyed by volume name, on mount via
 `NSWorkspace.didMountNotification` and a 60 s timer for interval rescans, last-scan times in
 UserDefaults) and launch-at-login are app-only (UserDefaults, SMAppService).
-`macos/build-app.sh` (`make app`) builds a universal CLI and app and assembles `dist/Replicant.app`
+`macos/build-app.sh` (`make app`) builds a universal CLI and app and assembles `dist/Replicant Client.app`
 with an ad-hoc signature. Keep CLI output lines stable; the app shows the last stderr line, and
 reads `replicant doctor --json` to report missing metadata tools with a link to `docs/tools.md`.
 

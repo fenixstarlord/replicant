@@ -662,3 +662,56 @@ func TestOpenModeNeedsNoAuth(t *testing.T) {
 		t.Errorf("closed mode without a password should fail")
 	}
 }
+
+func TestActivityAPIAndHistory(t *testing.T) {
+	s, c, _ := seedPages(t)
+	tok, _, err := s.store.CreateToken(context.Background(), "laptop")
+	if err != nil {
+		t.Fatal(err)
+	}
+	do := func(method, path, body string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(method, path, strings.NewReader(body))
+		req.Header.Set("Authorization", "Bearer "+tok)
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+		s.ServeHTTP(rec, req)
+		return rec
+	}
+	rec := do("POST", "/api/activity", `{"host":"studio","drive_name":"CARD_A","root":"/Volumes/CARD_A"}`)
+	if rec.Code != 201 {
+		t.Fatalf("start: %d %s", rec.Code, rec.Body.String())
+	}
+	var resp struct{ ID int64 }
+	json.Unmarshal(rec.Body.Bytes(), &resp)
+	if resp.ID == 0 {
+		t.Fatal("no activity id")
+	}
+	if rec := do("PUT", fmt.Sprintf("/api/activity/%d", resp.ID), `{"stage":"extract","done":3,"total":10}`); rec.Code != 204 {
+		t.Fatalf("update: %d %s", rec.Code, rec.Body.String())
+	}
+	// The status bar and history show it running, with the host.
+	_, bar := get(t, s, c, "/history/bar")
+	if !strings.Contains(bar, "CARD_A") || !strings.Contains(bar, "studio") || !strings.Contains(bar, "extracting metadata 3/10") {
+		t.Errorf("status bar = %s", bar)
+	}
+	_, page := get(t, s, c, "/history")
+	if !strings.Contains(page, "CARD_A") || !strings.Contains(page, "key “laptop”") {
+		t.Errorf("history page lacks the running scan: %.400s", page)
+	}
+	// Finishing with an error closes it; the bar goes idle.
+	if rec := do("PUT", fmt.Sprintf("/api/activity/%d", resp.ID), `{"status":"error","error":"disk unplugged"}`); rec.Code != 204 {
+		t.Fatalf("finish: %d", rec.Code)
+	}
+	_, bar = get(t, s, c, "/history/bar")
+	if !strings.Contains(bar, "Idle") {
+		t.Errorf("bar after finish = %s", bar)
+	}
+	_, page = get(t, s, c, "/history")
+	if !strings.Contains(page, "failed") || !strings.Contains(page, "disk unplugged") {
+		t.Errorf("history lacks the failure: %.400s", page)
+	}
+	// The seeded scan was backfilled into history as done.
+	if !strings.Contains(page, "Shelf9") || !strings.Contains(page, "scan #") {
+		t.Errorf("history lacks the backfilled scan")
+	}
+}

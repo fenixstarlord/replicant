@@ -31,7 +31,8 @@ type Manifest struct {
 	BundleVersion  int             `json:"bundle_version"`
 	ScannerVersion string          `json:"scanner_version"`
 	ScannedAt      time.Time       `json:"scanned_at"`
-	Root           string          `json:"root"` // absolute path that was scanned
+	Root           string          `json:"root"`           // absolute path that was scanned
+	Host           string          `json:"host,omitempty"` // computer that ran the scan
 	Volume         scan.Volume     `json:"volume"`
 	Options        Options         `json:"options"`
 	Extractors     []ExtractorInfo `json:"extractors"`

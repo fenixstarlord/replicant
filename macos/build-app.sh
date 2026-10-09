@@ -8,8 +8,8 @@ VERSION="$(git describe --tags --always --dirty 2>/dev/null || echo dev)"
 # catalog on this Mac (no server, no API keys).
 STANDALONE=0
 if [[ "${1:-}" == "--standalone" ]]; then STANDALONE=1; fi
-APP=dist/Replicant.app
-NAME=Replicant
+APP="dist/Replicant Client.app"
+NAME="Replicant Client"
 BUNDLE_ID=com.fenixstarlord.replicant.menubar
 if [[ $STANDALONE == 1 ]]; then APP="dist/Replicant Standalone.app"; NAME="Replicant Standalone"; BUNDLE_ID=com.fenixstarlord.replicant.standalone; fi
 universal() { # universal <cmd> <out>

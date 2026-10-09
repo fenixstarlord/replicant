@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -30,10 +31,12 @@ type Scheduler struct {
 }
 
 type runState struct {
-	Stage string
-	Done  int
-	Total int
-	Since time.Time
+	Stage    string
+	Done     int
+	Total    int
+	Since    time.Time
+	activity int64     // activity row id, 0 if none
+	reported time.Time // last progress write to the store
 }
 
 // New builds a scheduler. Call Start to run scheduled jobs.
@@ -48,6 +51,9 @@ func New(st *store.Store, log *slog.Logger, version string) *Scheduler {
 func (s *Scheduler) Start(ctx context.Context) {
 	if err := s.store.ResetRunningScanJobs(ctx); err != nil {
 		s.log.Warn("reset running scan jobs", "err", err)
+	}
+	if err := s.store.LoseServerActivity(ctx); err != nil {
+		s.log.Warn("close stale server activity", "err", err)
 	}
 	go func() {
 		t := time.NewTicker(30 * time.Second)
@@ -124,9 +130,29 @@ func (s *Scheduler) RunJob(ctx context.Context, id int64) (store.IngestResult, e
 	if err := s.store.MarkScanJobRunning(ctx, id, start); err != nil {
 		return store.IngestResult{}, err
 	}
+	host, _ := os.Hostname()
+	name := j.Label
+	if name == "" {
+		name = filepath.Base(j.Path)
+	}
+	actID, aerr := s.store.StartActivity(ctx, store.Activity{Host: host, Source: "server", DriveName: name, Root: j.Path})
+	if aerr != nil {
+		s.log.Warn("start activity", "err", aerr)
+	}
+	st.activity = actID
 	res, err := s.scan(ctx, j, st)
 	if err := s.store.MarkScanJobDone(context.Background(), id, err, res.ScanID, time.Since(start), time.Now()); err != nil {
 		s.log.Error("mark scan job done", "job", id, "err", err)
+	}
+	if actID > 0 && err != nil {
+		// Success is closed by the ingest itself.
+		status := "error"
+		if errors.Is(err, context.Canceled) {
+			status = "cancelled"
+		}
+		if ferr := s.store.FinishActivity(context.Background(), actID, status, 0, err.Error()); ferr != nil {
+			s.log.Warn("finish activity", "err", ferr)
+		}
 	}
 	if err != nil {
 		return res, err
@@ -148,7 +174,14 @@ func (s *Scheduler) scan(ctx context.Context, j store.ScanJob, st *runState) (st
 	res, err := scanner.Run(ctx, j.Path, opts, func(p scanner.Progress) {
 		s.mu.Lock()
 		st.Stage, st.Done, st.Total = p.Stage, p.Done, p.Total
+		write := st.activity > 0 && (time.Since(st.reported) > 2*time.Second || (p.Total > 0 && p.Done == p.Total))
+		if write {
+			st.reported = time.Now()
+		}
 		s.mu.Unlock()
+		if write {
+			_ = s.store.UpdateActivity(ctx, st.activity, p.Stage, p.Done, p.Total, "", "")
+		}
 	})
 	if err != nil {
 		return store.IngestResult{}, err
@@ -156,5 +189,8 @@ func (s *Scheduler) scan(ctx context.Context, j store.ScanJob, st *runState) (st
 	s.mu.Lock()
 	st.Stage = "ingest"
 	s.mu.Unlock()
-	return s.store.Ingest(ctx, res.Bundle())
+	if st.activity > 0 {
+		_ = s.store.UpdateActivity(ctx, st.activity, "ingest", 0, 0, res.Volume.Name, res.Volume.UUID)
+	}
+	return s.store.IngestFrom(ctx, res.Bundle(), "server", st.activity)
 }

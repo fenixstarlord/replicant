@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -80,9 +81,12 @@ func (s *Server) routes() {
 	m.Handle("POST "+api.PathScans, s.requireAuth(http.HandlerFunc(s.handleIngest)))
 	m.Handle("GET "+api.PathDrives, s.requireAuth(http.HandlerFunc(s.handleDrives)))
 	m.Handle("GET "+api.PathMe, s.requireAuth(http.HandlerFunc(s.handleMe)))
+	m.Handle("POST "+api.PathActivity, s.requireAuth(http.HandlerFunc(s.handleActivityStart)))
+	m.Handle("PUT "+api.PathActivity+"/{id}", s.requireAuth(http.HandlerFunc(s.handleActivityUpdate)))
 	m.Handle("GET /{$}", s.requireAuth(http.HandlerFunc(s.handleHome)))
 	s.pageRoutes()
 	s.historyRoutes()
+	s.activityRoutes()
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -202,13 +206,18 @@ func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	start := time.Now()
-	res, err := s.store.Ingest(r.Context(), b)
+	id, _ := IdentityFrom(r.Context())
+	source := id.TokenName
+	if id.Auth == "open" {
+		source = "local"
+	}
+	aid, _ := strconv.ParseInt(r.URL.Query().Get(api.ActivityQuery), 10, 64)
+	res, err := s.store.IngestFrom(r.Context(), b, source, aid)
 	if err != nil {
 		s.log.Error("ingest", "err", err, "volume", b.Manifest.Volume.Name)
 		writeError(w, http.StatusInternalServerError, "ingest failed: "+err.Error())
 		return
 	}
-	id, _ := IdentityFrom(r.Context())
 	s.log.Info("ingested scan", "scan_id", res.ScanID, "drive", res.DriveName, "entries", res.Entries,
 		"clips", res.Clips, "added", res.Added, "removed", res.Removed, "changed", res.Changed,
 		"bytes", size, "took", time.Since(start).Round(time.Millisecond), "by", id.TokenName)

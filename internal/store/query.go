@@ -557,17 +557,19 @@ type Scan struct {
 	IsLatest       bool      `json:"is_latest"`
 	IsPartial      bool      `json:"is_partial"`
 	Extractors     string    `json:"extractors_json"`
+	Host           string    `json:"host"`
+	Source         string    `json:"source"`
 }
 
 const scanColumns = `s.id, s.drive_id, d.name, s.scanned_at, s.ingested_at, s.scanner_version, s.root, s.file_count, s.dir_count,
-	s.clip_count, s.total_bytes, s.added, s.removed, s.changed, s.is_latest, s.is_partial, s.extractors_json FROM scans s JOIN drives d ON d.id = s.drive_id`
+	s.clip_count, s.total_bytes, s.added, s.removed, s.changed, s.is_latest, s.is_partial, s.extractors_json, s.host, s.source FROM scans s JOIN drives d ON d.id = s.drive_id`
 
 func scanScan(sc interface{ Scan(...any) error }) (Scan, error) {
 	var r Scan
 	var scanned, ingested string
 	var latest, partial int
 	if err := sc.Scan(&r.ID, &r.DriveID, &r.DriveName, &scanned, &ingested, &r.ScannerVersion, &r.Root, &r.FileCount, &r.DirCount,
-		&r.ClipCount, &r.TotalBytes, &r.Added, &r.Removed, &r.Changed, &latest, &partial, &r.Extractors); err != nil {
+		&r.ClipCount, &r.TotalBytes, &r.Added, &r.Removed, &r.Changed, &latest, &partial, &r.Extractors, &r.Host, &r.Source); err != nil {
 		return r, err
 	}
 	r.ScannedAt, _ = time.Parse(time.RFC3339Nano, scanned)

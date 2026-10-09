@@ -14,6 +14,7 @@
       <a href="/drives" class="btn btn-ghost text-lg font-semibold px-2">Replicant</a>
       <a href="/drives" class="btn btn-ghost btn-sm {{if eq .Path "/drives"}}btn-active{{end}}">Drives</a>
       <a href="/search" class="btn btn-ghost btn-sm {{if eq .Path "/search"}}btn-active{{end}}">Search</a>
+      <a href="/history" class="btn btn-ghost btn-sm {{if eq .Path "/history"}}btn-active{{end}}">History</a>
       {{if not .Open}}<a href="/settings/api-keys" class="btn btn-ghost btn-sm {{if eq .Path "/settings/api-keys"}}btn-active{{end}}">API keys</a>{{end}}
       <a href="/settings" class="btn btn-ghost btn-sm {{if eq .Path "/settings"}}btn-active{{end}}">Settings</a>
     </div>
@@ -25,9 +26,14 @@
     </div>
   </nav>
 </header>
-<main class="max-w-screen-2xl mx-auto p-4 md:p-6">
+<main class="max-w-screen-2xl mx-auto p-4 md:p-6 pb-16">
 {{block "content" .}}{{end}}
 </main>
-<footer class="muted text-xs max-w-screen-2xl mx-auto px-4 pb-6">Replicant {{.Version}}</footer>
+<footer class="statusbar fixed bottom-0 inset-x-0 bg-base-100 border-t border-base-300 text-sm">
+  <div class="max-w-screen-2xl mx-auto px-4 py-1.5 flex items-center gap-3 min-h-9">
+    <a href="/history" id="statusbar" class="flex-1 min-w-0 truncate link-hover" hx-get="/history/bar" hx-trigger="load, every 3s" hx-swap="innerHTML" title="Scan history"><span class="muted">…</span></a>
+    <span class="muted text-xs whitespace-nowrap">Replicant {{.Version}}</span>
+  </div>
+</footer>
 </body>
 </html>{{end}}

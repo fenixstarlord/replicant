@@ -340,7 +340,7 @@ func newIngestCmd() *cobra.Command {
 			}
 			defer st.Close()
 			start := time.Now()
-			res, err := st.Ingest(cmd.Context(), b)
+			res, err := st.IngestFrom(cmd.Context(), b, "file", 0)
 			if err != nil {
 				return err
 			}

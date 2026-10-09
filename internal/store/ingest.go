@@ -48,6 +48,37 @@ type fileSig struct {
 // Ingest stores a bundle as a new scan in one transaction. On any error
 // nothing is written.
 func (s *Store) Ingest(ctx context.Context, b *bundle.Bundle) (res IngestResult, err error) {
+	return s.IngestFrom(ctx, b, "", 0)
+}
+
+// IngestFrom is Ingest with a record of where the bundle came from (the
+// API key name, "server" for the server's own scans, "file" for the ingest
+// command, or "local" for the standalone app) and the activity that
+// produced it, if the scanner reported one; otherwise a finished activity
+// row is written so every scan shows in the history.
+func (s *Store) IngestFrom(ctx context.Context, b *bundle.Bundle, source string, activityID int64) (res IngestResult, err error) {
+	res, err = s.ingest(ctx, b, source)
+	if err != nil {
+		return res, err
+	}
+	if activityID > 0 {
+		if ferr := s.FinishActivity(ctx, activityID, "done", res.ScanID, ""); ferr != nil {
+			return res, fmt.Errorf("finish activity: %w", ferr)
+		}
+		return res, nil
+	}
+	m := b.Manifest
+	now := time.Now().UTC().Format(time.RFC3339)
+	_, aerr := s.DB.ExecContext(ctx, `INSERT INTO activity(host, source, drive_name, volume_uuid, root, stage, status, scan_id, started_at, updated_at, finished_at)
+		VALUES (?, ?, ?, ?, ?, 'ingest', 'done', ?, ?, ?, ?)`,
+		m.Host, source, res.DriveName, m.Volume.UUID, m.Root, res.ScanID, m.ScannedAt.UTC().Format(time.RFC3339Nano), now, now)
+	if aerr != nil {
+		return res, fmt.Errorf("record activity: %w", aerr)
+	}
+	return res, nil
+}
+
+func (s *Store) ingest(ctx context.Context, b *bundle.Bundle, source string) (res IngestResult, err error) {
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return res, err
@@ -104,9 +135,9 @@ func (s *Store) Ingest(ctx context.Context, b *bundle.Bundle) (res IngestResult,
 	}
 	var scanID int64
 	err = tx.QueryRowContext(ctx, `
-		INSERT INTO scans(drive_id, scanned_at, ingested_at, scanner_version, root, is_partial, options_json, extractors_json)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
-		driveID, m.ScannedAt.UTC().Format(time.RFC3339Nano), now, m.ScannerVersion, root, boolInt(partial), string(optsJSON), string(extJSON),
+		INSERT INTO scans(drive_id, scanned_at, ingested_at, scanner_version, root, is_partial, options_json, extractors_json, host, source)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+		driveID, m.ScannedAt.UTC().Format(time.RFC3339Nano), now, m.ScannerVersion, root, boolInt(partial), string(optsJSON), string(extJSON), m.Host, source,
 	).Scan(&scanID)
 	if err != nil {
 		return res, fmt.Errorf("scan insert: %w", err)

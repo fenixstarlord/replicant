@@ -69,7 +69,7 @@ first launch on another Mac is right-click → Open.
 
 ## Menu bar app (macOS)
 
-`make app` builds `dist/Replicant.app`, a menu bar app with the `replicant` CLI bundled inside. Drag it to
+`make app` builds `dist/Replicant Client.app`, a menu bar app with the `replicant` CLI bundled inside. Drag it to
 Applications and open it. From the drop-down, click a drive to scan it and push it to the server;
 Browse… scans a folder or network share instead. Settings… takes the connection key from the
 server's API keys page (one string with the address and the key, stored in the same

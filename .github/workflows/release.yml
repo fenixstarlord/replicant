@@ -27,7 +27,7 @@ jobs:
       - name: Zip the app bundles
         run: |
           cd dist
-          ditto -c -k --keepParent "Replicant.app" "replicant-client-${GITHUB_REF_NAME}-macos.zip"
+          ditto -c -k --keepParent "Replicant Client.app" "replicant-client-${GITHUB_REF_NAME}-macos.zip"
           ditto -c -k --keepParent "Replicant Standalone.app" "replicant-standalone-${GITHUB_REF_NAME}-macos.zip"
           ls -la *.zip
       - uses: actions/upload-artifact@v4

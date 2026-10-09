@@ -1,0 +1,21 @@
+{{define "content"}}
+<h1>History</h1>
+<p class="muted text-sm mt-1">Every scan, running or finished: which computer indexed which drive, and how it went. Running scans refresh on their own.</p>
+<div id="history-table" class="overflow-x-auto rounded-box border border-base-300 bg-base-100 my-4" hx-get="/history?page={{.Page}}" hx-trigger="every 5s" hx-select="#history-table" hx-swap="outerHTML">
+<table class="table table-sm">
+<thead><tr><th>Drive</th><th>Computer</th><th>Via</th><th>Started</th><th>Took</th><th>Status</th><th>Result</th></tr></thead>
+<tbody>
+{{range .Rows}}<tr class="hover">
+  <td class="font-medium">{{if .DriveID}}<a href="/browse/{{.DriveID}}" class="link link-hover">{{.DriveName}}</a>{{else}}{{.DriveName}}{{end}}{{if .Root}}<div class="muted text-xs mono">{{.Root}}</div>{{end}}</td>
+  <td>{{or .Host "—"}}</td>
+  <td class="muted">{{if eq .Source "server"}}server scan{{else if eq .Source "local"}}this Mac{{else if eq .Source "file"}}uploaded file{{else if .Source}}key “{{.Source}}”{{else}}—{{end}}</td>
+  <td>{{datetime .StartedAt}}</td>
+  <td>{{.Duration.Round 1000000000}}</td>
+  <td>{{template "activity_status" .}}</td>
+  <td>{{if .ScanID}}<a href="/scans/{{.ScanID}}" class="link link-hover">scan #{{.ScanID}}</a>{{else if .Error}}<span class="text-error text-xs">{{.Error}}</span>{{else}}—{{end}}</td>
+</tr>{{else}}<tr><td colspan="7" class="muted text-center py-6">Nothing scanned yet.</td></tr>{{end}}
+</tbody>
+</table>
+</div>
+{{if gt .Pages 1}}<div class="join">{{if gt .Page 1}}<a href="/history?page={{sub .Page 1}}" class="join-item btn btn-sm">«</a>{{end}}<span class="join-item btn btn-sm btn-disabled">page {{.Page}} of {{.Pages}}</span>{{if lt .Page .Pages}}<a href="/history?page={{add .Page 1}}" class="join-item btn btn-sm">»</a>{{end}}</div>{{end}}
+{{end}}
