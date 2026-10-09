@@ -48,7 +48,7 @@ struct MenuContent: View {
             if toolsCheck.missing.isEmpty {
                 Text("Settings…")
             } else {
-                Label("Settings… ⚠ \(toolsCheck.missing.count) tool\(toolsCheck.missing.count == 1 ? "" : "s") missing", systemImage: "exclamationmark.triangle")
+                Label("Settings…", systemImage: "exclamationmark.triangle")
             }
         }
         Button("Quit Shelf") { NSApplication.shared.terminate(nil) }
