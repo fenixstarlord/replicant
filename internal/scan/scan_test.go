@@ -8,6 +8,7 @@ import (
 	"math/rand/v2"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"sync/atomic"
 	"testing"
@@ -102,7 +103,7 @@ func TestWalkSkipsAndClassifies(t *testing.T) {
 	if mov.ModTime.IsZero() || mov.ModTime.Location() != time.UTC {
 		t.Errorf("mov mtime not set in UTC: %v", mov.ModTime)
 	}
-	if mov.BirthTime == nil {
+	if mov.BirthTime == nil && runtime.GOOS == "darwin" {
 		t.Errorf("expected a birth time on macOS")
 	}
 	if e := find(t, entries, "A001/A001C001.ale"); e.Kind != KindSidecar {
