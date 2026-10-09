@@ -96,9 +96,9 @@ var funcs = template.FuncMap{
 			return ""
 		}
 		if *p {
-			return "YES"
+			return "Yes"
 		}
-		return "NO"
+		return "No"
 	},
 	"crumbs":   crumbs,
 	"parent":   parentOf,
@@ -263,7 +263,7 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, page string, dat
 	data["Path"] = r.URL.Path
 	data["Query"] = r.URL.Query()
 	if _, ok := data["Title"]; !ok {
-		data["Title"] = strings.ToUpper(page)
+		data["Title"] = strings.ToUpper(page[:1]) + page[1:]
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	name := "layout"

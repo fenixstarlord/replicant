@@ -1,21 +1,23 @@
 {{define "content"}}
 {{$e := .Entry}}
-<h1>{{$e.Name}} <span class="badge {{kindBadge $e.Kind}}">{{$e.Kind}}</span>{{if not $e.IsLatest}} <span class="badge badge-warning">OLD SCAN</span>{{end}}</h1>
-<p><a href="/drives/{{$e.DriveID}}">{{$e.DriveName}}</a>{{if .Drive.Label}} · {{.Drive.Label}}{{end}} · <span class="value">{{if .Drive.Location}}{{.Drive.Location}}{{else}}LOCATION NOT SET{{end}}</span> · <a href="/browse/{{$e.DriveID}}/{{$e.ParentPath}}?scan={{$e.ScanID}}" class="info">{{$e.Path}}</a></p>
-{{if $e.Error}}<div role="alert" class="alert alert-error">{{$e.Error}}</div>{{end}}
+<h1>{{$e.Name}} <span class="badge badge-ghost">{{$e.Kind}}</span>{{if not $e.IsLatest}} <span class="badge badge-warning">old scan</span>{{end}}</h1>
+<p class="text-sm"><a href="/drives/{{$e.DriveID}}" class="link link-hover">{{$e.DriveName}}</a>{{if .Drive.Label}} · {{.Drive.Label}}{{end}} · <strong>{{if .Drive.Location}}{{.Drive.Location}}{{else}}location not set{{end}}</strong> · <a href="/browse/{{$e.DriveID}}/{{$e.ParentPath}}?scan={{$e.ScanID}}" class="link link-hover mono muted">{{$e.Path}}</a></p>
+{{if $e.Error}}<div role="alert" class="alert alert-error text-sm my-2">{{$e.Error}}</div>{{end}}
+<div class="card bg-base-100 border border-base-300 mt-4"><div class="card-body">
 <dl class="kv">
-  <dt>SIZE</dt><dd class="value">{{bytes $e.Size}} <span class="info">({{n $e.Size}} B)</span></dd>
-  <dt>MODIFIED</dt><dd>{{datetime $e.ModTime}}</dd>
-  {{if not $e.BirthTime.IsZero}}<dt>CREATED</dt><dd>{{datetime $e.BirthTime}}</dd>{{end}}
-  <dt>EXT</dt><dd>{{or $e.Ext "--"}}</dd>
-  {{if $e.Fingerprint}}<dt>FINGERPRINT</dt><dd class="info">{{$e.Fingerprint}}</dd>{{end}}
-  {{if $e.FullHash}}<dt>XXH64</dt><dd class="info">{{$e.FullHash}}</dd>{{end}}
-  {{if $e.IsSymlink}}<dt>SYMLINK</dt><dd>YES</dd>{{end}}
-  {{if $e.ClipID}}<dt>CLIP</dt><dd><a href="/clips/{{$e.ClipID}}">{{$e.ClipKind}} CLIP</a></dd>{{end}}
-  <dt>SCAN</dt><dd><a href="/scans/{{$e.ScanID}}">#{{$e.ScanID}}</a></dd>
+  <dt>Size</dt><dd>{{bytes $e.Size}} <span class="muted">({{n $e.Size}} bytes)</span></dd>
+  <dt>Modified</dt><dd>{{datetime $e.ModTime}}</dd>
+  {{if not $e.BirthTime.IsZero}}<dt>Created</dt><dd>{{datetime $e.BirthTime}}</dd>{{end}}
+  <dt>Extension</dt><dd>{{or $e.Ext "—"}}</dd>
+  {{if $e.Fingerprint}}<dt>Fingerprint</dt><dd class="mono">{{$e.Fingerprint}}</dd>{{end}}
+  {{if $e.FullHash}}<dt>xxHash64</dt><dd class="mono">{{$e.FullHash}}</dd>{{end}}
+  {{if $e.IsSymlink}}<dt>Symlink</dt><dd>Yes</dd>{{end}}
+  {{if $e.ClipID}}<dt>Clip</dt><dd><a href="/clips/{{$e.ClipID}}" class="link link-hover">{{$e.ClipKind}} clip</a></dd>{{end}}
+  <dt>Scan</dt><dd><a href="/scans/{{$e.ScanID}}" class="link link-hover">#{{$e.ScanID}}</a></dd>
 </dl>
-<h2>OTHER COPIES</h2>
-<div class="overflow-x-auto"><table class="table table-xs"><thead><tr><th>DRIVE</th><th>PATH</th><th class="num">SIZE</th><th>MODIFIED</th></tr></thead><tbody>
-{{range .Copies}}<tr><td><a href="/drives/{{.DriveID}}">{{.DriveName}}</a></td><td><a href="/files/{{.ID}}">{{.Path}}</a></td><td class="num">{{bytes .Size}}</td><td>{{datetime .ModTime}}</td></tr>{{else}}<tr><td colspan="4" class="empty">-- NO OTHER COPIES KNOWN --</td></tr>{{end}}
+</div></div>
+<h2>Other copies</h2>
+<div class="overflow-x-auto rounded-box border border-base-300 bg-base-100"><table class="table table-sm"><thead><tr><th>Drive</th><th>Path</th><th class="num">Size</th><th>Modified</th></tr></thead><tbody>
+{{range .Copies}}<tr class="hover"><td><a href="/drives/{{.DriveID}}" class="link link-hover">{{.DriveName}}</a></td><td class="mono"><a href="/files/{{.ID}}" class="link link-hover">{{.Path}}</a></td><td class="num">{{bytes .Size}}</td><td>{{datetime .ModTime}}</td></tr>{{else}}<tr><td colspan="4" class="muted text-center py-6">No other copies known.</td></tr>{{end}}
 </tbody></table></div>
 {{end}}

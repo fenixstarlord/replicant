@@ -101,7 +101,7 @@ func (s *Server) handleLoginForm(w http.ResponseWriter, r *http.Request) {
 	if !strings.HasPrefix(next, "/") {
 		next = "/"
 	}
-	s.render(w, r, "login", map[string]any{"Title": "LOGIN", "Next": next, "Failed": r.URL.Query().Get("failed") != ""})
+	s.render(w, r, "login", map[string]any{"Title": "Log in", "Next": next, "Failed": r.URL.Query().Get("failed") != ""})
 }
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {

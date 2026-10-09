@@ -1,12 +1,14 @@
 {{define "content"}}
-<div class="max-w-sm mx-auto mt-8">
-<h1>SHELF</h1>
-<p class="info">CATALOG OF OFFLINE DRIVES</p>
-{{if .Failed}}<div role="alert" class="alert alert-error">WRONG PASSWORD</div>{{end}}
-<form method="post" action="/login" class="flex flex-col gap-2 mt-2">
-  <input type="hidden" name="next" value="{{.Next}}">
-  <label class="flex flex-col">PASSWORD<input type="password" name="password" class="input" autofocus autocomplete="current-password"></label>
-  <button class="btn btn-primary">LOGIN</button>
-</form>
+<div class="max-w-sm mx-auto mt-16 card bg-base-100 border border-base-300">
+  <div class="card-body">
+    <h1 class="card-title">Shelf</h1>
+    <p class="muted">Catalog of offline drives</p>
+    {{if .Failed}}<div role="alert" class="alert alert-error text-sm">Wrong password.</div>{{end}}
+    <form method="post" action="/login" class="flex flex-col gap-3 mt-2">
+      <input type="hidden" name="next" value="{{.Next}}">
+      <label class="form-control"><span class="label-text mb-1">Password</span><input type="password" name="password" class="input input-bordered" autofocus autocomplete="current-password"></label>
+      <button class="btn btn-primary">Log in</button>
+    </form>
+  </div>
 </div>
 {{end}}

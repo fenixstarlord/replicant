@@ -36,6 +36,7 @@ func (s *Server) pageRoutes() {
 	m.Handle("GET /files/{id}", auth(s.handleFile))
 	m.Handle("GET /scans/{id}", auth(s.handleScan))
 	m.Handle("GET /settings", auth(s.handleSettings))
+	m.Handle("GET /settings/api-keys", auth(s.handleAPIKeys))
 	m.Handle("POST /settings/tokens", auth(s.handleTokenCreate))
 	m.Handle("POST /settings/tokens/{id}/revoke", auth(s.handleTokenRevoke))
 	m.Handle("POST /settings/upload", auth(s.handleUpload))
@@ -71,7 +72,7 @@ func (s *Server) handleDrivesPage(w http.ResponseWriter, r *http.Request) {
 		clips += d.ClipCount
 		bytes += d.TotalBytes
 	}
-	s.render(w, r, "drives", map[string]any{"Title": "DRIVES", "Drives": drives,
+	s.render(w, r, "drives", map[string]any{"Title": "Drives", "Drives": drives,
 		"TotalFiles": files, "TotalClips": clips, "TotalBytes": bytes})
 }
 
@@ -146,7 +147,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	q := parseSearch(r)
 	mode := r.URL.Query().Get("mode")
-	data := map[string]any{"Title": "SEARCH", "Q": q, "Mode": mode, "Form": r.URL.Query()}
+	data := map[string]any{"Title": "Search", "Q": q, "Mode": mode, "Form": r.URL.Query()}
 	drives, err := s.store.ListDrives(ctx)
 	if err != nil {
 		s.fail(w, r, err, "drives")
@@ -298,23 +299,28 @@ func (s *Server) handleScan(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err, "changes")
 		return
 	}
-	s.render(w, r, "scan", map[string]any{"Title": fmt.Sprintf("SCAN %d", id), "Scan": sc, "Changes": changes})
+	s.render(w, r, "scan", map[string]any{"Title": fmt.Sprintf("Scan #%d", id), "Scan": sc, "Changes": changes})
 }
 
 func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
+	s.render(w, r, "settings", map[string]any{"Title": "Settings", "Backups": s.listBackups(),
+		"Message": r.URL.Query().Get("msg"), "Error": r.URL.Query().Get("err")})
+}
+
+func (s *Server) handleAPIKeys(w http.ResponseWriter, r *http.Request) {
 	toks, err := s.store.ListTokens(r.Context())
 	if err != nil {
 		s.fail(w, r, err, "tokens")
 		return
 	}
-	s.render(w, r, "settings", map[string]any{"Title": "SETTINGS", "Tokens": toks, "Backups": s.listBackups(),
-		"NewToken": r.URL.Query().Get("token"), "Message": r.URL.Query().Get("msg"), "Error": r.URL.Query().Get("err")})
+	s.render(w, r, "apikeys", map[string]any{"Title": "API keys", "Tokens": toks, "Host": r.Host,
+		"Message": r.URL.Query().Get("msg")})
 }
 
 func (s *Server) handleTokenCreate(w http.ResponseWriter, r *http.Request) {
 	name := strings.TrimSpace(r.FormValue("name"))
 	if name == "" {
-		name = "token"
+		name = "key"
 	}
 	plain, _, err := s.store.CreateToken(r.Context(), name)
 	if err != nil {
@@ -322,7 +328,8 @@ func (s *Server) handleTokenCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	toks, _ := s.store.ListTokens(r.Context())
-	s.render(w, r, "settings", map[string]any{"Title": "SETTINGS", "Tokens": toks, "Backups": s.listBackups(), "NewToken": plain, "NewTokenName": name})
+	s.render(w, r, "apikeys", map[string]any{"Title": "API keys", "Tokens": toks, "Host": r.Host,
+		"NewToken": plain, "NewTokenName": name})
 }
 
 func (s *Server) handleTokenRevoke(w http.ResponseWriter, r *http.Request) {
@@ -335,7 +342,7 @@ func (s *Server) handleTokenRevoke(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err, "revoke token")
 		return
 	}
-	http.Redirect(w, r, "/settings?msg=token+revoked", http.StatusSeeOther)
+	http.Redirect(w, r, "/settings/api-keys?msg=Key+revoked.", http.StatusSeeOther)
 }
 
 // handleUpload ingests a bundle from the settings page form.

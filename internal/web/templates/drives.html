@@ -1,20 +1,22 @@
 {{define "content"}}
-<h1>DRIVES</h1>
-<div class="stats stats-vertical sm:stats-horizontal mb-2 w-full sm:w-auto">
-  <div class="stat"><div class="stat-title">DRIVES</div><div class="stat-value">{{len .Drives}}</div></div>
-  <div class="stat"><div class="stat-title">FILES</div><div class="stat-value">{{n .TotalFiles}}</div></div>
-  <div class="stat"><div class="stat-title">CLIPS</div><div class="stat-value">{{n .TotalClips}}</div></div>
-  <div class="stat"><div class="stat-title">BYTES</div><div class="stat-value">{{bytes .TotalBytes}}</div></div>
+<div class="flex items-end justify-between gap-4 flex-wrap mb-4">
+  <h1>Drives</h1>
+  <div class="stats stats-horizontal bg-base-100 border border-base-300 text-sm">
+    <div class="stat py-2 px-4"><div class="stat-title">Drives</div><div class="stat-value text-xl">{{len .Drives}}</div></div>
+    <div class="stat py-2 px-4"><div class="stat-title">Files</div><div class="stat-value text-xl">{{n .TotalFiles}}</div></div>
+    <div class="stat py-2 px-4"><div class="stat-title">Clips</div><div class="stat-value text-xl">{{n .TotalClips}}</div></div>
+    <div class="stat py-2 px-4"><div class="stat-title">Stored</div><div class="stat-value text-xl">{{bytes .TotalBytes}}</div></div>
+  </div>
 </div>
-<div class="overflow-x-auto">
-<table class="table table-xs">
-<thead><tr><th>NAME</th><th>LABEL</th><th>LOCATION</th><th>FS</th><th class="num">CAPACITY</th><th>USED</th><th class="num">FREE</th><th class="num">FILES</th><th class="num">CLIPS</th><th class="num">SCANS</th><th>LAST SCAN</th><th></th></tr></thead>
+<div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
+<table class="table table-sm">
+<thead><tr><th>Name</th><th>Label</th><th>Location</th><th>Filesystem</th><th class="num">Capacity</th><th>Used</th><th class="num">Free</th><th class="num">Files</th><th class="num">Clips</th><th class="num">Scans</th><th>Last scan</th><th></th></tr></thead>
 <tbody>
-{{range .Drives}}<tr tabindex="0">
-  <td><a href="/drives/{{.ID}}" class="value">{{.Name}}</a></td>
-  <td>{{or .Label "--"}}</td>
-  <td>{{or .Location "--"}}</td>
-  <td class="info">{{.FSType}}</td>
+{{range .Drives}}<tr class="hover">
+  <td><a href="/drives/{{.ID}}" class="link link-hover font-medium">{{.Name}}</a></td>
+  <td>{{or .Label "—"}}</td>
+  <td>{{or .Location "—"}}</td>
+  <td class="muted">{{.FSType}}</td>
   <td class="num">{{bytes .CapacityBytes}}</td>
   <td><progress class="progress progress-primary w-24" value="{{pct (used .CapacityBytes .FreeBytes) .CapacityBytes}}" max="100"></progress></td>
   <td class="num">{{bytes .FreeBytes}}</td>
@@ -22,8 +24,8 @@
   <td class="num">{{n .ClipCount}}</td>
   <td class="num">{{.ScanCount}}</td>
   <td>{{datetime .LastScannedAt}}</td>
-  <td><a href="/browse/{{.ID}}" class="btn btn-xs">BROWSE</a> <a href="/search?drive={{.ID}}" class="btn btn-xs">SEARCH</a></td>
-</tr>{{else}}<tr><td colspan="12" class="empty">-- NO DRIVES YET. RUN: shelf scan /Volumes/NAME --</td></tr>{{end}}
+  <td class="text-right"><a href="/browse/{{.ID}}" class="btn btn-ghost btn-xs">Browse</a> <a href="/search?drive={{.ID}}" class="btn btn-ghost btn-xs">Search</a></td>
+</tr>{{else}}<tr><td colspan="12" class="muted text-center py-8">No drives yet. On the Mac, run <code class="mono">shelf scan /Volumes/NAME</code>.</td></tr>{{end}}
 </tbody>
 </table>
 </div>

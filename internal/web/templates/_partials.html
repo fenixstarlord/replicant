@@ -1,65 +1,65 @@
-{{define "kv"}}{{if .v}}<dt>{{.k}}</dt><dd class="value" {{if .src}}title="source: {{.src}}"{{end}}>{{.v}}{{if .src}} <span class="info text-xs hidden sm:inline">[{{.src}}]</span>{{end}}</dd>{{end}}{{end}}
+{{define "kv"}}{{if .v}}<dt>{{.k}}</dt><dd {{if .src}}title="Source: {{.src}}"{{end}}>{{.v}}{{if .src}} <span class="badge badge-ghost badge-xs hidden sm:inline-flex">{{.src}}</span>{{end}}</dd>{{end}}{{end}}
 
 {{define "pager"}}{{if gt .Pages 1}}
-<div class="flex gap-2 items-center mt-2">
-  {{if gt .Page 1}}<a class="btn btn-sm" href="?{{.Form.Encode}}&page={{sub .Page 1}}">PREV</a>{{end}}
-  <span class="info">PAGE {{.Page}} / {{.Pages}}</span>
-  {{if lt .Page .Pages}}<a class="btn btn-sm" href="?{{.Form.Encode}}&page={{add .Page 1}}">NEXT</a>{{end}}
+<div class="join mt-3">
+  {{if gt .Page 1}}<a class="join-item btn btn-sm" href="?{{.Form.Encode}}&page={{sub .Page 1}}">« Previous</a>{{end}}
+  <span class="join-item btn btn-sm btn-disabled">Page {{.Page}} of {{.Pages}}</span>
+  {{if lt .Page .Pages}}<a class="join-item btn btn-sm" href="?{{.Form.Encode}}&page={{add .Page 1}}">Next »</a>{{end}}
 </div>{{end}}{{end}}
 
 {{define "clips_table"}}
-<div class="overflow-x-auto">
-<table class="table table-xs">
+<div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
+<table class="table table-sm">
 <thead><tr>
-  <th><a href="{{sortlink .Query "name"}}">CLIP</a></th>
-  <th><a href="{{sortlink .Query "drive"}}">DRIVE</a></th>
-  <th><a href="{{sortlink .Query "path"}}">PATH</a></th>
-  <th><a href="{{sortlink .Query "codec"}}">CODEC</a></th>
-  <th><a href="{{sortlink .Query "resolution"}}">RES</a></th>
-  <th class="num"><a href="{{sortlink .Query "fps"}}">FPS</a></th>
-  <th class="num"><a href="{{sortlink .Query "duration"}}">DUR</a></th>
-  <th>TC</th>
-  <th><a href="{{sortlink .Query "camera"}}">CAMERA</a></th>
+  <th><a href="{{sortlink .Query "name"}}">Clip</a></th>
+  <th><a href="{{sortlink .Query "drive"}}">Drive</a></th>
+  <th><a href="{{sortlink .Query "path"}}">Folder</a></th>
+  <th><a href="{{sortlink .Query "codec"}}">Codec</a></th>
+  <th><a href="{{sortlink .Query "resolution"}}">Resolution</a></th>
+  <th class="num"><a href="{{sortlink .Query "fps"}}">fps</a></th>
+  <th class="num"><a href="{{sortlink .Query "duration"}}">Duration</a></th>
+  <th>Timecode</th>
+  <th><a href="{{sortlink .Query "camera"}}">Camera</a></th>
   <th class="num"><a href="{{sortlink .Query "iso"}}">ISO</a></th>
-  <th><a href="{{sortlink .Query "reel"}}">REEL</a></th>
-  <th><a href="{{sortlink .Query "scene"}}">SC/TK</a></th>
-  <th class="num"><a href="{{sortlink .Query "size"}}">SIZE</a></th>
+  <th><a href="{{sortlink .Query "reel"}}">Reel</a></th>
+  <th><a href="{{sortlink .Query "scene"}}">Scene / take</a></th>
+  <th class="num"><a href="{{sortlink .Query "size"}}">Size</a></th>
 </tr></thead>
 <tbody>
-{{range .Clips}}<tr tabindex="0">
-  <td><a href="/clips/{{.ID}}" class="value">{{.Name}}</a> <span class="badge badge-xs {{kindBadge .Kind}}">{{.Kind}}</span>{{if not .IsLatest}} <span class="badge badge-xs badge-warning">OLD</span>{{end}}</td>
-  <td><a href="/drives/{{.DriveID}}">{{.DriveName}}</a>{{if .Location}} <span class="info">{{.Location}}</span>{{end}}</td>
-  <td class="info"><a href="/browse/{{.DriveID}}/{{.Dir}}?scan={{.ScanID}}">{{.Dir}}</a></td>
-  <td>{{or (str .Meta.Codec) "--"}}</td>
-  <td>{{or (res .Meta) "--"}}</td>
-  <td class="num">{{or (fps .Meta.FPS) "--"}}</td>
-  <td class="num">{{or (durp .Meta.DurationS) "--"}}</td>
-  <td>{{or (str .Meta.TCStart) "--"}}</td>
-  <td>{{or (str .Meta.CameraModel) "--"}}</td>
-  <td class="num">{{or (int .Meta.ISO) "--"}}</td>
-  <td>{{or (str .Meta.Reel) "--"}}</td>
-  <td>{{str .Meta.Scene}}{{if .Meta.Take}}/{{str .Meta.Take}}{{end}}{{if not .Meta.Scene}}--{{end}}</td>
+{{range .Clips}}<tr class="hover">
+  <td><a href="/clips/{{.ID}}" class="link link-hover font-medium">{{.Name}}</a> <span class="badge badge-ghost badge-xs">{{.Kind}}</span>{{if not .IsLatest}} <span class="badge badge-warning badge-xs">old scan</span>{{end}}</td>
+  <td><a href="/drives/{{.DriveID}}" class="link link-hover">{{.DriveName}}</a>{{if .Location}} <span class="muted">· {{.Location}}</span>{{end}}</td>
+  <td class="muted mono"><a href="/browse/{{.DriveID}}/{{.Dir}}?scan={{.ScanID}}" class="link link-hover">{{.Dir}}</a></td>
+  <td>{{or (str .Meta.Codec) "—"}}</td>
+  <td>{{or (res .Meta) "—"}}</td>
+  <td class="num">{{or (fps .Meta.FPS) "—"}}</td>
+  <td class="num">{{or (durp .Meta.DurationS) "—"}}</td>
+  <td class="mono">{{or (str .Meta.TCStart) "—"}}</td>
+  <td>{{or (str .Meta.CameraModel) "—"}}</td>
+  <td class="num">{{or (int .Meta.ISO) "—"}}</td>
+  <td>{{or (str .Meta.Reel) "—"}}</td>
+  <td>{{if .Meta.Scene}}{{str .Meta.Scene}}{{if .Meta.Take}} / {{str .Meta.Take}}{{end}}{{else}}—{{end}}</td>
   <td class="num">{{bytes .TotalSize}}</td>
-</tr>{{else}}<tr><td colspan="13" class="empty">-- NO CLIPS --</td></tr>{{end}}
+</tr>{{else}}<tr><td colspan="13" class="muted text-center py-6">No clips match.</td></tr>{{end}}
 </tbody>
 </table>
 </div>
 {{end}}
 
 {{define "entries_table"}}
-<div class="overflow-x-auto">
-<table class="table table-xs">
-<thead><tr><th>NAME</th><th>KIND</th><th>DRIVE</th><th>PATH</th><th class="num">SIZE</th><th>MODIFIED</th><th>CLIP</th></tr></thead>
+<div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
+<table class="table table-sm">
+<thead><tr><th>Name</th><th>Kind</th><th>Drive</th><th>Folder</th><th class="num">Size</th><th>Modified</th><th>Clip</th></tr></thead>
 <tbody>
-{{range .Entries}}<tr tabindex="0">
-  <td>{{if .IsDir}}<a href="/browse/{{.DriveID}}/{{.Path}}?scan={{.ScanID}}" class="value">{{.Name}}/</a>{{else}}<a href="/files/{{.ID}}" class="value">{{.Name}}</a>{{end}}{{if not .IsLatest}} <span class="badge badge-xs badge-warning">OLD</span>{{end}}</td>
-  <td><span class="badge badge-xs {{kindBadge .Kind}}">{{.Kind}}</span></td>
-  <td><a href="/drives/{{.DriveID}}">{{.DriveName}}</a></td>
-  <td class="info"><a href="/browse/{{.DriveID}}/{{.ParentPath}}?scan={{.ScanID}}">{{.ParentPath}}</a></td>
+{{range .Entries}}<tr class="hover">
+  <td>{{if .IsDir}}<a href="/browse/{{.DriveID}}/{{.Path}}?scan={{.ScanID}}" class="link link-hover font-medium">{{.Name}}/</a>{{else}}<a href="/files/{{.ID}}" class="link link-hover font-medium">{{.Name}}</a>{{end}}{{if not .IsLatest}} <span class="badge badge-warning badge-xs">old scan</span>{{end}}</td>
+  <td><span class="badge badge-ghost badge-xs">{{.Kind}}</span></td>
+  <td><a href="/drives/{{.DriveID}}" class="link link-hover">{{.DriveName}}</a></td>
+  <td class="muted mono"><a href="/browse/{{.DriveID}}/{{.ParentPath}}?scan={{.ScanID}}" class="link link-hover">{{.ParentPath}}</a></td>
   <td class="num">{{if .IsDir}}{{bytes .DirTotalSize}}{{else}}{{bytes .Size}}{{end}}</td>
   <td>{{datetime .ModTime}}</td>
-  <td>{{if .ClipID}}<a href="/clips/{{.ClipID}}">{{.ClipKind}}</a>{{else}}<span class="empty">--</span>{{end}}</td>
-</tr>{{else}}<tr><td colspan="7" class="empty">-- NO FILES --</td></tr>{{end}}
+  <td>{{if .ClipID}}<a href="/clips/{{.ClipID}}" class="link link-hover">{{.ClipKind}}</a>{{else}}<span class="muted">—</span>{{end}}</td>
+</tr>{{else}}<tr><td colspan="7" class="muted text-center py-6">No files match.</td></tr>{{end}}
 </tbody>
 </table>
 </div>

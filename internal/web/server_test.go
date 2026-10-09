@@ -150,7 +150,7 @@ func TestPasswordLoginAndSession(t *testing.T) {
 	req.AddCookie(cookies[0])
 	rec = httptest.NewRecorder()
 	s.ServeHTTP(rec, req)
-	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "DRIVES") || !strings.Contains(rec.Body.String(), "LOGOUT") {
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "Drives") || !strings.Contains(rec.Body.String(), "Log out") {
 		t.Errorf("drives with session: %d %.200s", rec.Code, rec.Body.String())
 	}
 
@@ -238,18 +238,19 @@ func TestPagesRender(t *testing.T) {
 		path string
 		want []string
 	}{
-		{"/drives", []string{"Shelf9", "BROWSE"}},
-		{fmt.Sprintf("/drives/%d", res.DriveID), []string{"SCAN HISTORY", "LATEST", "WHERE IS IT"}},
-		{"/search?q=c001", []string{"1 CLIPS", "A001C001", "ARRICORE", "4608x3164", "ALEXA 35"}},
-		{"/search?camera=ALEXA+35&fps=24&iso_min=800&iso_max=800", []string{"1 CLIPS", "A001C001"}},
-		{"/search?q=zzz", []string{"0 CLIPS", "NO CLIPS"}},
-		{"/search?mode=files&q=notes", []string{"1 FILES", "notes.txt"}},
+		{"/drives", []string{"Shelf9", "Browse"}},
+		{fmt.Sprintf("/drives/%d", res.DriveID), []string{"Scan history", "latest", "Where is it?"}},
+		{"/search?q=c001", []string{"1 clips", "A001C001", "ARRICORE", "4608x3164", "ALEXA 35"}},
+		{"/search?camera=ALEXA+35&fps=24&iso_min=800&iso_max=800", []string{"1 clips", "A001C001"}},
+		{"/search?q=zzz", []string{"0 clips", "No clips match"}},
+		{"/search?mode=files&q=notes", []string{"1 files", "notes.txt"}},
 		{fmt.Sprintf("/browse/%d", res.DriveID), []string{"A001/", "notes.txt"}},
 		{fmt.Sprintf("/browse/%d/A001", res.DriveID), []string{"A001C001.mxf", "file"}},
-		{fmt.Sprintf("/clips/%d", clipID), []string{"A001C001", "ARRICORE", "[ale]", "08:46:50:00", "RAW EXTRACTOR OUTPUT", "LOCATION NOT SET"}},
-		{fmt.Sprintf("/files/%d", entryID), []string{"A001C001.mxf", "00000000deadbeef", "file CLIP"}},
-		{fmt.Sprintf("/scans/%d", res.ScanID), []string{"SCAN #", "CHANGES VS PREVIOUS SCAN"}},
-		{"/settings", []string{"API TOKENS", "UPLOAD SCAN"}},
+		{fmt.Sprintf("/clips/%d", clipID), []string{"A001C001", "ARRICORE", ">ale<", "08:46:50:00", "Raw extractor output", "location not set"}},
+		{fmt.Sprintf("/files/%d", entryID), []string{"A001C001.mxf", "00000000deadbeef", "file clip"}},
+		{fmt.Sprintf("/scans/%d", res.ScanID), []string{"Scan #", "Changes since the previous scan"}},
+		{"/settings", []string{"Upload a scan", "Backups"}},
+		{"/settings/api-keys", []string{"API keys", "Create a key", "No keys yet"}},
 	}
 	for _, tc := range cases {
 		code, body := get(t, s, c, tc.path)
@@ -289,7 +290,7 @@ func TestPagesRender(t *testing.T) {
 		t.Errorf("location not shown on clip page")
 	}
 	// Static assets are served.
-	if code, body := get(t, s, c, "/static/app.css"); code != 200 || !strings.Contains(body, "stealth57") {
+	if code, body := get(t, s, c, "/static/app.css"); code != 200 || !strings.Contains(body, "silk") {
 		t.Errorf("static css = %d", code)
 	}
 }
@@ -300,8 +301,8 @@ func TestHistoryPagesAndExports(t *testing.T) {
 		path string
 		want []string
 	}{
-		{"/duplicates", []string{"DUPLICATES", "NO DUPLICATES FOUND"}},
-		{fmt.Sprintf("/scans/%d/diff/%d", res.ScanID, res.ScanID), []string{"DIFF", "ADDED", "NONE"}},
+		{"/duplicates", []string{"Duplicates", "No duplicates found"}},
+		{fmt.Sprintf("/scans/%d/diff/%d", res.ScanID, res.ScanID), []string{"Diff", "Added", "None"}},
 		{"/export.csv?q=c001", []string{"drive,label,location,path,clip", "A001C001", "ARRICORE"}},
 		{"/export.ale?q=c001", []string{"Heading", "Column", "A001C001.mxf", "ALEXA 35"}},
 	} {
@@ -320,7 +321,7 @@ func TestHistoryPagesAndExports(t *testing.T) {
 	req.AddCookie(c)
 	rec := httptest.NewRecorder()
 	s.ServeHTTP(rec, req)
-	if rec.Code != 303 || !strings.Contains(rec.Header().Get("Location"), "backup+written") {
+	if rec.Code != 303 || !strings.Contains(rec.Header().Get("Location"), "Backup+written") {
 		t.Fatalf("backup = %d %s", rec.Code, rec.Header().Get("Location"))
 	}
 	names := s.listBackups()
@@ -335,5 +336,33 @@ func TestHistoryPagesAndExports(t *testing.T) {
 	}
 	if code, _ := get(t, s, c, "/settings/backup/..%2F..%2Fetc%2Fpasswd"); code != 404 {
 		t.Errorf("path traversal = %d", code)
+	}
+}
+
+func TestAPIKeyCreateAndRevokeViaUI(t *testing.T) {
+	s, c, _ := seedPages(t)
+	form := url.Values{"name": {"MacBook Pro"}}
+	req := httptest.NewRequest("POST", "/settings/tokens", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(c)
+	rec := httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+	body := rec.Body.String()
+	if rec.Code != 200 || !strings.Contains(body, "shelf_") || !strings.Contains(body, "MacBook Pro") || !strings.Contains(body, "shown only once") {
+		t.Fatalf("create key: %d %.300s", rec.Code, body)
+	}
+	toks, _ := s.store.ListTokens(context.Background())
+	if len(toks) != 1 {
+		t.Fatalf("tokens = %d", len(toks))
+	}
+	req = httptest.NewRequest("POST", fmt.Sprintf("/settings/tokens/%d/revoke", toks[0].ID), nil)
+	req.AddCookie(c)
+	rec = httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+	if rec.Code != 303 || !strings.Contains(rec.Header().Get("Location"), "/settings/api-keys") {
+		t.Errorf("revoke = %d %s", rec.Code, rec.Header().Get("Location"))
+	}
+	if toks, _ := s.store.ListTokens(context.Background()); len(toks) != 0 {
+		t.Errorf("token not revoked")
 	}
 }

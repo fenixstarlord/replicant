@@ -1,24 +1,26 @@
 {{define "content"}}
 {{$s := .Scan}}
-<h1>SCAN #{{$s.ID}} <span class="info">/ <a href="/drives/{{$s.DriveID}}">{{$s.DriveName}}</a></span>{{if $s.IsLatest}} <span class="badge badge-accent">LATEST</span>{{end}}{{if $s.IsPartial}} <span class="badge badge-warning">PARTIAL SCAN OF {{$s.Root}}</span>{{end}}</h1>
-<div class="stats stats-vertical sm:stats-horizontal mb-2 w-full sm:w-auto">
-  <div class="stat"><div class="stat-title">FILES</div><div class="stat-value">{{n $s.FileCount}}</div><div class="stat-desc">{{n $s.DirCount}} DIRS</div></div>
-  <div class="stat"><div class="stat-title">CLIPS</div><div class="stat-value">{{n $s.ClipCount}}</div></div>
-  <div class="stat"><div class="stat-title">BYTES</div><div class="stat-value">{{bytes $s.TotalBytes}}</div></div>
-  <div class="stat"><div class="stat-title">ADDED</div><div class="stat-value text-success">+{{n $s.Added}}</div></div>
-  <div class="stat"><div class="stat-title">REMOVED</div><div class="stat-value text-error">-{{n $s.Removed}}</div></div>
-  <div class="stat"><div class="stat-title">CHANGED</div><div class="stat-value text-warning">~{{n $s.Changed}}</div></div>
+<h1>Scan #{{$s.ID}} <span class="muted font-normal">· <a href="/drives/{{$s.DriveID}}" class="link link-hover">{{$s.DriveName}}</a></span>{{if $s.IsLatest}} <span class="badge badge-success">latest</span>{{end}}{{if $s.IsPartial}} <span class="badge badge-warning">partial scan of {{$s.Root}}</span>{{end}}</h1>
+<div class="stats stats-vertical sm:stats-horizontal bg-base-100 border border-base-300 my-4 w-full sm:w-auto">
+  <div class="stat"><div class="stat-title">Files</div><div class="stat-value text-2xl">{{n $s.FileCount}}</div><div class="stat-desc">{{n $s.DirCount}} folders</div></div>
+  <div class="stat"><div class="stat-title">Clips</div><div class="stat-value text-2xl">{{n $s.ClipCount}}</div></div>
+  <div class="stat"><div class="stat-title">Size</div><div class="stat-value text-2xl">{{bytes $s.TotalBytes}}</div></div>
+  <div class="stat"><div class="stat-title">Added</div><div class="stat-value text-2xl text-success">+{{n $s.Added}}</div></div>
+  <div class="stat"><div class="stat-title">Removed</div><div class="stat-value text-2xl text-error">−{{n $s.Removed}}</div></div>
+  <div class="stat"><div class="stat-title">Changed</div><div class="stat-value text-2xl text-warning">~{{n $s.Changed}}</div></div>
 </div>
+<div class="card bg-base-100 border border-base-300"><div class="card-body">
 <dl class="kv">
-  <dt>SCANNED</dt><dd>{{datetime $s.ScannedAt}}</dd>
-  <dt>INGESTED</dt><dd>{{datetime $s.IngestedAt}}</dd>
-  <dt>ROOT</dt><dd class="info">{{$s.Root}}</dd>
-  <dt>SCANNER</dt><dd class="info">{{$s.ScannerVersion}}</dd>
-  <dt>EXTRACTORS</dt><dd class="info">{{$s.Extractors}}</dd>
+  <dt>Scanned</dt><dd>{{datetime $s.ScannedAt}}</dd>
+  <dt>Ingested</dt><dd>{{datetime $s.IngestedAt}}</dd>
+  <dt>Root</dt><dd class="mono">{{$s.Root}}</dd>
+  <dt>Scanner</dt><dd class="mono">{{$s.ScannerVersion}}</dd>
+  <dt>Extractors</dt><dd class="mono text-xs">{{$s.Extractors}}</dd>
 </dl>
-<p><a href="/browse/{{$s.DriveID}}?scan={{$s.ID}}" class="btn btn-sm btn-primary">BROWSE THIS SCAN</a></p>
-<h2>CHANGES VS PREVIOUS SCAN</h2>
-<div class="overflow-x-auto"><table class="table table-xs"><thead><tr><th>CHANGE</th><th>PATH</th><th class="num">OLD</th><th class="num">NEW</th></tr></thead><tbody>
-{{range .Changes}}<tr><td><span class="badge badge-xs {{if eq .Change "added"}}badge-success{{else if eq .Change "removed"}}badge-error{{else}}badge-warning{{end}}">{{.Change}}</span></td><td>{{.Path}}</td><td class="num">{{if .OldSize}}{{bytes .OldSize}}{{else}}--{{end}}</td><td class="num">{{if .NewSize}}{{bytes .NewSize}}{{else}}--{{end}}</td></tr>{{else}}<tr><td colspan="4" class="empty">-- NO CHANGES RECORDED (FIRST SCAN OR IDENTICAL) --</td></tr>{{end}}
+<div><a href="/browse/{{$s.DriveID}}?scan={{$s.ID}}" class="btn btn-primary btn-sm">Browse this scan</a></div>
+</div></div>
+<h2>Changes since the previous scan</h2>
+<div class="overflow-x-auto rounded-box border border-base-300 bg-base-100"><table class="table table-sm"><thead><tr><th>Change</th><th>Path</th><th class="num">Old</th><th class="num">New</th></tr></thead><tbody>
+{{range .Changes}}<tr class="hover"><td><span class="badge badge-xs {{if eq .Change "added"}}badge-success{{else if eq .Change "removed"}}badge-error{{else}}badge-warning{{end}}">{{.Change}}</span></td><td class="mono">{{.Path}}</td><td class="num">{{if .OldSize}}{{bytes .OldSize}}{{else}}—{{end}}</td><td class="num">{{if .NewSize}}{{bytes .NewSize}}{{else}}—{{end}}</td></tr>{{else}}<tr><td colspan="4" class="muted text-center py-6">No changes recorded (first scan or identical).</td></tr>{{end}}
 </tbody></table></div>
 {{end}}

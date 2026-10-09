@@ -1,31 +1,34 @@
 {{define "layout"}}<!doctype html>
-<html lang="en" data-theme="m8">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{.Title}} · SHELF</title>
+<title>{{.Title}} · Shelf</title>
 <link rel="stylesheet" href="/static/app.css">
 <script src="/static/htmx.min.js" defer></script>
 </head>
-<body>
-<nav class="navbar bg-base-100 border-b border-base-200 flex-wrap gap-x-4 gap-y-1">
-  <div class="flex flex-wrap gap-x-4 gap-y-1 items-center">
-    <a href="/drives" class="text-primary font-bold">SHELF</a>
-    <a href="/drives" {{if eq .Path "/drives"}}class="text-m8-value"{{end}}>DRIVES</a>
-    <a href="/search" {{if eq .Path "/search"}}class="text-m8-value"{{end}}>SEARCH</a>
-    <a href="/duplicates" {{if eq .Path "/duplicates"}}class="text-m8-value"{{end}}>DUPLICATES</a>
-    <a href="/settings" {{if eq .Path "/settings"}}class="text-m8-value"{{end}}>SETTINGS</a>
-  </div>
-  <div class="ml-auto flex gap-2 items-center">
-    <form method="get" action="/search" class="hidden md:flex gap-2 items-center">
-      <input type="search" name="q" placeholder="FIND CLIP OR FILE" class="input input-sm" aria-label="search">
-    </form>
-    {{if .Identity.Auth}}<form method="post" action="/logout"><button class="btn btn-sm">LOGOUT</button></form>{{end}}
-  </div>
-</nav>
-<main class="container p-4 max-w-screen-2xl mx-auto">
+<body class="min-h-screen bg-base-200">
+<header class="bg-base-100 border-b border-base-300">
+  <nav class="navbar max-w-screen-2xl mx-auto px-4 flex-wrap gap-y-1">
+    <div class="flex flex-wrap items-center gap-x-1">
+      <a href="/drives" class="btn btn-ghost text-lg font-semibold px-2">Shelf</a>
+      <a href="/drives" class="btn btn-ghost btn-sm {{if eq .Path "/drives"}}btn-active{{end}}">Drives</a>
+      <a href="/search" class="btn btn-ghost btn-sm {{if eq .Path "/search"}}btn-active{{end}}">Search</a>
+      <a href="/duplicates" class="btn btn-ghost btn-sm {{if eq .Path "/duplicates"}}btn-active{{end}}">Duplicates</a>
+      <a href="/settings/api-keys" class="btn btn-ghost btn-sm {{if eq .Path "/settings/api-keys"}}btn-active{{end}}">API keys</a>
+      <a href="/settings" class="btn btn-ghost btn-sm {{if eq .Path "/settings"}}btn-active{{end}}">Settings</a>
+    </div>
+    <div class="ml-auto flex items-center gap-2">
+      <form method="get" action="/search" class="hidden md:block">
+        <input type="search" name="q" placeholder="Find a clip or file…" class="input input-bordered input-sm w-64" aria-label="Search">
+      </form>
+      {{if .Identity.Auth}}<form method="post" action="/logout"><button class="btn btn-ghost btn-sm">Log out</button></form>{{end}}
+    </div>
+  </nav>
+</header>
+<main class="max-w-screen-2xl mx-auto p-4 md:p-6">
 {{block "content" .}}{{end}}
 </main>
-<footer class="info p-4 text-xs">SHELF {{.Version}} · FONT: STEALTH57 BY TRASH80 (CC BY-SA 3.0) · NOT AFFILIATED WITH DIRTYWAVE</footer>
+<footer class="muted text-xs max-w-screen-2xl mx-auto px-4 pb-6">Shelf {{.Version}}</footer>
 </body>
 </html>{{end}}

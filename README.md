@@ -9,7 +9,7 @@ A self-hosted catalog of offline drives full of camera media.
 - **`shelf-server`** stores every scan in SQLite and serves a web UI to search and browse any
   drive while it is unplugged, see what changed between scans, and find duplicates.
 
-The UI emulates the look of the Dirtywave M8 tracker. See `docs/design/m8-theme.md`.
+The web UI is a clean daisyUI/Tailwind interface with automatic dark mode. See `docs/design/ui.md`.
 
 ## Quick start (development)
 
@@ -69,7 +69,7 @@ Commands:
 
 ```
 shelf-server                      serve (default)
-shelf-server token create <name>  mint an API token for the CLI (shown once)
+shelf-server token create <name>  mint an API key for the CLI (or use the API keys page in the web UI)
 shelf-server token list | revoke <id>
 shelf-server ingest <file.shelf>  import a bundle without HTTP
 shelf-server backup <path|dir>    consistent copy of the database (VACUUM INTO)
@@ -91,7 +91,7 @@ binary, so the image will be a multi-stage build with a distroless final stage.
 
 ## Building the stylesheet
 
-The UI uses daisyUI on Tailwind CSS with a custom M8 theme. The compiled stylesheet is committed
+The UI uses daisyUI on Tailwind CSS. The compiled stylesheet is committed
 and embedded; rebuild it after editing `internal/web/static/src/app.css` or the templates:
 
 ```bash
@@ -112,9 +112,3 @@ internal/web       HTTP API, auth, templates, static assets
 docs/              design spec and decision records
 testdata/          golden tool output, sidecars, carved BWF headers
 ```
-
-## Credits
-
-Font: stealth57 by Trash80 (Timothy Lamb),
-<https://fontstruct.com/fontstructions/show/413734/stealth57>, licensed CC BY-SA 3.0.
-The Dirtywave M8 is a product of Dirtywave; this project is not affiliated with Dirtywave.

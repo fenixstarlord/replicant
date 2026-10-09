@@ -1,78 +1,80 @@
 {{define "content"}}
 {{$c := .Clip}}{{$m := .Clip.Meta}}{{$s := .Clip.Sources}}
-<h1>{{$c.Name}} <span class="badge {{kindBadge $c.Kind}}">{{$c.Kind}}</span>{{if not $c.IsLatest}} <span class="badge badge-warning">OLD SCAN</span>{{end}}</h1>
-<p><a href="/drives/{{$c.DriveID}}">{{$c.DriveName}}</a>{{if .Drive.Label}} · {{.Drive.Label}}{{end}} · <span class="value">{{if .Drive.Location}}{{.Drive.Location}}{{else}}LOCATION NOT SET{{end}}</span> · <a href="/browse/{{$c.DriveID}}/{{$c.Dir}}?scan={{$c.ScanID}}" class="info">{{$c.RootPath}}</a></p>
-<p class="info">{{n $c.FileCount}} FILES · {{bytes $c.TotalSize}} · MODIFIED {{datetime $c.ModTime}} · SCAN #{{$c.ScanID}} {{datetime $c.ScannedAt}}{{if $c.SeqFrames}} · {{n $c.SeqFrames}} FRAMES{{end}}</p>
-{{range $c.Errors}}<div role="alert" class="alert alert-warning">{{.}}</div>{{end}}
-<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-<div>
-<h2>CLIP</h2><dl class="kv">
-{{template "kv" (dict "k" "NAME" "v" (str $m.ClipName) "src" (source $s "clip_name"))}}
-{{template "kv" (dict "k" "REEL" "v" (str $m.Reel) "src" (source $s "reel"))}}
-{{template "kv" (dict "k" "CAMERA INDEX" "v" (str $m.CameraIndex) "src" (source $s "camera_index"))}}
-{{template "kv" (dict "k" "SCENE" "v" (str $m.Scene) "src" (source $s "scene"))}}
-{{template "kv" (dict "k" "TAKE" "v" (str $m.Take) "src" (source $s "take"))}}
-{{template "kv" (dict "k" "CIRCLED" "v" (bool $m.Circled) "src" (source $s "circled"))}}
-{{template "kv" (dict "k" "RECORDED" "v" (tm $m.RecordedAt) "src" (source $s "recorded_at"))}}
-{{template "kv" (dict "k" "TC START" "v" (str $m.TCStart) "src" (source $s "tc_start"))}}
-{{template "kv" (dict "k" "TC END" "v" (str $m.TCEnd) "src" (source $s "tc_end"))}}
-{{template "kv" (dict "k" "DURATION" "v" (durp $m.DurationS) "src" (source $s "duration_s"))}}
-{{template "kv" (dict "k" "FRAMES" "v" (int $m.FrameCount) "src" (source $s "frame_count"))}}
-<dd class="empty only-child">--</dd></dl>
-<h2>FORMAT</h2><dl class="kv">
-{{template "kv" (dict "k" "CONTAINER" "v" (str $m.Container) "src" (source $s "container"))}}
-{{template "kv" (dict "k" "CODEC" "v" (str $m.Codec) "src" (source $s "codec"))}}
-{{template "kv" (dict "k" "DETAIL" "v" (str $m.CodecDetail) "src" (source $s "codec_detail"))}}
-{{template "kv" (dict "k" "RESOLUTION" "v" (res $m) "src" (source $s "width"))}}
-{{template "kv" (dict "k" "SENSOR MODE" "v" (str $m.SensorMode) "src" (source $s "sensor_mode"))}}
-{{template "kv" (dict "k" "FPS" "v" (fps $m.FPS) "src" (source $s "fps"))}}
-{{template "kv" (dict "k" "CAPTURE FPS" "v" (fps $m.CaptureFPS) "src" (source $s "capture_fps"))}}
-{{template "kv" (dict "k" "BIT DEPTH" "v" (int $m.BitDepth) "src" (source $s "bit_depth"))}}
-{{template "kv" (dict "k" "COLOR / GAMMA" "v" (str $m.ColorGamma) "src" (source $s "color_gamma"))}}
-{{template "kv" (dict "k" "SQUEEZE" "v" (flt $m.Squeeze) "src" (source $s "squeeze"))}}
-<dd class="empty only-child">--</dd></dl>
-</div>
-<div>
-<h2>CAMERA</h2><dl class="kv">
-{{template "kv" (dict "k" "MAKE" "v" (str $m.CameraMake) "src" (source $s "camera_make"))}}
-{{template "kv" (dict "k" "MODEL" "v" (str $m.CameraModel) "src" (source $s "camera_model"))}}
-{{template "kv" (dict "k" "SERIAL" "v" (str $m.CameraSerial) "src" (source $s "camera_serial"))}}
-{{template "kv" (dict "k" "FIRMWARE" "v" (str $m.Firmware) "src" (source $s "firmware"))}}
-<dd class="empty only-child">--</dd></dl>
-<h2>EXPOSURE</h2><dl class="kv">
+<h1>{{$c.Name}} <span class="badge badge-ghost">{{$c.Kind}}</span>{{if not $c.IsLatest}} <span class="badge badge-warning">old scan</span>{{end}}</h1>
+<p class="text-sm"><a href="/drives/{{$c.DriveID}}" class="link link-hover">{{$c.DriveName}}</a>{{if .Drive.Label}} · {{.Drive.Label}}{{end}} · <strong>{{if .Drive.Location}}{{.Drive.Location}}{{else}}location not set{{end}}</strong> · <a href="/browse/{{$c.DriveID}}/{{$c.Dir}}?scan={{$c.ScanID}}" class="link link-hover mono muted">{{$c.RootPath}}</a></p>
+<p class="muted text-sm">{{n $c.FileCount}} files · {{bytes $c.TotalSize}} · modified {{datetime $c.ModTime}} · scan #{{$c.ScanID}} {{datetime $c.ScannedAt}}{{if $c.SeqFrames}} · {{n $c.SeqFrames}} frames{{end}}</p>
+{{range $c.Errors}}<div role="alert" class="alert alert-warning text-sm my-2">{{.}}</div>{{end}}
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+<div class="card bg-base-100 border border-base-300"><div class="card-body gap-4">
+<section><h2 class="mt-0">Clip</h2><dl class="kv">
+{{template "kv" (dict "k" "Name" "v" (str $m.ClipName) "src" (source $s "clip_name"))}}
+{{template "kv" (dict "k" "Reel" "v" (str $m.Reel) "src" (source $s "reel"))}}
+{{template "kv" (dict "k" "Camera index" "v" (str $m.CameraIndex) "src" (source $s "camera_index"))}}
+{{template "kv" (dict "k" "Scene" "v" (str $m.Scene) "src" (source $s "scene"))}}
+{{template "kv" (dict "k" "Take" "v" (str $m.Take) "src" (source $s "take"))}}
+{{template "kv" (dict "k" "Circled" "v" (bool $m.Circled) "src" (source $s "circled"))}}
+{{template "kv" (dict "k" "Recorded" "v" (tm $m.RecordedAt) "src" (source $s "recorded_at"))}}
+{{template "kv" (dict "k" "TC start" "v" (str $m.TCStart) "src" (source $s "tc_start"))}}
+{{template "kv" (dict "k" "TC end" "v" (str $m.TCEnd) "src" (source $s "tc_end"))}}
+{{template "kv" (dict "k" "Duration" "v" (durp $m.DurationS) "src" (source $s "duration_s"))}}
+{{template "kv" (dict "k" "Frames" "v" (int $m.FrameCount) "src" (source $s "frame_count"))}}
+<dd class="muted only-child">—</dd></dl></section>
+<section><h2 class="mt-0">Format</h2><dl class="kv">
+{{template "kv" (dict "k" "Container" "v" (str $m.Container) "src" (source $s "container"))}}
+{{template "kv" (dict "k" "Codec" "v" (str $m.Codec) "src" (source $s "codec"))}}
+{{template "kv" (dict "k" "Detail" "v" (str $m.CodecDetail) "src" (source $s "codec_detail"))}}
+{{template "kv" (dict "k" "Resolution" "v" (res $m) "src" (source $s "width"))}}
+{{template "kv" (dict "k" "Sensor mode" "v" (str $m.SensorMode) "src" (source $s "sensor_mode"))}}
+{{template "kv" (dict "k" "fps" "v" (fps $m.FPS) "src" (source $s "fps"))}}
+{{template "kv" (dict "k" "Capture fps" "v" (fps $m.CaptureFPS) "src" (source $s "capture_fps"))}}
+{{template "kv" (dict "k" "Bit depth" "v" (int $m.BitDepth) "src" (source $s "bit_depth"))}}
+{{template "kv" (dict "k" "Colour / gamma" "v" (str $m.ColorGamma) "src" (source $s "color_gamma"))}}
+{{template "kv" (dict "k" "Squeeze" "v" (flt $m.Squeeze) "src" (source $s "squeeze"))}}
+<dd class="muted only-child">—</dd></dl></section>
+</div></div>
+<div class="card bg-base-100 border border-base-300"><div class="card-body gap-4">
+<section><h2 class="mt-0">Camera</h2><dl class="kv">
+{{template "kv" (dict "k" "Make" "v" (str $m.CameraMake) "src" (source $s "camera_make"))}}
+{{template "kv" (dict "k" "Model" "v" (str $m.CameraModel) "src" (source $s "camera_model"))}}
+{{template "kv" (dict "k" "Serial" "v" (str $m.CameraSerial) "src" (source $s "camera_serial"))}}
+{{template "kv" (dict "k" "Firmware" "v" (str $m.Firmware) "src" (source $s "firmware"))}}
+<dd class="muted only-child">—</dd></dl></section>
+<section><h2 class="mt-0">Exposure</h2><dl class="kv">
 {{template "kv" (dict "k" "ISO / EI" "v" (int $m.ISO) "src" (source $s "iso"))}}
-{{template "kv" (dict "k" "WHITE BALANCE" "v" (int $m.WBKelvin) "src" (source $s "wb_kelvin"))}}
-{{template "kv" (dict "k" "TINT" "v" (flt $m.Tint) "src" (source $s "tint"))}}
-{{template "kv" (dict "k" "SHUTTER ANGLE" "v" (flt $m.ShutterAngle) "src" (source $s "shutter_angle"))}}
-{{template "kv" (dict "k" "SHUTTER" "v" (str $m.ShutterSpeed) "src" (source $s "shutter_speed"))}}
+{{template "kv" (dict "k" "White balance" "v" (int $m.WBKelvin) "src" (source $s "wb_kelvin"))}}
+{{template "kv" (dict "k" "Tint" "v" (flt $m.Tint) "src" (source $s "tint"))}}
+{{template "kv" (dict "k" "Shutter angle" "v" (flt $m.ShutterAngle) "src" (source $s "shutter_angle"))}}
+{{template "kv" (dict "k" "Shutter" "v" (str $m.ShutterSpeed) "src" (source $s "shutter_speed"))}}
 {{template "kv" (dict "k" "ND" "v" (str $m.ND) "src" (source $s "nd"))}}
-<dd class="empty only-child">--</dd></dl>
-<h2>LENS</h2><dl class="kv">
-{{template "kv" (dict "k" "LENS" "v" (str $m.Lens) "src" (source $s "lens"))}}
-{{template "kv" (dict "k" "FOCAL MM" "v" (flt $m.FocalMM) "src" (source $s "focal_mm"))}}
-{{template "kv" (dict "k" "T-STOP" "v" (flt $m.TStop) "src" (source $s "t_stop"))}}
-{{template "kv" (dict "k" "FOCUS" "v" (str $m.FocusDistance) "src" (source $s "focus_distance"))}}
-<dd class="empty only-child">--</dd></dl>
-<h2>AUDIO</h2><dl class="kv">
-{{template "kv" (dict "k" "CHANNELS" "v" (int $m.AudioChannels) "src" (source $s "audio_channels"))}}
-{{template "kv" (dict "k" "SAMPLE RATE" "v" (int $m.SampleRate) "src" (source $s "sample_rate"))}}
-{{template "kv" (dict "k" "BIT DEPTH" "v" (int $m.AudioBitDepth) "src" (source $s "audio_bit_depth"))}}
-<dd class="empty only-child">--</dd></dl>
-<h2>LOOK</h2><dl class="kv">
-{{template "kv" (dict "k" "LOOK / LUT" "v" (str $m.Look) "src" (source $s "look"))}}
-<dd class="empty only-child">--</dd></dl>
+<dd class="muted only-child">—</dd></dl></section>
+<section><h2 class="mt-0">Lens</h2><dl class="kv">
+{{template "kv" (dict "k" "Lens" "v" (str $m.Lens) "src" (source $s "lens"))}}
+{{template "kv" (dict "k" "Focal length (mm)" "v" (flt $m.FocalMM) "src" (source $s "focal_mm"))}}
+{{template "kv" (dict "k" "T-stop" "v" (flt $m.TStop) "src" (source $s "t_stop"))}}
+{{template "kv" (dict "k" "Focus" "v" (str $m.FocusDistance) "src" (source $s "focus_distance"))}}
+<dd class="muted only-child">—</dd></dl></section>
+<section><h2 class="mt-0">Audio</h2><dl class="kv">
+{{template "kv" (dict "k" "Channels" "v" (int $m.AudioChannels) "src" (source $s "audio_channels"))}}
+{{template "kv" (dict "k" "Sample rate" "v" (int $m.SampleRate) "src" (source $s "sample_rate"))}}
+{{template "kv" (dict "k" "Bit depth" "v" (int $m.AudioBitDepth) "src" (source $s "audio_bit_depth"))}}
+<dd class="muted only-child">—</dd></dl></section>
+<section><h2 class="mt-0">Look</h2><dl class="kv">
+{{template "kv" (dict "k" "Look / LUT" "v" (str $m.Look) "src" (source $s "look"))}}
+<dd class="muted only-child">—</dd></dl></section>
+</div></div>
 </div>
-</div>
-<h2>FILES</h2>
-<ul class="info">{{range $c.Files}}<li>{{.}}</li>{{end}}{{range $c.Sidecars}}<li>{{.}} <span class="badge badge-xs badge-neutral">SIDECAR</span></li>{{end}}</ul>
-{{if .Copies}}<h2>OTHER COPIES</h2>
-<div class="overflow-x-auto"><table class="table table-xs"><thead><tr><th>DRIVE</th><th>PATH</th><th class="num">SIZE</th></tr></thead><tbody>
-{{range .Copies}}<tr><td><a href="/drives/{{.DriveID}}">{{.DriveName}}</a></td><td><a href="/files/{{.ID}}">{{.Path}}</a></td><td class="num">{{bytes .Size}}</td></tr>{{end}}
+
+<h2>Files</h2>
+<ul class="mono text-sm muted list-disc list-inside">{{range $c.Files}}<li>{{.}}</li>{{end}}{{range $c.Sidecars}}<li>{{.}} <span class="badge badge-ghost badge-xs">sidecar</span></li>{{end}}</ul>
+{{if .Copies}}<h2>Other copies</h2>
+<div class="overflow-x-auto rounded-box border border-base-300 bg-base-100"><table class="table table-sm"><thead><tr><th>Drive</th><th>Path</th><th class="num">Size</th></tr></thead><tbody>
+{{range .Copies}}<tr class="hover"><td><a href="/drives/{{.DriveID}}" class="link link-hover">{{.DriveName}}</a></td><td class="mono"><a href="/files/{{.ID}}" class="link link-hover">{{.Path}}</a></td><td class="num">{{bytes .Size}}</td></tr>{{end}}
 </tbody></table></div>{{end}}
-<h2>HISTORY ON THIS DRIVE</h2>
-<div class="overflow-x-auto"><table class="table table-xs"><thead><tr><th>SCAN</th><th>SCANNED</th><th class="num">SIZE</th><th>CODEC</th><th>CAMERA</th></tr></thead><tbody>
-{{range .History}}<tr><td><a href="/clips/{{.ID}}">#{{.ScanID}}</a>{{if .IsLatest}} <span class="badge badge-xs badge-accent">LATEST</span>{{end}}</td><td>{{datetime .ScannedAt}}</td><td class="num">{{bytes .TotalSize}}</td><td>{{or (str .Meta.Codec) "--"}}</td><td>{{or (str .Meta.CameraModel) "--"}}</td></tr>{{end}}
+<h2>History on this drive</h2>
+<div class="overflow-x-auto rounded-box border border-base-300 bg-base-100"><table class="table table-sm"><thead><tr><th>Scan</th><th>Scanned</th><th class="num">Size</th><th>Codec</th><th>Camera</th></tr></thead><tbody>
+{{range .History}}<tr class="hover"><td><a href="/clips/{{.ID}}" class="link link-hover">#{{.ScanID}}</a>{{if .IsLatest}} <span class="badge badge-success badge-xs">latest</span>{{end}}</td><td>{{datetime .ScannedAt}}</td><td class="num">{{bytes .TotalSize}}</td><td>{{or (str .Meta.Codec) "—"}}</td><td>{{or (str .Meta.CameraModel) "—"}}</td></tr>{{end}}
 </tbody></table></div>
-<h2>RAW EXTRACTOR OUTPUT</h2>
-{{range $src, $raw := .Raw}}<details class="collapse"><summary class="collapse-title">{{$src}}</summary><div class="collapse-content"><pre>{{json $raw}}</pre></div></details>{{else}}<p class="empty">-- NONE --</p>{{end}}
+<h2>Raw extractor output</h2>
+{{range $src, $raw := .Raw}}<details class="collapse collapse-arrow bg-base-100 border border-base-300 mb-2"><summary class="collapse-title text-sm font-medium">{{$src}}</summary><div class="collapse-content"><pre class="mono text-xs whitespace-pre-wrap break-all">{{json $raw}}</pre></div></details>{{else}}<p class="muted">None.</p>{{end}}
 {{end}}

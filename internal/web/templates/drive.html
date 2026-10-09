@@ -1,46 +1,60 @@
 {{define "content"}}
-<h1>{{.Drive.Name}}{{if .Drive.Label}} <span class="info">/ {{.Drive.Label}}</span>{{end}}</h1>
-<div class="stats stats-vertical sm:stats-horizontal mb-2 w-full sm:w-auto">
-  <div class="stat"><div class="stat-title">CAPACITY</div><div class="stat-value">{{bytes .Drive.CapacityBytes}}</div><div class="stat-desc">{{bytes .Drive.FreeBytes}} FREE · {{.Drive.FSType}}</div></div>
-  <div class="stat"><div class="stat-title">FILES</div><div class="stat-value">{{n .Drive.FileCount}}</div><div class="stat-desc">{{bytes .Drive.TotalBytes}}</div></div>
-  <div class="stat"><div class="stat-title">CLIPS</div><div class="stat-value">{{n .Drive.ClipCount}}</div></div>
-  <div class="stat"><div class="stat-title">SCANS</div><div class="stat-value">{{.Drive.ScanCount}}</div><div class="stat-desc">LAST {{datetime .Drive.LastScannedAt}}</div></div>
+<h1>{{.Drive.Name}}{{if .Drive.Label}} <span class="muted font-normal">· {{.Drive.Label}}</span>{{end}}</h1>
+<div class="stats stats-vertical sm:stats-horizontal bg-base-100 border border-base-300 my-4 w-full sm:w-auto">
+  <div class="stat"><div class="stat-title">Capacity</div><div class="stat-value text-2xl">{{bytes .Drive.CapacityBytes}}</div><div class="stat-desc">{{bytes .Drive.FreeBytes}} free · {{.Drive.FSType}}</div></div>
+  <div class="stat"><div class="stat-title">Files</div><div class="stat-value text-2xl">{{n .Drive.FileCount}}</div><div class="stat-desc">{{bytes .Drive.TotalBytes}}</div></div>
+  <div class="stat"><div class="stat-title">Clips</div><div class="stat-value text-2xl">{{n .Drive.ClipCount}}</div></div>
+  <div class="stat"><div class="stat-title">Scans</div><div class="stat-value text-2xl">{{.Drive.ScanCount}}</div><div class="stat-desc">Last {{datetime .Drive.LastScannedAt}}</div></div>
 </div>
-<div class="flex gap-2 mb-2">
-  <a href="/browse/{{.Drive.ID}}" class="btn btn-primary btn-sm">BROWSE</a>
-  <a href="/search?drive={{.Drive.ID}}" class="btn btn-sm">SEARCH THIS DRIVE</a>
+<div class="flex gap-2 flex-wrap">
+  <a href="/browse/{{.Drive.ID}}" class="btn btn-primary btn-sm">Browse</a>
+  <a href="/search?drive={{.Drive.ID}}" class="btn btn-sm">Search this drive</a>
+  <a href="/export.csv?drive={{.Drive.ID}}" class="btn btn-ghost btn-sm">Export CSV</a>
+  <a href="/export.ale?drive={{.Drive.ID}}" class="btn btn-ghost btn-sm">Export ALE</a>
 </div>
-<h2>WHERE IS IT</h2>
-<form method="post" action="/drives/{{.Drive.ID}}" class="filters">
-  <label>LABEL<input class="input input-sm" name="label" value="{{.Drive.Label}}" placeholder="e.g. 2TB SILVER LACIE"></label>
-  <label>LOCATION<input class="input input-sm" name="location" value="{{.Drive.Location}}" placeholder="e.g. SHELF B, BOX 3"></label>
-  <label>NOTES<input class="input input-sm" name="notes" value="{{.Drive.Notes}}"></label>
-  <label>&nbsp;<button class="btn btn-sm">SAVE</button></label>
-</form>
-<dl class="kv mt-2">
-  <dt>UUID</dt><dd class="info">{{.Drive.VolumeUUID}}</dd>
-  {{if .Drive.MediaName}}<dt>MEDIA</dt><dd>{{.Drive.MediaName}}</dd>{{end}}
-  <dt>FIRST SEEN</dt><dd>{{datetime .Drive.FirstSeen}}</dd>
-  <dt>LAST SEEN</dt><dd>{{datetime .Drive.LastSeen}}</dd>
-</dl>
-<h2>SCAN HISTORY</h2>
-{{if gt (len .Scans) 1}}<form method="get" class="flex gap-2 items-center mb-2" onsubmit="location.href='/scans/'+this.a.value+'/diff/'+this.b.value;return false">
-  <label>FROM <select name="a" class="select select-sm">{{range .Scans}}<option value="{{.ID}}">#{{.ID}} {{datetime .ScannedAt}}</option>{{end}}</select></label>
-  <label>TO <select name="b" class="select select-sm">{{range $i, $s := .Scans}}<option value="{{$s.ID}}" {{if eq $i 0}}selected{{end}}>#{{$s.ID}} {{datetime $s.ScannedAt}}</option>{{end}}</select></label>
-  <button class="btn btn-sm">COMPARE</button>
+
+<div class="grid md:grid-cols-2 gap-6 mt-2">
+<div class="card bg-base-100 border border-base-300">
+  <div class="card-body">
+    <h2 class="card-title text-base mt-0">Where is it?</h2>
+    <form method="post" action="/drives/{{.Drive.ID}}" class="flex flex-col gap-3">
+      <label class="form-control"><span class="label-text">Label</span><input class="input input-bordered input-sm" name="label" value="{{.Drive.Label}}" placeholder="e.g. 2TB silver LaCie"></label>
+      <label class="form-control"><span class="label-text">Location</span><input class="input input-bordered input-sm" name="location" value="{{.Drive.Location}}" placeholder="e.g. Shelf B, box 3"></label>
+      <label class="form-control"><span class="label-text">Notes</span><input class="input input-bordered input-sm" name="notes" value="{{.Drive.Notes}}"></label>
+      <div><button class="btn btn-primary btn-sm">Save</button></div>
+    </form>
+  </div>
+</div>
+<div class="card bg-base-100 border border-base-300">
+  <div class="card-body">
+    <h2 class="card-title text-base mt-0">Volume</h2>
+    <dl class="kv">
+      <dt>UUID</dt><dd class="mono">{{.Drive.VolumeUUID}}</dd>
+      {{if .Drive.MediaName}}<dt>Media</dt><dd>{{.Drive.MediaName}}</dd>{{end}}
+      <dt>First seen</dt><dd>{{datetime .Drive.FirstSeen}}</dd>
+      <dt>Last seen</dt><dd>{{datetime .Drive.LastSeen}}</dd>
+    </dl>
+  </div>
+</div>
+</div>
+
+<h2>Scan history</h2>
+{{if gt (len .Scans) 1}}<form method="get" class="flex gap-2 items-end flex-wrap mb-3" onsubmit="location.href='/scans/'+this.a.value+'/diff/'+this.b.value;return false">
+  <label class="form-control"><span class="label-text">From</span><select name="a" class="select select-bordered select-sm">{{range .Scans}}<option value="{{.ID}}">#{{.ID}} · {{datetime .ScannedAt}}</option>{{end}}</select></label>
+  <label class="form-control"><span class="label-text">To</span><select name="b" class="select select-bordered select-sm">{{range $i, $s := .Scans}}<option value="{{$s.ID}}" {{if eq $i 0}}selected{{end}}>#{{$s.ID}} · {{datetime $s.ScannedAt}}</option>{{end}}</select></label>
+  <button class="btn btn-sm">Compare</button>
 </form>{{end}}
-<p><a href="/export.csv?drive={{.Drive.ID}}" class="btn btn-xs">EXPORT DRIVE CSV</a> <a href="/export.ale?drive={{.Drive.ID}}" class="btn btn-xs">EXPORT DRIVE ALE</a></p>
-<div class="overflow-x-auto">
-<table class="table table-xs">
-<thead><tr><th>SCAN</th><th>SCANNED</th><th>INGESTED</th><th class="num">FILES</th><th class="num">CLIPS</th><th class="num">BYTES</th><th class="num">ADDED</th><th class="num">REMOVED</th><th class="num">CHANGED</th><th>SCANNER</th><th></th></tr></thead>
+<div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
+<table class="table table-sm">
+<thead><tr><th>Scan</th><th>Scanned</th><th>Ingested</th><th class="num">Files</th><th class="num">Clips</th><th class="num">Size</th><th class="num">Added</th><th class="num">Removed</th><th class="num">Changed</th><th>Scanner</th><th></th></tr></thead>
 <tbody>
-{{range .Scans}}<tr tabindex="0">
-  <td><a href="/scans/{{.ID}}" class="value">#{{.ID}}</a>{{if .IsLatest}} <span class="badge badge-xs badge-accent">LATEST</span>{{end}}{{if .IsPartial}} <span class="badge badge-xs badge-warning" title="{{.Root}}">PARTIAL</span>{{end}}</td>
-  <td>{{datetime .ScannedAt}}</td><td class="info">{{datetime .IngestedAt}}</td>
+{{range .Scans}}<tr class="hover">
+  <td><a href="/scans/{{.ID}}" class="link link-hover font-medium">#{{.ID}}</a>{{if .IsLatest}} <span class="badge badge-success badge-xs">latest</span>{{end}}{{if .IsPartial}} <span class="badge badge-warning badge-xs" title="{{.Root}}">partial</span>{{end}}</td>
+  <td>{{datetime .ScannedAt}}</td><td class="muted">{{datetime .IngestedAt}}</td>
   <td class="num">{{n .FileCount}}</td><td class="num">{{n .ClipCount}}</td><td class="num">{{bytes .TotalBytes}}</td>
-  <td class="num text-success">+{{n .Added}}</td><td class="num text-error">-{{n .Removed}}</td><td class="num text-warning">~{{n .Changed}}</td>
-  <td class="info">{{.ScannerVersion}}</td>
-  <td><a href="/browse/{{.DriveID}}?scan={{.ID}}" class="btn btn-xs">BROWSE</a></td>
+  <td class="num text-success">+{{n .Added}}</td><td class="num text-error">−{{n .Removed}}</td><td class="num text-warning">~{{n .Changed}}</td>
+  <td class="muted mono">{{.ScannerVersion}}</td>
+  <td class="text-right"><a href="/browse/{{.DriveID}}?scan={{.ID}}" class="btn btn-ghost btn-xs">Browse</a></td>
 </tr>{{end}}
 </tbody>
 </table>

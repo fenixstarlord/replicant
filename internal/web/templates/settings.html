@@ -1,23 +1,22 @@
 {{define "content"}}
-<h1>SETTINGS</h1>
-{{if .Message}}<div role="alert" class="alert alert-success">{{.Message}}</div>{{end}}
-{{if .Error}}<div role="alert" class="alert alert-error">{{.Error}}</div>{{end}}
-{{if .NewToken}}<div role="alert" class="alert alert-success">NEW TOKEN{{if .NewTokenName}} "{{.NewTokenName}}"{{end}}. SHOWN ONCE:<br><code class="value">{{.NewToken}}</code><br>ON THE MAC: <code>shelf login http://THIS-SERVER:8080 --token {{.NewToken}}</code></div>{{end}}
-<h2>API TOKENS</h2>
-<div class="overflow-x-auto"><table class="table table-xs"><thead><tr><th>ID</th><th>NAME</th><th>CREATED</th><th>LAST USED</th><th></th></tr></thead><tbody>
-{{range .Tokens}}<tr><td>{{.ID}}</td><td class="value">{{.Name}}</td><td>{{datetime .CreatedAt}}</td><td>{{if .LastUsedAt}}{{tm .LastUsedAt}}{{else}}<span class="empty">NEVER</span>{{end}}</td><td><form method="post" action="/settings/tokens/{{.ID}}/revoke" onsubmit="return confirm('REVOKE TOKEN {{.Name}}?')"><button class="btn btn-xs btn-error">REVOKE</button></form></td></tr>{{else}}<tr><td colspan="5" class="empty">-- NO TOKENS --</td></tr>{{end}}
-</tbody></table></div>
-<form method="post" action="/settings/tokens" class="flex gap-2 items-center mt-2">
-  <input class="input input-sm" name="name" placeholder="TOKEN NAME (E.G. LAPTOP)">
-  <button class="btn btn-sm btn-primary">CREATE TOKEN</button>
-</form>
-<h2>UPLOAD SCAN</h2>
-<form method="post" action="/settings/upload" enctype="multipart/form-data" class="flex gap-2 items-center">
-  <input type="file" name="bundle" accept=".shelf,application/zip" class="file-input file-input-sm">
-  <button class="btn btn-sm btn-primary">UPLOAD .SHELF</button>
-</form>
-<p class="info mt-2">BUNDLES COME FROM: shelf scan /Volumes/NAME -o name.shelf</p>
-<h2>BACKUP</h2>
-<form method="post" action="/settings/backup"><button class="btn btn-sm btn-primary">WRITE BACKUP NOW</button> <span class="info">USES SQLITE VACUUM INTO; FILES LAND IN THE DATA DIR UNDER backups/</span></form>
-<ul class="mt-2">{{range .Backups}}<li><a href="/settings/backup/{{.}}">{{.}}</a></li>{{else}}<li class="empty">-- NO BACKUPS YET --</li>{{end}}</ul>
+<h1>Settings</h1>
+{{if .Message}}<div role="alert" class="alert alert-success text-sm my-3">{{.Message}}</div>{{end}}
+{{if .Error}}<div role="alert" class="alert alert-error text-sm my-3">{{.Error}}</div>{{end}}
+<div class="grid md:grid-cols-2 gap-6 mt-4">
+<div class="card bg-base-100 border border-base-300"><div class="card-body">
+  <h2 class="card-title text-base mt-0">Upload a scan</h2>
+  <p class="muted text-sm">Bundles come from <code class="mono">shelf scan /Volumes/NAME -o name.shelf</code> on the Mac.</p>
+  <form method="post" action="/settings/upload" enctype="multipart/form-data" class="flex gap-2 items-center flex-wrap">
+    <input type="file" name="bundle" accept=".shelf,application/zip" class="file-input file-input-bordered file-input-sm">
+    <button class="btn btn-primary btn-sm">Upload</button>
+  </form>
+</div></div>
+<div class="card bg-base-100 border border-base-300"><div class="card-body">
+  <h2 class="card-title text-base mt-0">Backups</h2>
+  <p class="muted text-sm">A consistent copy of the database (SQLite <code class="mono">VACUUM INTO</code>), written under <code class="mono">backups/</code> in the data directory.</p>
+  <form method="post" action="/settings/backup"><button class="btn btn-sm">Write a backup now</button></form>
+  <ul class="mt-2 text-sm">{{range .Backups}}<li><a href="/settings/backup/{{.}}" class="link link-hover mono">{{.}}</a></li>{{else}}<li class="muted">No backups yet.</li>{{end}}</ul>
+</div></div>
+</div>
+<p class="muted text-sm mt-6">API keys for the <code class="mono">shelf</code> CLI are managed on the <a href="/settings/api-keys" class="link">API keys</a> page.</p>
 {{end}}

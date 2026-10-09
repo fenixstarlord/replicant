@@ -1,24 +1,24 @@
 {{define "content"}}
-<h1><a href="/drives/{{.Drive.ID}}">{{.Drive.Name}}</a></h1>
-<p class="info">SCAN #{{.Scan.ID}} · {{datetime .Scan.ScannedAt}}{{if .Scan.IsLatest}} · LATEST{{else}} · <span class="text-warning">OLD SCAN</span>{{end}}{{if .Scan.IsPartial}} · <span class="text-warning">PARTIAL: {{.Scan.Root}}</span>{{end}} · {{if .Drive.Location}}{{.Drive.Location}}{{else}}LOCATION NOT SET{{end}}</p>
-<div class="breadcrumbs text-sm"><ul>
+<h1><a href="/drives/{{.Drive.ID}}" class="link link-hover">{{.Drive.Name}}</a></h1>
+<p class="muted text-sm">Scan #{{.Scan.ID}} · {{datetime .Scan.ScannedAt}}{{if .Scan.IsLatest}} · latest{{else}} · <span class="text-warning">old scan</span>{{end}}{{if .Scan.IsPartial}} · <span class="text-warning">partial scan of {{.Scan.Root}}</span>{{end}} · {{if .Drive.Location}}{{.Drive.Location}}{{else}}location not set{{end}}</p>
+<div class="breadcrumbs text-sm mono"><ul>
   <li><a href="/browse/{{.Drive.ID}}?scan={{.Scan.ID}}">/</a></li>
   {{$d := .Drive.ID}}{{$s := .Scan.ID}}{{range .Crumbs}}<li><a href="/browse/{{$d}}/{{.Path}}?scan={{$s}}">{{.Name}}</a></li>{{end}}
 </ul></div>
-<p class="info">{{n .Dir.DirFileCount}} FILES · {{bytes .Dir.DirTotalSize}}</p>
-<div class="overflow-x-auto">
-<table class="table table-xs">
-<thead><tr><th>NAME</th><th>KIND</th><th class="num">SIZE</th><th class="num">FILES</th><th>MODIFIED</th><th>CLIP</th><th>FINGERPRINT</th></tr></thead>
+<p class="muted text-sm mb-2">{{n .Dir.DirFileCount}} files · {{bytes .Dir.DirTotalSize}}</p>
+<div class="overflow-x-auto rounded-box border border-base-300 bg-base-100">
+<table class="table table-sm">
+<thead><tr><th>Name</th><th>Kind</th><th class="num">Size</th><th class="num">Files</th><th>Modified</th><th>Clip</th><th>Fingerprint</th></tr></thead>
 <tbody>
-{{range .Entries}}<tr tabindex="0" {{if .Error}}class="text-error"{{end}}>
-  <td>{{if .IsDir}}{{if .ClipID}}<a href="/clips/{{.ClipID}}" class="value">{{.Name}}/</a>{{else}}<a href="/browse/{{$d}}/{{.Path}}?scan={{$s}}" class="value">{{.Name}}/</a>{{end}}{{else}}<a href="/files/{{.ID}}" class="value">{{.Name}}</a>{{end}}{{if .IsSymlink}} <span class="badge badge-xs badge-neutral">LINK</span>{{end}}{{if .IsPackage}} <span class="badge badge-xs badge-neutral">PKG</span>{{end}}</td>
-  <td><span class="badge badge-xs {{kindBadge .Kind}}">{{.Kind}}</span></td>
+{{range .Entries}}<tr class="hover {{if .Error}}text-error{{end}}">
+  <td>{{if .IsDir}}{{if .ClipID}}<a href="/clips/{{.ClipID}}" class="link link-hover font-medium">{{.Name}}/</a>{{else}}<a href="/browse/{{$d}}/{{.Path}}?scan={{$s}}" class="link link-hover font-medium">{{.Name}}/</a>{{end}}{{else}}<a href="/files/{{.ID}}" class="link link-hover">{{.Name}}</a>{{end}}{{if .IsSymlink}} <span class="badge badge-ghost badge-xs">link</span>{{end}}{{if .IsPackage}} <span class="badge badge-ghost badge-xs">package</span>{{end}}</td>
+  <td><span class="badge badge-ghost badge-xs">{{.Kind}}</span></td>
   <td class="num">{{if .IsDir}}{{bytes .DirTotalSize}}{{else}}{{bytes .Size}}{{end}}</td>
-  <td class="num">{{if .IsDir}}{{n .DirFileCount}}{{else}}<span class="empty">--</span>{{end}}</td>
+  <td class="num">{{if .IsDir}}{{n .DirFileCount}}{{else}}<span class="muted">—</span>{{end}}</td>
   <td>{{datetime .ModTime}}</td>
-  <td>{{if .ClipID}}<a href="/clips/{{.ClipID}}">{{.ClipKind}}</a>{{else}}<span class="empty">--</span>{{end}}</td>
-  <td class="info">{{or .Fingerprint "--"}}</td>
-</tr>{{else}}<tr><td colspan="7" class="empty">-- EMPTY --</td></tr>{{end}}
+  <td>{{if .ClipID}}<a href="/clips/{{.ClipID}}" class="link link-hover">{{.ClipKind}}</a>{{else}}<span class="muted">—</span>{{end}}</td>
+  <td class="muted mono">{{or .Fingerprint "—"}}</td>
+</tr>{{else}}<tr><td colspan="7" class="muted text-center py-6">Empty folder.</td></tr>{{end}}
 </tbody>
 </table>
 </div>

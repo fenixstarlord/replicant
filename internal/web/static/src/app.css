@@ -1,118 +1,36 @@
 /* Shelf web UI stylesheet source. Built with the standalone Tailwind CLI
-   into ../app.css (committed, embedded). See docs/design/m8-theme.md. */
+   into ../app.css (committed, embedded). See docs/design/ui.md. */
 @import "tailwindcss";
 @plugin "daisyui" {
-  themes: m8 --default;
+  themes: silk --default, dim --prefersdark;
   logs: false;
 }
 
-@plugin "daisyui/theme" {
-  name: "m8";
-  default: true;
-  prefersdark: true;
-  color-scheme: dark;
-
-  --color-base-100: #000000;
-  --color-base-200: #1E1E28;
-  --color-base-300: #2C2C3E;
-  --color-base-content: #8C8CBA;
-  --color-primary: #32ECFF;
-  --color-primary-content: #000000;
-  --color-secondary: #FF00D2;
-  --color-secondary-content: #000000;
-  --color-accent: #00FF70;
-  --color-accent-content: #000000;
-  --color-neutral: #60608E;
-  --color-neutral-content: #FAFAFA;
-  --color-info: #60608E;
-  --color-info-content: #FAFAFA;
-  --color-success: #00FF50;
-  --color-success-content: #000000;
-  --color-warning: #FFE000;
-  --color-warning-content: #000000;
-  --color-error: #FF3070;
-  --color-error-content: #000000;
-
-  --radius-selector: 0rem;
-  --radius-field: 0rem;
-  --radius-box: 0rem;
-  --size-selector: 0.25rem;
-  --size-field: 0.25rem;
-  --border: 1px;
-  --depth: 0;
-  --noise: 0;
-}
-
 @theme {
-  --color-m8-bg: #000000;
-  --color-m8-empty: #1E1E28;
-  --color-m8-info: #60608E;
-  --color-m8-default: #8C8CBA;
-  --color-m8-value: #FAFAFA;
-  --color-m8-title: #32ECFF;
-  --color-m8-play: #00FF70;
-  --color-m8-cursor: #32ECFF;
-  --color-m8-selection: #FF00D2;
-  --color-m8-scope: #32ECFF;
-  --color-m8-meter-low: #00FF50;
-  --color-m8-meter-mid: #FFE000;
-  --color-m8-meter-high: #FF3070;
-
-  --font-sans: "stealth57", ui-monospace, Menlo, monospace;
-  --font-mono: "stealth57", ui-monospace, Menlo, monospace;
-}
-
-@font-face {
-  font-family: "stealth57";
-  src: url("fonts/m8stealth57.woff2") format("woff2");
-  font-weight: normal;
-  font-style: normal;
-  font-display: block;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
 }
 
 @layer base {
-  html {
-    background: var(--color-base-100);
-    font-size: 16px;
-    text-rendering: optimizeSpeed;
-    -webkit-font-smoothing: none;
-    font-variant-numeric: tabular-nums;
-  }
-  h1, h2, h3, h4, th, label, .btn, .tab, .badge, .menu, .navbar, .stat-title {
-    text-transform: uppercase;
-    letter-spacing: 0;
-  }
-  h1 { font-size: 24px; color: var(--color-primary); }
-  h2, h3 { font-size: 16px; color: var(--color-primary); }
-  * { transition: none !important; animation: none !important; box-shadow: none !important; }
-  :focus-visible { outline: 1px solid var(--color-primary); outline-offset: 0; }
-  ::selection { background: var(--color-secondary); color: #000; }
-  ::placeholder { color: var(--color-m8-info); }
-  * { scrollbar-width: thin; scrollbar-color: var(--color-neutral) var(--color-base-300); }
-  a { color: var(--color-primary); }
+  html { font-size: 15px; }
+  body { font-variant-numeric: tabular-nums; }
+  h1 { font-size: 1.5rem; font-weight: 600; letter-spacing: -0.01em; }
+  h2 { font-size: 1.05rem; font-weight: 600; margin-top: 1.5rem; margin-bottom: 0.5rem; }
 }
 
 @layer components {
-  .table tbody tr:hover            { background: var(--color-primary);   color: #000; }
-  .table tbody tr:hover a          { color: #000; }
-  .table tbody tr[aria-selected="true"],
-  .table tbody tr.is-selected      { background: var(--color-secondary); color: #000; }
-  .table :where(th, td)            { padding-top: 2px; padding-bottom: 2px; border-color: var(--color-base-200); }
-  .table td.num, .table th.num     { text-align: right; }
-  .empty                           { color: var(--color-m8-empty); }
+  .muted      { color: color-mix(in oklch, var(--color-base-content) 60%, transparent); }
+  .mono       { font-family: var(--font-mono); font-size: 0.85em; }
+  .num        { text-align: right; font-variant-numeric: tabular-nums; }
+  .table :where(td, th) { white-space: nowrap; }
+  /* Key/value groups on detail pages. */
+  .kv         { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1rem; align-items: baseline; }
+  .kv dt      { color: color-mix(in oklch, var(--color-base-content) 60%, transparent); font-size: 0.85rem; }
+  .kv dd      { margin: 0; }
   .kv dd.only-child:not(:only-child) { display: none; }
-  .value                           { color: var(--color-m8-value); }
-  .info                            { color: var(--color-m8-info); }
-  .table tbody tr:focus-within::before { content: ">"; color: var(--color-primary); animation: m8blink 1s steps(1) infinite !important; }
-  @keyframes m8blink { 50% { opacity: 0; } }
-  .table :where(td, th)            { white-space: nowrap; }
-  /* Key/value groups on detail pages: label column, value column. */
-  .kv                              { display: grid; grid-template-columns: max-content 1fr; gap: 2px 16px; }
-  .kv dt                           { color: var(--color-m8-info); text-transform: uppercase; }
-  .kv dd                           { margin: 0; color: var(--color-m8-value); }
   /* Filter grid on the search page. */
-  .filters                         { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 4px 8px; }
-  .filters label                   { display: flex; flex-direction: column; font-size: 12px; color: var(--color-m8-info); }
+  .filters    { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 0.5rem 1rem; }
+  .filters label { display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.8rem; color: color-mix(in oklch, var(--color-base-content) 65%, transparent); }
   .filters .input, .filters .select { width: 100%; }
-  @media (max-width: 640px) { .filters { grid-template-columns: repeat(2, 1fr); } .stats { flex-wrap: wrap; } }
+  @media (max-width: 640px) { .filters { grid-template-columns: repeat(2, 1fr); } }
 }

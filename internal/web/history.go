@@ -33,7 +33,7 @@ func (s *Server) handleDuplicates(w http.ResponseWriter, r *http.Request) {
 	for _, g := range groups {
 		wasted += g.WastedBytes
 	}
-	s.render(w, r, "duplicates", map[string]any{"Title": "DUPLICATES", "Groups": groups, "Wasted": wasted, "MinGB": r.URL.Query().Get("min_gb")})
+	s.render(w, r, "duplicates", map[string]any{"Title": "Duplicates", "Groups": groups, "Wasted": wasted, "MinGB": r.URL.Query().Get("min_gb")})
 }
 
 func (s *Server) handleDiff(w http.ResponseWriter, r *http.Request) {
@@ -48,7 +48,7 @@ func (s *Server) handleDiff(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err, "diff")
 		return
 	}
-	s.render(w, r, "diff", map[string]any{"Title": fmt.Sprintf("DIFF %d → %d", a, b), "Diff": d})
+	s.render(w, r, "diff", map[string]any{"Title": fmt.Sprintf("Diff #%d → #%d", a, b), "Diff": d})
 }
 
 // exportClips runs the search from the query string without paging.
@@ -97,7 +97,7 @@ func (s *Server) handleBackup(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err, "backup")
 		return
 	}
-	http.Redirect(w, r, "/settings?msg=backup+written:+"+name, http.StatusSeeOther)
+	http.Redirect(w, r, "/settings?msg=Backup+written:+"+name, http.StatusSeeOther)
 }
 
 func (s *Server) handleBackupDownload(w http.ResponseWriter, r *http.Request) {

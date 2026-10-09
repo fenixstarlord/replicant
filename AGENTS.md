@@ -51,8 +51,8 @@ Track progress here. Update this section at the end of each phase, and commit.
   login, drives (inline label/location), drive (scan history, diff picker, exports), search
   (clips/files, filters, htmx live results), browse, clip detail (grouped fields with source tags,
   raw output), file detail, scan detail, settings (tokens, upload, backup). Real stylesheet built
-  with `./build-css.sh` (Tailwind v4.3.3 + daisyUI 5.7.47, cached in `.tools/`), htmx 2.0.11 and
-  stealth57 vendored under `internal/web/static/`. Verified in the browser pane.
+  with `./build-css.sh` (Tailwind v4.3.3 + daisyUI 5.7.47, cached in `.tools/`), htmx 2.0.11
+  vendored under `internal/web/static/`. Verified in the browser pane. Restyled 2026-10-09 (ADR-002).
 - [x] Phase 6 — History + duplicates (2026-10-08). Diffs at ingest (`scan_changes`), scan page,
   any-two-scans diff (`/scans/{a}/diff/{b}`, FULL OUTER JOIN by path), duplicates page by
   fingerprint or name+size with wasted bytes, other copies on clip and file pages.
@@ -132,14 +132,13 @@ other installed Go skills.
   **standalone Tailwind CLI binary** (no npm, no Node at runtime) from
   `internal/web/static/src/app.css` into `internal/web/static/app.css`, which is committed and
   embedded. A `make css` (or `./build-css.sh`) target wraps the command and documents the pinned
-  Tailwind/DaisyUI versions. htmx and DaisyUI's JS-free design mean no bundler; vendor `htmx.min.js`
-  under `internal/web/static/`. The only theme is the custom `m8` DaisyUI theme (see next item).
-- **Visual design: faithful Dirtywave M8 look.** Read `docs/design/m8-theme.md` before writing any
-  template or CSS. In short: dark only, M8 stock palette mapped to DaisyUI tokens, stealth57 pixel
-  font at integer scales, uppercase headings/labels/buttons, 1px flat borders, zero radius, no
-  shadows, no motion except the blinking focus cursor, semantic `m8-*` colours (`text-m8-value`
-  for the thing the user is looking for, `m8-info` for hints, `--` in `m8-empty` for empty cells),
-  hover row = cyan, selected row = magenta. Colour carries meaning; never decorate with it.
+  Tailwind/DaisyUI versions. htmx and DaisyUI's JS-free design mean no bundler; `htmx.min.js` is
+  vendored under `internal/web/static/`. Themes are daisyUI built-ins (see next item).
+- **Visual design: clean and readable.** Read `docs/design/ui.md` before writing any template or
+  CSS. daisyUI `silk` (light) + `dim` (dark via OS preference), system fonts, sentence case, cards
+  and bordered `table-sm` tables, `.kv` definition lists for metadata with the source as a ghost
+  badge, em dash for empty values, semantic colours only. The M8 emulation (ADR-001,
+  `docs/design/m8-theme.md`) was replaced by ADR-002 on 2026-10-09.
 - **Running the server locally:** `./start.sh` at the repo root builds and runs `shelf-server`
   against a local data dir (`./data`, gitignored) with dev-friendly env defaults
   (`SHELF_PASSWORD`, `SHELF_DATA_DIR=./data`, `SHELF_LISTEN=:8080`). This is the primary way to
@@ -216,9 +215,9 @@ Add a skill with `npx skills add <owner/repo> -s <skill> -a claude-code -y` and 
 - **UI component library:** DaisyUI on Tailwind, built with the standalone Tailwind CLI, output
   committed. Chosen over templUI, Shoelace, and Pico to keep html/template and the no-runtime-build
   design.
-- **Look:** faithful Dirtywave M8 emulation. Dark only, stock M8 palette, stealth57 font (CC BY-SA,
-  vendored in Phase 5 with attribution). Spec: `docs/design/m8-theme.md`, decision:
-  `docs/decisions/ADR-001-web-ui-stack.md`.
+- **Look (2026-10-09):** clean daisyUI `silk`/`dim` with system fonts, replacing the M8 emulation
+  of 2026-10-08. Spec: `docs/design/ui.md`, decision: `docs/decisions/ADR-002-clean-ui-theme.md`.
+  API keys have their own page at `/settings/api-keys`.
 - **Vendor tools:** the user installs `art-cmd` and REDCINE-X PRO before Phase 4. Build the
   ffprobe, ALE, Sony XML, BRAW sidecar and BWF extractors first; ARRI and RED extractors last.
 
