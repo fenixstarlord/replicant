@@ -21,12 +21,5 @@ struct ShelfMenuApp: App {
         }
         .menuBarExtraStyle(.menu)
 
-        Settings {
-            SettingsView()
-                .environmentObject(volumes)
-                .environmentObject(scans)
-                .environmentObject(settings)
-                .environmentObject(toolsCheck)
-        }
     }
 }

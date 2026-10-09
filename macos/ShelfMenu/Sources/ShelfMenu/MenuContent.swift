@@ -6,7 +6,6 @@ struct MenuContent: View {
     @EnvironmentObject var scans: ScanManager
     @EnvironmentObject var settings: AppSettings
     @EnvironmentObject var toolsCheck: ToolChecker
-    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         if let name = scans.current {
@@ -17,7 +16,7 @@ struct MenuContent: View {
             Divider()
         }
         if settings.server.isEmpty || !settings.hasToken {
-            Button("Set up server and API key…") { openSettings() }
+            Button("Set up server and API key…") { showSettings() }
             Divider()
         }
         if !toolsCheck.missing.isEmpty {
@@ -48,8 +47,18 @@ struct MenuContent: View {
             }
         }
         Divider()
-        Button("Settings…") { openSettings() }
+        Button("Settings…") { showSettings() }
         Button("Quit Shelf") { NSApplication.shared.terminate(nil) }
+    }
+
+    private func showSettings() {
+        SettingsWindow.shared.show(
+            SettingsView()
+                .environmentObject(volumes)
+                .environmentObject(scans)
+                .environmentObject(settings)
+                .environmentObject(toolsCheck)
+        )
     }
 
     private func browse() {
