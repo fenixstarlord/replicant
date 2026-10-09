@@ -473,7 +473,7 @@ func TestDefaultViewGroupsAndScanJobs(t *testing.T) {
 	if len(jobs) != 1 || jobs[0].Label != "Archive" || jobs[0].IntervalMin != 1440 || !jobs[0].Extract {
 		t.Fatalf("job wrong: %+v", jobs)
 	}
-	if _, body := get(t, s, c, "/settings"); !strings.Contains(body, dir) || !strings.Contains(body, "Every day") || !strings.Contains(body, "Scan now") {
+	if _, body := get(t, s, c, "/settings"); !strings.Contains(body, dir) || !strings.Contains(body, "Every day") || !strings.Contains(body, "Scan now") || !strings.Contains(body, `id="job-editor"`) {
 		t.Errorf("settings page lacks the job")
 	}
 	if rec := post(t, s, c, fmt.Sprintf("/settings/jobs/%d/run", jobs[0].ID), nil); rec.Code != 303 {

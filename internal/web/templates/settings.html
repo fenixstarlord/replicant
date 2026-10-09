@@ -50,15 +50,7 @@
   <td>{{if .NextRunAt}}{{tm .NextRunAt}}{{else}}<span class="muted">—</span>{{end}}</td>
   <td class="text-right whitespace-nowrap">
     <form method="post" action="/settings/jobs/{{.ID}}/run" class="inline"><button class="btn btn-xs btn-primary" {{if .Running}}disabled{{end}}>Scan now</button></form>
-    <details class="dropdown dropdown-end inline-block"><summary class="btn btn-xs btn-ghost">Edit</summary>
-      <form method="post" action="/settings/jobs/{{.ID}}" class="dropdown-content z-10 card bg-base-100 border border-base-300 w-72 p-3 flex flex-col gap-2 text-left">
-        <label class="form-control"><span class="label-text text-xs">Label</span><input class="input input-bordered input-xs" name="label" value="{{.Label}}"></label>
-        <label class="form-control"><span class="label-text text-xs">Schedule</span><select name="interval" class="select select-bordered select-xs">{{template "interval_options" .IntervalMin}}</select></label>
-        <label class="label cursor-pointer justify-start gap-2"><input type="checkbox" name="extract" value="1" class="checkbox checkbox-xs" {{if .Extract}}checked{{end}}><span class="label-text text-xs">Extract metadata</span></label>
-        <label class="label cursor-pointer justify-start gap-2"><input type="checkbox" name="fingerprint" value="1" class="checkbox checkbox-xs" {{if .Fingerprint}}checked{{end}}><span class="label-text text-xs">Fingerprint files</span></label>
-        <label class="label cursor-pointer justify-start gap-2"><input type="checkbox" name="enabled" value="1" class="checkbox checkbox-xs" {{if .Enabled}}checked{{end}}><span class="label-text text-xs">Enabled</span></label>
-        <button class="btn btn-xs btn-primary">Save</button>
-      </form></details>
+    <button type="button" class="btn btn-xs btn-ghost" onclick="editJob(this)" data-action="/settings/jobs/{{.ID}}" data-path="{{.Path}}" data-label="{{.Label}}" data-interval="{{.IntervalMin}}" data-extract="{{if .Extract}}1{{end}}" data-fingerprint="{{if .Fingerprint}}1{{end}}" data-enabled="{{if .Enabled}}1{{end}}">Edit</button>
     <form method="post" action="/settings/jobs/{{.ID}}/delete" class="inline" onsubmit="return confirm('Remove this scan job? Past scans stay in the catalog.')"><button class="btn btn-xs btn-ghost text-error">Remove</button></form>
   </td>
 </tr>{{else}}<tr><td colspan="7" class="muted text-center py-6">No server scans configured.</td></tr>{{end}}
@@ -87,4 +79,36 @@
 </div></div>
 
 <p class="muted text-sm mt-6">API keys for the <code class="mono">shelf</code> CLI are managed on the <a href="/settings/api-keys" class="link">API keys</a> page.</p>
+
+<dialog id="job-editor" class="modal modal-side">
+  <form method="post" class="modal-box flex flex-col gap-3" id="job-editor-form">
+    <div class="flex items-start justify-between gap-2">
+      <div><h3 class="font-semibold">Edit server scan</h3><p class="muted mono text-xs break-all" id="job-editor-path"></p></div>
+      <button type="button" class="btn btn-sm btn-circle btn-ghost" onclick="document.getElementById('job-editor').close()" aria-label="Close">✕</button>
+    </div>
+    <label class="form-control"><span class="label-text">Label</span><input class="input input-bordered input-sm" name="label"></label>
+    <label class="form-control"><span class="label-text">Schedule</span><select name="interval" class="select select-bordered select-sm">{{template "interval_options" -1}}</select></label>
+    <label class="label cursor-pointer justify-start gap-3"><input type="checkbox" name="extract" value="1" class="toggle toggle-sm"><span class="label-text">Extract metadata<br><span class="muted text-xs">Runs ffprobe and the sidecar parsers on the server.</span></span></label>
+    <label class="label cursor-pointer justify-start gap-3"><input type="checkbox" name="fingerprint" value="1" class="toggle toggle-sm"><span class="label-text">Fingerprint files<br><span class="muted text-xs">Reads the first and last megabyte of every file; needed for duplicate detection.</span></span></label>
+    <label class="label cursor-pointer justify-start gap-3"><input type="checkbox" name="enabled" value="1" class="toggle toggle-sm"><span class="label-text">Enabled</span></label>
+    <div class="modal-action mt-auto">
+      <button type="button" class="btn btn-sm" onclick="document.getElementById('job-editor').close()">Cancel</button>
+      <button class="btn btn-sm btn-primary">Save</button>
+    </div>
+  </form>
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+<script>
+function editJob(btn) {
+  const d = btn.dataset, f = document.getElementById('job-editor-form');
+  f.action = d.action;
+  document.getElementById('job-editor-path').textContent = d.path;
+  f.label.value = d.label;
+  f.interval.value = d.interval;
+  f.extract.checked = d.extract === '1';
+  f.fingerprint.checked = d.fingerprint === '1';
+  f.enabled.checked = d.enabled === '1';
+  document.getElementById('job-editor').showModal();
+}
+</script>
 {{end}}
