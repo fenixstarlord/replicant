@@ -13,7 +13,7 @@ services:
       REPLICANT_PASSWORD: change-me
       # The address Macs use to reach this server (baked into API keys).
       # Use the host's NetBird or LAN address; the container cannot detect it.
-      REPLICANT_PUBLIC_URL: http://100.64.0.5:8080
+      REPLICANT_PUBLIC_URL: http://100.114.130.219:8080
       TZ: America/Los_Angeles
     volumes:
       # Where the catalog lives (database, uploads, backups). host:container
