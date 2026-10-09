@@ -36,16 +36,17 @@ Track progress here. Update this section at the end of each phase, and commit.
   login page. CLI: `shelf login`, `upload`, `drives`, and `scan` without `-o` pushes directly.
   `shelf-server token create|list|revoke`, `shelf-server ingest <file>`. Verified end to end
   against `./start.sh`: the 614k-entry RAID bundle ingests in 16 s. Docker still deferred.
-- [~] Phase 4 — Extractors (2026-10-08, **blocked on vendor tools for completion**).
-  `internal/meta` (normalized fields, priority merge with weak fields), `internal/extract` (runner,
-  worker pool, per-clip timeouts, missing tools never fatal), extractors: `ffprobe`, `ale`, `bwf`
-  (bext + iXML), `sony-xml`, `braw-sidecar`, `redline` (REDline), `art-cmd` (ARRI). `shelf doctor`,
-  `shelf scan` extracts unless `--fast`; ingest stores fields, sources, errors, `clip_raw`.
-  Verified on a real ALEXA 35 card day: ARRICORE clips get codec, 4608x3164, fps, timecode, camera,
-  ISO, WB, lens, LogC from the ALE; Sound Devices WAVs get scene/take/tape/timecode from BWF.
-  **Open:** `redline` and `art-cmd` parsers are written against documented names but unverified;
-  capture golden output and pin the parsers once the user installs REDCINE-X PRO and ART. The
-  Sony XML and BRAW sidecar parsers are tested on synthetic samples only (none on this drive).
+- [~] Phase 4 — Extractors (2026-10-08/09). `internal/meta` (normalized fields, priority merge with
+  weak fields), `internal/extract` (runner, worker pool, per-clip timeouts, missing tools never
+  fatal), extractors: `ffprobe`, `ale`, `bwf` (bext + iXML), `sony-xml`, `braw-sidecar`, `redline`,
+  `art-cmd`. `shelf doctor [--json]`; `shelf scan` extracts unless `--fast`; ingest stores fields,
+  sources, errors, `clip_raw`.
+  **ARRI verified 2026-10-09** with ART CMD 1.0.0: `art-cmd export --input <clip> --duration 1
+  --output <tmp>/metadata.json` (0.14 s per clip); mapper in `internal/extract/arri/export.go`
+  against `testdata/golden/arri/alexa35_arricore_metadata.json`. On the ALEXA 35 card: 74 clips,
+  0 errors, art-cmd wins camera/exposure/lens/colour, ALE supplies duration and frame count.
+  **Open:** `redline` mapper still unverified against real `--printMeta` output; Sony XML and
+  BRAW sidecar parsers tested on synthetic samples only.
 - [x] Phase 5 — Search + browse UI (2026-10-08). `internal/store/query.go` (clip search with every
   plan filter, file search, browse listing, detail, history, copies, facets), `internal/web` pages:
   login, drives (inline label/location), drive (scan history, diff picker, exports), search

@@ -136,6 +136,14 @@ func (e *Extractor) Extract(ctx context.Context, root string, c *clips.Clip) (*m
 			}
 		}
 	}
+	if IsExport(raw) {
+		var ex Export
+		if err := json.Unmarshal(raw, &ex); err != nil {
+			return nil, fmt.Errorf("art-cmd export json: %w", err)
+		}
+		return &meta.Result{Fields: MapExport(&ex), Raw: json.RawMessage(raw)}, nil
+	}
+	// Unknown shape (older or newer tool): fall back to matching leaf names.
 	var kv map[string]any
 	if err := json.Unmarshal(raw, &kv); err != nil {
 		return nil, fmt.Errorf("art-cmd output is not JSON (flags may need adjusting): %w", err)
