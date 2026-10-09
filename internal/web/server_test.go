@@ -570,3 +570,57 @@ func TestGroupsCreateMoveDelete(t *testing.T) {
 		t.Errorf("drive should be ungrouped")
 	}
 }
+
+func TestSearchScopedToGroupOrClient(t *testing.T) {
+	s, c, res := seedPages(t)
+	ctx := context.Background()
+	if err := s.store.SetDriveGroup(ctx, store.ByGroup, res.DriveID, "Studio RAIDs"); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.store.SetDriveGroup(ctx, store.ByClient, res.DriveID, "Sockeye"); err != nil {
+		t.Fatal(err)
+	}
+	groups, _ := s.store.ListGroups(ctx, store.ByGroup)
+	clients, _ := s.store.ListGroups(ctx, store.ByClient)
+	get := func(path string) string {
+		req := httptest.NewRequest("GET", path, nil)
+		req.AddCookie(c)
+		rec := httptest.NewRecorder()
+		s.ServeHTTP(rec, req)
+		if rec.Code != 200 {
+			t.Fatalf("%s: %d", path, rec.Code)
+		}
+		return rec.Body.String()
+	}
+	// The drives page links every group and drive to a scoped search.
+	body := get("/drives")
+	for _, want := range []string{fmt.Sprintf(`/search?group=%d`, groups[0].ID), fmt.Sprintf(`/search?drive=%d`, res.DriveID)} {
+		if !strings.Contains(body, want) {
+			t.Errorf("drives page lacks %s", want)
+		}
+	}
+	// Searching within the group finds the clip and says so.
+	body = get(fmt.Sprintf("/search?group=%d", groups[0].ID))
+	for _, want := range []string{"1 clips", "A001C001", "Searching within", "group Studio RAIDs"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("group search lacks %q", want)
+		}
+	}
+	body = get(fmt.Sprintf("/search?client=%d", clients[0].ID))
+	if !strings.Contains(body, "1 clips") || !strings.Contains(body, "client Sockeye") {
+		t.Errorf("client search: %.300s", body)
+	}
+	// An empty group matches nothing rather than everything.
+	id, _ := s.store.CreateGroup(ctx, store.ByGroup, "Empty")
+	if body = get(fmt.Sprintf("/search?group=%d", id)); !strings.Contains(body, "0 clips") {
+		t.Errorf("empty group search should match nothing")
+	}
+	// Exports honour the scope.
+	req := httptest.NewRequest("GET", fmt.Sprintf("/export.csv?group=%d", id), nil)
+	req.AddCookie(c)
+	rec := httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+	if strings.Contains(rec.Body.String(), "A001C001") {
+		t.Errorf("csv export ignored the group scope")
+	}
+}

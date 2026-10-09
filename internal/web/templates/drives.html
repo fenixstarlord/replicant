@@ -21,17 +21,17 @@
 {{range $groups}}
 <section class="group-zone mb-5" data-group-id="{{.ID}}" ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="dropDrive(event)">
 <div class="flex items-center gap-2 mb-1">
-  {{if .Name}}<h3 class="font-semibold text-lg">{{.Name}}</h3><span class="badge badge-ghost">{{len .Drives}}</span>
+  {{if .Name}}<a href="/search?{{$by}}={{.ID}}" class="btn btn-ghost btn-sm btn-circle" title="Search this {{$label}}" aria-label="Search this {{$label}}">{{template "icon_search"}}</a><h3 class="font-semibold text-lg">{{.Name}}</h3><span class="badge badge-ghost">{{len .Drives}}</span>
     <form method="post" action="/drives/groups/{{.ID}}/delete" class="ml-1" onsubmit="return confirm('Remove “{{.Name}}”? Its drives stay.')"><input type="hidden" name="kind" value="{{$by}}"><button class="btn btn-ghost btn-xs btn-circle" title="Remove {{$label}}" aria-label="Remove {{$label}}">{{template "icon_trash"}}</button></form>
   {{else}}<h3 class="font-semibold text-lg muted">{{if eq $by "client"}}No client{{else}}Ungrouped{{end}}</h3><span class="badge badge-ghost">{{len .Drives}}</span>{{end}}
 </div>
 <div class="overflow-x-auto rounded-box border border-base-300 bg-base-100 min-h-14">
 <table class="table">
-<thead><tr><th class="w-8"></th><th>Name</th><th>Label</th><th>Location</th><th>Filesystem</th><th class="num">Capacity</th><th>Used</th><th class="num">Free</th><th class="num">Files</th><th class="num">Clips</th><th class="num">Scans</th><th>Last scan</th><th></th></tr></thead>
+<thead><tr><th class="w-8"></th><th>Name</th><th>Label</th><th>Location</th><th>Filesystem</th><th class="num">Capacity</th><th>Used</th><th class="num">Free</th><th class="num">Files</th><th class="num">Clips</th><th class="num">Scans</th><th>Last scan</th></tr></thead>
 <tbody>
 {{range .Drives}}<tr class="hover drive-row" draggable="true" data-drive-id="{{.ID}}" ondragstart="dragDrive(event)" ondragend="dragEnd(event)">
   <td class="muted cursor-grab">{{template "icon_grip"}}</td>
-  <td><a href="/browse/{{.ID}}" class="link link-hover font-medium inline-flex items-center gap-2">{{template "icon_drive"}}{{.Name}}</a></td>
+  <td class="whitespace-nowrap"><a href="/search?drive={{.ID}}" class="btn btn-ghost btn-sm btn-circle mr-1 align-middle" title="Search this drive" aria-label="Search this drive">{{template "icon_search"}}</a><a href="/browse/{{.ID}}" class="link link-hover font-medium inline-flex items-center gap-2 align-middle">{{template "icon_drive"}}{{.Name}}</a></td>
   <td>{{or .Label "—"}}</td>
   <td>{{or .Location "—"}}</td>
   <td class="muted">{{.FSType}}</td>
@@ -42,8 +42,7 @@
   <td class="num">{{n .ClipCount}}</td>
   <td class="num">{{.ScanCount}}</td>
   <td>{{datetime .LastScannedAt}}</td>
-  <td class="text-right"><a href="/search?drive={{.ID}}" class="btn btn-ghost btn-sm btn-circle" title="Search this drive" aria-label="Search this drive">{{template "icon_search"}}</a></td>
-</tr>{{else}}<tr><td colspan="13" class="muted text-center py-4">Drop a drive here.</td></tr>{{end}}
+</tr>{{else}}<tr><td colspan="12" class="muted text-center py-4">Drop a drive here.</td></tr>{{end}}
 </tbody>
 </table>
 </div>

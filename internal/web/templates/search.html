@@ -3,6 +3,8 @@
 <form method="get" action="/search" id="searchform" class="card bg-base-100 border border-base-300"
       hx-get="/search" hx-trigger="input changed delay:300ms from:#q, change" hx-target="#results" hx-select="#results" hx-swap="outerHTML" hx-push-url="true">
   <div class="card-body gap-3">
+    {{if .Scope}}<input type="hidden" name="group" value="{{.Form.Get "group"}}"><input type="hidden" name="client" value="{{.Form.Get "client"}}">
+    <div class="flex items-center gap-2 text-sm"><span class="muted">Searching within</span><span class="badge badge-primary badge-outline gap-1">{{.Scope}}</span><a href="/search?q={{.Form.Get "q"}}" class="link link-hover muted">All drives</a></div>{{end}}
     <div class="flex gap-2 items-center flex-wrap">
       <input id="q" type="search" name="q" value="{{.Form.Get "q"}}" placeholder="Name, path, reel, camera, lens…" class="input input-bordered w-full sm:w-96" autofocus>
       <div class="join">

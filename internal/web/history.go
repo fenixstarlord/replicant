@@ -39,6 +39,9 @@ func (s *Server) handleDiff(w http.ResponseWriter, r *http.Request) {
 func (s *Server) exportClips(r *http.Request) ([]store.ClipRow, error) {
 	q := parseSearch(r)
 	q.Limit, q.Offset = 100000, 0
+	if drives, err := s.store.ListDrives(r.Context()); err == nil {
+		searchScope(r, drives, &q)
+	}
 	rows, _, err := s.store.SearchClips(r.Context(), q)
 	return rows, err
 }

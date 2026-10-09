@@ -208,16 +208,51 @@ func parseSearch(r *http.Request) store.SearchQuery {
 	return q
 }
 
+// searchScope narrows a query to the drives of a group (?group=ID) or client
+// (?client=ID) from the Drives page. An explicit ?drive= wins. It returns a
+// label for the page ("group Studio RAIDs") or "" when no scope applies.
+func searchScope(r *http.Request, drives []store.Drive, q *store.SearchQuery) string {
+	if len(q.DriveIDs) > 0 {
+		return ""
+	}
+	for _, by := range []store.Taxonomy{store.ByGroup, store.ByClient} {
+		id, err := strconv.ParseInt(r.URL.Query().Get(string(by)), 10, 64)
+		if err != nil || id <= 0 {
+			continue
+		}
+		name := ""
+		for _, d := range drives {
+			if d.SetIn(by) == id {
+				q.DriveIDs = append(q.DriveIDs, d.ID)
+				if by == store.ByClient {
+					name = d.ClientName
+				} else {
+					name = d.GroupName
+				}
+			}
+		}
+		if len(q.DriveIDs) == 0 {
+			q.DriveIDs = []int64{-1} // an empty set matches nothing
+		}
+		if name == "" {
+			name = "#" + strconv.FormatInt(id, 10)
+		}
+		return string(by) + " " + name
+	}
+	return ""
+}
+
 func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	q := parseSearch(r)
 	mode := r.URL.Query().Get("mode")
-	data := map[string]any{"Title": "Search", "Q": q, "Mode": mode, "Form": r.URL.Query()}
 	drives, err := s.store.ListDrives(ctx)
 	if err != nil {
 		s.fail(w, r, err, "drives")
 		return
 	}
+	scope := searchScope(r, drives, &q)
+	data := map[string]any{"Title": "Search", "Q": q, "Mode": mode, "Form": r.URL.Query(), "Scope": scope}
 	data["Drives"] = drives
 	groups, _ := s.store.ListGroups(ctx, store.ByGroup)
 	data["Groups"] = groups
