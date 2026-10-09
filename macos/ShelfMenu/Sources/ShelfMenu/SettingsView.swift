@@ -50,6 +50,9 @@ struct SettingsView: View {
                                 if t.available {
                                     Text(t.displayName)
                                     Text(t.version ?? "found").font(.caption).foregroundStyle(.secondary)
+                                } else if let v = t.version, !v.isEmpty {
+                                    Text(t.displayName)
+                                    Text(v).font(.caption).foregroundStyle(.orange)
                                 } else if let url = t.vendorURL {
                                     Link(t.displayName, destination: url)
                                     Text("Not installed · needed for \(t.formats) · click to download").font(.caption).foregroundStyle(.secondary)

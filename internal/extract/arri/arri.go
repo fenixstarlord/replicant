@@ -73,7 +73,12 @@ func (e *Extractor) Available(ctx context.Context) (bool, string) {
 	if e.bin == "" {
 		return false, ""
 	}
-	return true, extract.VersionLine(ctx, e.bin, "--version")
+	v := extract.VersionLine(ctx, e.bin, "--version")
+	if strings.Contains(v, "Library not loaded") || strings.Contains(v, "disallowed by system policy") {
+		// Downloaded but still quarantined: macOS refuses to load its libraries.
+		return false, "blocked by macOS quarantine; see docs/tools.md"
+	}
+	return true, v
 }
 
 // Matches accepts ARRIRAW sequences and ARRI-named MXF/MOV/ARI/ARX clips.
