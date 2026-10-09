@@ -71,11 +71,11 @@
   {{if .Mounts}}<p class="muted text-xs mt-2">Mounted here: {{range $i, $m := .Mounts}}{{if $i}}, {{end}}<code class="mono">{{$m.Path}}</code>{{end}}</p>{{end}}
 </div></div>
 
-<h2>Groups</h2>
-<div class="card bg-base-100 border border-base-300"><div class="card-body text-sm">
-  {{if .Groups}}<ul class="flex flex-wrap gap-2">{{range .Groups}}<li><a href="/drives#g-{{.ID}}" class="badge badge-outline badge-lg">{{.Name}} · {{.Count}}</a></li>{{end}}</ul>
-  {{else}}<p class="muted">No groups yet.</p>{{end}}
-  <p class="muted mt-2">Assign a drive to a group from the Group field in its inspector. Groups disappear when their last drive leaves.</p>
+<h2>Groups and clients</h2>
+<div class="card bg-base-100 border border-base-300"><div class="card-body text-sm gap-3">
+  <div><span class="font-medium">Groups:</span> {{if .Groups}}{{range $i, $g := .Groups}}{{if $i}} {{end}}<a href="/drives?by=group" class="badge badge-outline">{{$g.Name}} · {{$g.Count}}</a>{{end}}{{else}}<span class="muted">none yet</span>{{end}}</div>
+  <div><span class="font-medium">Clients:</span> {{if .Clients}}{{range $i, $g := .Clients}}{{if $i}} {{end}}<a href="/drives?by=client" class="badge badge-outline">{{$g.Name}} · {{$g.Count}}</a>{{end}}{{else}}<span class="muted">none yet</span>{{end}}</div>
+  <p class="muted">Create either with the + button on the Drives page and drag drives in, or type a name in a drive's inspector. A drive can be in one group and belong to one client.</p>
 </div></div>
 
 <p class="muted text-sm mt-6">API keys for the <code class="mono">shelf</code> CLI are managed on the <a href="/settings/api-keys" class="link">API keys</a> page.</p>

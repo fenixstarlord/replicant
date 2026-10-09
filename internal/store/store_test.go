@@ -36,7 +36,7 @@ func TestMigrateIsIdempotentAndUsesWAL(t *testing.T) {
 		t.Fatal(err)
 	}
 	var n int
-	if err := s.DB.QueryRow(`SELECT count(*) FROM schema_migrations`).Scan(&n); err != nil || n != 3 {
+	if err := s.DB.QueryRow(`SELECT count(*) FROM schema_migrations`).Scan(&n); err != nil || n != 4 {
 		t.Fatalf("schema_migrations rows = %d, err %v", n, err)
 	}
 	var mode string
@@ -345,44 +345,44 @@ func TestGroupsAndScanJobs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := s.SetDriveGroup(ctx, r.DriveID, "Shelf B"); err != nil {
+	if err := s.SetDriveGroup(ctx, ByGroup, r.DriveID, "Shelf B"); err != nil {
 		t.Fatal(err)
 	}
 	drives, _ := s.ListDrives(ctx)
 	if drives[0].GroupName != "Shelf B" || drives[0].GroupID == 0 {
 		t.Errorf("group not applied: %+v", drives[0])
 	}
-	groups, _ := s.ListGroups(ctx)
+	groups, _ := s.ListGroups(ctx, ByGroup)
 	if len(groups) != 1 || groups[0].Count != 1 {
 		t.Errorf("groups = %+v", groups)
 	}
-	if err := s.SetDriveGroup(ctx, r.DriveID, ""); err != nil {
+	if err := s.SetDriveGroup(ctx, ByGroup, r.DriveID, ""); err != nil {
 		t.Fatal(err)
 	}
-	if groups, _ := s.ListGroups(ctx); len(groups) != 1 || groups[0].Count != 0 {
+	if groups, _ := s.ListGroups(ctx, ByGroup); len(groups) != 1 || groups[0].Count != 0 {
 		t.Errorf("empty group should remain: %+v", groups)
 	}
-	gid, err := s.CreateGroup(ctx, "Client X")
+	gid, err := s.CreateGroup(ctx, ByClient, "Client X")
 	if err != nil || gid == 0 {
 		t.Fatalf("create group: %d %v", gid, err)
 	}
-	if again, _ := s.CreateGroup(ctx, "Client X"); again != gid {
+	if again, _ := s.CreateGroup(ctx, ByClient, "Client X"); again != gid {
 		t.Errorf("creating an existing group should return it")
 	}
-	if err := s.SetDriveGroupID(ctx, r.DriveID, gid); err != nil {
+	if err := s.SetDriveGroupID(ctx, ByClient, r.DriveID, gid); err != nil {
 		t.Fatal(err)
 	}
-	if drives, _ := s.ListDrives(ctx); drives[0].GroupID != gid {
-		t.Errorf("drive not moved by id: %+v", drives[0])
+	if drives, _ := s.ListDrives(ctx); drives[0].ClientID != gid || drives[0].ClientName != "Client X" || drives[0].GroupID != 0 {
+		t.Errorf("client not set independently of group: %+v", drives[0])
 	}
-	if err := s.SetDriveGroupID(ctx, r.DriveID, 999); err == nil {
+	if err := s.SetDriveGroupID(ctx, ByClient, r.DriveID, 999); err == nil {
 		t.Error("moving to a missing group should fail")
 	}
-	if err := s.DeleteGroup(ctx, gid); err != nil {
+	if err := s.DeleteGroup(ctx, ByClient, gid); err != nil {
 		t.Fatal(err)
 	}
-	if drives, _ := s.ListDrives(ctx); drives[0].GroupID != 0 {
-		t.Errorf("drive should be ungrouped after group delete: %+v", drives[0])
+	if drives, _ := s.ListDrives(ctx); drives[0].ClientID != 0 {
+		t.Errorf("drive should have no client after delete: %+v", drives[0])
 	}
 
 	id, err := s.CreateScanJob(ctx, ScanJob{Path: "/mnt/raid", Label: "RAID", IntervalMin: 60, Extract: true, Fingerprint: true, Enabled: true})

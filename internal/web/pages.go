@@ -70,6 +70,27 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/drives", http.StatusSeeOther)
 }
 
+const drivesByCookie = "shelf_drives_by"
+
+// drivesBy resolves which taxonomy the Drives page sections by.
+func drivesBy(w http.ResponseWriter, r *http.Request) store.Taxonomy {
+	if t := store.Taxonomy(r.URL.Query().Get("by")); t.Valid() {
+		http.SetCookie(w, &http.Cookie{Name: drivesByCookie, Value: string(t), Path: "/drives", MaxAge: 365 * 24 * 3600, SameSite: http.SameSiteLaxMode})
+		return t
+	}
+	if c, err := r.Cookie(drivesByCookie); err == nil && store.Taxonomy(c.Value).Valid() {
+		return store.Taxonomy(c.Value)
+	}
+	return store.ByGroup
+}
+
+func taxonomyFrom(r *http.Request) store.Taxonomy {
+	if t := store.Taxonomy(r.FormValue("kind")); t.Valid() {
+		return t
+	}
+	return store.ByGroup
+}
+
 func (s *Server) handleDrivesPage(w http.ResponseWriter, r *http.Request) {
 	drives, err := s.store.ListDrives(r.Context())
 	if err != nil {
@@ -83,8 +104,9 @@ func (s *Server) handleDrivesPage(w http.ResponseWriter, r *http.Request) {
 		clips += d.ClipCount
 		bytes += d.TotalBytes
 	}
-	// Every group gets a section, even when empty, so it can be a drop target.
-	groups, err := s.store.ListGroups(r.Context())
+	by := drivesBy(w, r)
+	// Every set gets a section, even when empty, so it can be a drop target.
+	groups, err := s.store.ListGroups(r.Context(), by)
 	if err != nil {
 		s.fail(w, r, err, "groups")
 		return
@@ -103,13 +125,13 @@ func (s *Server) handleDrivesPage(w http.ResponseWriter, r *http.Request) {
 	index[0] = len(byGroup)
 	byGroup = append(byGroup, group{ID: 0, Name: ""})
 	for _, d := range drives {
-		i := index[d.GroupID]
+		i := index[d.SetIn(by)]
 		byGroup[i].Drives = append(byGroup[i].Drives, d)
 	}
 	if len(groups) == 0 && len(drives) == 0 {
 		byGroup = nil
 	}
-	s.render(w, r, "drives", map[string]any{"Title": "Drives", "Drives": drives, "ByGroup": byGroup,
+	s.render(w, r, "drives", map[string]any{"Title": "Drives", "Drives": drives, "ByGroup": byGroup, "By": string(by),
 		"TotalFiles": files, "TotalClips": clips, "TotalBytes": bytes})
 }
 
@@ -140,8 +162,14 @@ func (s *Server) handleDriveEdit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if _, has := r.Form["group"]; has {
-		if err := s.store.SetDriveGroup(r.Context(), id, r.FormValue("group")); err != nil {
+		if err := s.store.SetDriveGroup(r.Context(), store.ByGroup, id, r.FormValue("group")); err != nil {
 			s.fail(w, r, err, "update group")
+			return
+		}
+	}
+	if _, has := r.Form["client"]; has {
+		if err := s.store.SetDriveGroup(r.Context(), store.ByClient, id, r.FormValue("client")); err != nil {
+			s.fail(w, r, err, "update client")
 			return
 		}
 	}
@@ -189,7 +217,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data["Drives"] = drives
-	groups, _ := s.store.ListGroups(ctx)
+	groups, _ := s.store.ListGroups(ctx, store.ByGroup)
 	data["Groups"] = groups
 	facets, err := s.store.Facets(ctx)
 	if err != nil {
@@ -330,10 +358,11 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		}
 		views = append(views, v)
 	}
-	groups, _ := s.store.ListGroups(r.Context())
+	groups, _ := s.store.ListGroups(r.Context(), store.ByGroup)
+	clients, _ := s.store.ListGroups(r.Context(), store.ByClient)
 	s.render(w, r, "settings", map[string]any{"Title": "Settings", "Backups": s.listBackups(),
 		"DefaultView": s.defaultView(r), "Jobs": views, "Mounts": scanner.Mounts(), "Groups": groups,
-		"SchedEnabled": s.cfg.Sched != nil, "Hostname": hostname(),
+		"Clients": clients, "SchedEnabled": s.cfg.Sched != nil, "Hostname": hostname(),
 		"Message": r.URL.Query().Get("msg"), "Error": r.URL.Query().Get("err")})
 }
 
@@ -521,7 +550,7 @@ func (s *Server) handleDriveMove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	gid, _ := strconv.ParseInt(r.FormValue("group_id"), 10, 64)
-	if err := s.store.SetDriveGroupID(r.Context(), id, gid); err != nil {
+	if err := s.store.SetDriveGroupID(r.Context(), taxonomyFrom(r), id, gid); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -533,11 +562,12 @@ func (s *Server) handleDriveMove(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleGroupCreate(w http.ResponseWriter, r *http.Request) {
-	if _, err := s.store.CreateGroup(r.Context(), r.FormValue("name")); err != nil {
+	t := taxonomyFrom(r)
+	if _, err := s.store.CreateGroup(r.Context(), t, r.FormValue("name")); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	http.Redirect(w, r, "/drives", http.StatusSeeOther)
+	http.Redirect(w, r, "/drives?by="+string(t), http.StatusSeeOther)
 }
 
 func (s *Server) handleGroupDelete(w http.ResponseWriter, r *http.Request) {
@@ -546,9 +576,10 @@ func (s *Server) handleGroupDelete(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	if err := s.store.DeleteGroup(r.Context(), id); err != nil {
+	t := taxonomyFrom(r)
+	if err := s.store.DeleteGroup(r.Context(), t, id); err != nil {
 		s.fail(w, r, err, "delete group")
 		return
 	}
-	http.Redirect(w, r, "/drives", http.StatusSeeOther)
+	http.Redirect(w, r, "/drives?by="+string(t), http.StatusSeeOther)
 }

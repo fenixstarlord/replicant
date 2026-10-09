@@ -464,6 +464,12 @@ func TestDefaultViewGroupsAndScanJobs(t *testing.T) {
 	if _, body := get(t, s, c, fmt.Sprintf("/browse/%d", res.DriveID)); !strings.Contains(body, `value="Shelf B"`) {
 		t.Errorf("inspector lacks the group value")
 	}
+	if rec := post(t, s, c, fmt.Sprintf("/drives/%d", res.DriveID), url.Values{"label": {""}, "location": {""}, "notes": {""}, "group": {"Shelf B"}, "client": {"Sockeye"}}); rec.Code != 303 {
+		t.Fatalf("client edit = %d", rec.Code)
+	}
+	if drives, _ := s.store.ListDrives(context.Background()); drives[0].ClientName != "Sockeye" || drives[0].GroupName != "Shelf B" {
+		t.Errorf("inspector client not saved: %+v", drives[0])
+	}
 
 	// Scan jobs: add, list, run now, delete. A missing path is refused.
 	if rec := post(t, s, c, "/settings/jobs", url.Values{"path": {"/definitely/not/here"}, "interval": {"60"}}); rec.Code != 303 || !strings.Contains(rec.Header().Get("Location"), "err=") {
@@ -509,10 +515,16 @@ func TestDefaultViewGroupsAndScanJobs(t *testing.T) {
 
 func TestGroupsCreateMoveDelete(t *testing.T) {
 	s, c, res := seedPages(t)
+	if rec := post(t, s, c, "/drives/groups", url.Values{"name": {"Client X"}, "kind": {"client"}}); rec.Code != 303 {
+		t.Fatalf("create client = %d", rec.Code)
+	}
+	if _, body := get(t, s, c, "/drives?by=client"); !strings.Contains(body, "Client X") || !strings.Contains(body, "No client") {
+		t.Errorf("client view should show the client and the no-client section")
+	}
 	if rec := post(t, s, c, "/drives/groups", url.Values{"name": {"Client X"}}); rec.Code != 303 {
 		t.Fatalf("create group = %d", rec.Code)
 	}
-	groups, _ := s.store.ListGroups(context.Background())
+	groups, _ := s.store.ListGroups(context.Background(), store.ByGroup)
 	if len(groups) != 1 || groups[0].Name != "Client X" {
 		t.Fatalf("groups = %+v", groups)
 	}
@@ -532,13 +544,26 @@ func TestGroupsCreateMoveDelete(t *testing.T) {
 	if drives, _ := s.store.ListDrives(context.Background()); drives[0].GroupID != groups[0].ID {
 		t.Errorf("drive not moved")
 	}
+	clients, _ := s.store.ListGroups(context.Background(), store.ByClient)
+	req = httptest.NewRequest("POST", fmt.Sprintf("/drives/%d/group", res.DriveID), strings.NewReader(url.Values{"group_id": {fmt.Sprint(clients[0].ID)}, "kind": {"client"}}.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Accept", "application/json")
+	req.AddCookie(c)
+	rec = httptest.NewRecorder()
+	s.ServeHTTP(rec, req)
+	if rec.Code != 204 {
+		t.Fatalf("move to client = %d %s", rec.Code, rec.Body.String())
+	}
+	if drives, _ := s.store.ListDrives(context.Background()); drives[0].ClientID != clients[0].ID || drives[0].GroupID != groups[0].ID {
+		t.Errorf("client and group should be independent: %+v", drives[0])
+	}
 	if rec := post(t, s, c, fmt.Sprintf("/drives/%d/group", res.DriveID), url.Values{"group_id": {"999"}}); rec.Code != 400 {
 		t.Errorf("move to missing group = %d", rec.Code)
 	}
 	if rec := post(t, s, c, fmt.Sprintf("/drives/groups/%d/delete", groups[0].ID), nil); rec.Code != 303 {
 		t.Errorf("delete group = %d", rec.Code)
 	}
-	if groups, _ := s.store.ListGroups(context.Background()); len(groups) != 0 {
+	if groups, _ := s.store.ListGroups(context.Background(), store.ByGroup); len(groups) != 0 {
 		t.Errorf("group not deleted")
 	}
 	if drives, _ := s.store.ListDrives(context.Background()); drives[0].GroupID != 0 {

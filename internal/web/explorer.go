@@ -103,14 +103,19 @@ func (s *Server) handleBrowse(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err, "scans")
 		return
 	}
-	groups, err := s.store.ListGroups(ctx)
+	groups, err := s.store.ListGroups(ctx, store.ByGroup)
 	if err != nil {
 		s.fail(w, r, err, "groups")
 		return
 	}
+	clients, err := s.store.ListGroups(ctx, store.ByClient)
+	if err != nil {
+		s.fail(w, r, err, "clients")
+		return
+	}
 	view := s.browseView(w, r)
 	data := map[string]any{
-		"Scans": scans, "Groups": groups,
+		"Scans": scans, "Groups": groups, "Clients": clients,
 		"Title": d.Name + " / " + p, "Drive": d, "Scan": sc, "View": view,
 		"DirPath": dirPath, "Crumbs": crumbs(dirPath), "Target": target, "IsFile": target.ID != 0 && !target.IsDir,
 	}

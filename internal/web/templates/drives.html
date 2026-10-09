@@ -9,17 +9,21 @@
   </div>
 </div>
 {{$groups := .ByGroup}}
-<div class="flex items-center gap-3 mb-2">
-  <h2 class="mt-0">Groups</h2>
-  <button type="button" class="btn btn-sm btn-circle" title="New group" aria-label="New group" onclick="document.getElementById('new-group').showModal()">{{template "icon_plus"}}</button>
-  <span class="muted text-sm">Drag a drive onto a group to move it.</span>
+{{$by := .By}}{{$label := "group"}}{{if eq $by "client"}}{{$label = "client"}}{{end}}
+<div class="flex items-center gap-3 mb-2 flex-wrap">
+  <div class="join">
+    <a href="/drives?by=group" class="join-item btn btn-sm {{if eq $by "group"}}btn-active{{end}}">Groups</a>
+    <a href="/drives?by=client" class="join-item btn btn-sm {{if eq $by "client"}}btn-active{{end}}">Clients</a>
+  </div>
+  <button type="button" class="btn btn-sm btn-circle" title="New {{$label}}" aria-label="New {{$label}}" onclick="document.getElementById('new-group').showModal()">{{template "icon_plus"}}</button>
+  <span class="muted text-sm">Drag a drive onto a {{$label}} to move it.</span>
 </div>
 {{range $groups}}
 <section class="group-zone mb-5" data-group-id="{{.ID}}" ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="dropDrive(event)">
 <div class="flex items-center gap-2 mb-1">
   {{if .Name}}<h3 class="font-semibold text-lg">{{.Name}}</h3><span class="badge badge-ghost">{{len .Drives}}</span>
-    <form method="post" action="/drives/groups/{{.ID}}/delete" class="ml-1" onsubmit="return confirm('Remove the group “{{.Name}}”? Its drives stay, ungrouped.')"><button class="btn btn-ghost btn-xs btn-circle" title="Remove group" aria-label="Remove group">{{template "icon_trash"}}</button></form>
-  {{else}}<h3 class="font-semibold text-lg muted">Ungrouped</h3><span class="badge badge-ghost">{{len .Drives}}</span>{{end}}
+    <form method="post" action="/drives/groups/{{.ID}}/delete" class="ml-1" onsubmit="return confirm('Remove “{{.Name}}”? Its drives stay.')"><input type="hidden" name="kind" value="{{$by}}"><button class="btn btn-ghost btn-xs btn-circle" title="Remove {{$label}}" aria-label="Remove {{$label}}">{{template "icon_trash"}}</button></form>
+  {{else}}<h3 class="font-semibold text-lg muted">{{if eq $by "client"}}No client{{else}}Ungrouped{{end}}</h3><span class="badge badge-ghost">{{len .Drives}}</span>{{end}}
 </div>
 <div class="overflow-x-auto rounded-box border border-base-300 bg-base-100 min-h-14">
 <table class="table">
@@ -48,14 +52,16 @@
 
 <dialog id="new-group" class="modal">
   <form method="post" action="/drives/groups" class="modal-box flex flex-col gap-3">
-    <h3 class="font-semibold">New group</h3>
-    <label class="form-control"><span class="label-text">Name</span><input class="input input-bordered" name="name" placeholder="e.g. Shelf B, Client X, 2026" required autofocus></label>
+    <input type="hidden" name="kind" value="{{$by}}">
+    <h3 class="font-semibold">New {{$label}}</h3>
+    <label class="form-control"><span class="label-text">Name</span><input class="input input-bordered" name="name" placeholder="{{if eq $by "client"}}e.g. Sockeye, Fred Hutch{{else}}e.g. Shelf B, Box 3, 2026{{end}}" required autofocus></label>
     <div class="modal-action"><button type="button" class="btn" onclick="document.getElementById('new-group').close()">Cancel</button><button class="btn btn-primary">Create</button></div>
   </form>
   <form method="dialog" class="modal-backdrop"><button>close</button></form>
 </dialog>
 
 <script>
+document.body.dataset.by = {{$by}};
 let dragged = null;
 function dragDrive(e) { dragged = e.currentTarget.dataset.driveId; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', dragged); e.currentTarget.classList.add('opacity-50'); }
 function dragEnd(e) { e.currentTarget.classList.remove('opacity-50'); document.querySelectorAll('.group-zone').forEach(z => z.classList.remove('drop-target')); }
@@ -66,7 +72,7 @@ async function dropDrive(e) {
   const zone = e.currentTarget, id = dragged; dragged = null;
   zone.classList.remove('drop-target');
   if (!id) return;
-  const body = new URLSearchParams({ group_id: zone.dataset.groupId });
+  const body = new URLSearchParams({ group_id: zone.dataset.groupId, kind: document.body.dataset.by || 'group' });
   const r = await fetch('/drives/' + id + '/group', { method: 'POST', body, headers: { 'Accept': 'application/json' } });
   if (r.ok) location.reload(); else alert('Could not move the drive: ' + (await r.text()));
 }

@@ -273,8 +273,10 @@ are attached; this RAID is not representative of the shelf drives.
 
 - **Server scans (2026-10-09):** `scan_jobs` table + `internal/sched`; one job at a time, 30 s
   tick, "Scan now" from Settings; `is_partial` applies to server scans the same way.
-- **Groups (2026-10-09):** `drive_groups` + `drives.group_id`; set from the inspector, groups
-  auto-delete when empty; the Drives page sections by group.
+- **Groups and clients (2026-10-09):** two independent taxonomies, `drive_groups`/`drives.group_id`
+  and `clients`/`drives.client_id`, both handled by `store.Taxonomy` (`ByGroup`, `ByClient`). The
+  Drives page toggles between them, creates sets with the + button, and moves drives by
+  drag-and-drop (`POST /drives/{id}/group` with `kind`). Empty sets persist until removed.
 - **Default explorer view** is a server setting (`default_view`, list unless changed) that a
   browser cookie can override; the Duplicates page was removed (other copies remain on clip and
   file pages).
