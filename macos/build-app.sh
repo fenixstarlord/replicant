@@ -36,7 +36,9 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN/ReplicantMenu" "$APP/Contents/MacOS/ReplicantMenu"
 cp dist/replicant "$APP/Contents/MacOS/replicant"
 EXTRA_PLIST=""
+UI_ELEMENT=true   # menu bar only
 if [[ $STANDALONE == 1 ]]; then
+  UI_ELEMENT=false  # Dock icon and a main window
   cp dist/replicant-server "$APP/Contents/MacOS/replicant-server"
   EXTRA_PLIST="  <key>ReplicantStandalone</key><true/>"
 fi
@@ -53,7 +55,7 @@ ${EXTRA_PLIST}
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleExecutable</key><string>ReplicantMenu</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
-  <key>LSUIElement</key><true/>
+  <key>LSUIElement</key><${UI_ELEMENT}/>
   <key>NSHighResolutionCapable</key><true/>
   <key>NSHumanReadableCopyright</key><string>Replicant</string>
 </dict></plist>

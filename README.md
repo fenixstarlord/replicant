@@ -145,11 +145,13 @@ user accordingly. The container cannot see the host's NetBird interface, hence `
 
 ### Standalone app (no server)
 
-`make standalone` builds `dist/Replicant Standalone.app`: the menu bar app with `replicant-server`
-bundled. It runs the catalog on this Mac at `http://127.0.0.1:8787` with authentication off
-(`REPLICANT_AUTH=open`, loopback only), keeps its data in `~/Library/Application Support/Replicant`, and
-connects the scanner to it automatically. There is no password and no API key: click a drive to
-scan it, "Open catalog" to browse. Its config file lives in the data folder, so it does not touch
+`make standalone` builds `dist/Replicant Standalone.app`: a regular windowed app (Dock icon, main
+window) with `replicant-server` bundled. It runs the catalog on this Mac at `http://127.0.0.1:8787`
+with authentication off (`REPLICANT_AUTH=open`, loopback only), keeps its data in
+`~/Library/Application Support/Replicant`, and connects the scanner to it automatically. The main
+window shows the catalog in a native WebKit view with back/forward/reload and a "Scan a drive"
+menu; exports land in Downloads and external links open in your browser. The menu bar icon is
+still there for quick scans. There is no password and no API key. Its config file lives in the data folder, so it does not touch
 a `~/.config/replicant/config.toml` set up for a remote server.
 
 ## Building the stylesheet

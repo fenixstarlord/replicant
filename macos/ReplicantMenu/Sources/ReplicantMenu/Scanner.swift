@@ -146,6 +146,7 @@ final class ScanManager: ObservableObject {
         current = nil
         status = ""
         onFinished?(url, ok)
+        NotificationCenter.default.post(name: .scanFinished, object: nil)
         let content = UNMutableNotificationContent()
         content.title = ok ? "Scanned \(name)" : "Scan of \(name) failed"
         content.body = summary

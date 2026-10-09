@@ -8,10 +8,9 @@ struct MenuContent: View {
     @EnvironmentObject var toolsCheck: ToolChecker
     @EnvironmentObject var autoScan: AutoScanner
     @EnvironmentObject var local: LocalServer
-
     var body: some View {
         if LocalServer.isStandalone {
-            Button(local.running ? "Open catalog" : local.status) { local.open() }.disabled(!local.running)
+            Button(local.running ? "Open Replicant" : local.status) { local.open() }.disabled(!local.running)
             Divider()
         }
         if let name = scans.current {

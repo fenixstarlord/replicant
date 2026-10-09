@@ -321,7 +321,11 @@ reads `replicant doctor --json` to report missing metadata tools with a link to 
   `auth: "open"` and `replicant login <url>` then saves an empty token. `make standalone` builds
   `dist/Replicant Standalone.app`, the menu bar app plus a bundled `replicant-server` that
   `LocalServer.swift` runs on 127.0.0.1:8787 with data in `~/Library/Application Support/Replicant`
-  (`Info.plist` key `ReplicantStandalone`; the CLI gets `REPLICANT_CONFIG` in that folder).
+  (`Info.plist` key `ReplicantStandalone`; the CLI gets `REPLICANT_CONFIG` in that folder). It is a
+  regular app (`LSUIElement` false) whose main window (`CatalogWindow.swift`, an AppKit NSWindow
+  hosting a WKWebView; SwiftUI `Window` scenes cannot be conditional, so the menu-bar-only build
+  simply never creates it) shows the catalog; downloads go to ~/Downloads, external links to the
+  browser, `confirm()` dialogs become NSAlerts.
 
 ## Open questions (ask the user, don't guess)
 

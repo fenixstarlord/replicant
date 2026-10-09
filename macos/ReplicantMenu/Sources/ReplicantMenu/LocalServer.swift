@@ -99,7 +99,10 @@ final class LocalServer: ObservableObject {
         status = "The catalog did not start; check \(Self.dataDir.path)"
     }
 
-    func open() {
+    /// Shows the catalog window.
+    func open() { CatalogWindow.shared.show() }
+
+    func openInBrowser() {
         NSWorkspace.shared.open(URL(string: Self.url)!)
     }
 

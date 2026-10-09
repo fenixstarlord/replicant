@@ -19,10 +19,10 @@ struct SettingsView: View {
                     LabeledContent("Built-in server") { Text(local.status).textSelection(.enabled) }
                     LabeledContent("Data") { Text(LocalServer.dataDir.path).textSelection(.enabled) }
                     HStack {
-                        Button("Open catalog") { local.open() }.disabled(!local.running)
+                        Button("Open in browser") { local.openInBrowser() }.disabled(!local.running)
                         Button("Show data folder") { NSWorkspace.shared.activateFileViewerSelecting([LocalServer.dataDir]) }
                     }
-                    Text("This app runs its own catalog on this Mac, no server or API key needed. Scans go straight into it; open the catalog in your browser to search. Back it up by copying the data folder.")
+                    Text("This app runs its own catalog on this Mac, no server or API key needed. Scans go straight into it; the main window is the catalog. Back it up by copying the data folder.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
             } else {
