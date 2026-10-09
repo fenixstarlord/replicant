@@ -27,6 +27,8 @@ type Config struct {
 	Version       string
 	MaxUploadSize int64     // bytes; 0 means 4 GiB
 	Sched         Scheduler // server-side scans; nil disables the section
+	Listen        string    // listen address, for the port in connection strings
+	PublicURL     string    // SHELF_PUBLIC_URL: address clients use; overrides detection
 }
 
 // Scheduler is what the settings page needs from the scan scheduler.

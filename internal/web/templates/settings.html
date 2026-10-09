@@ -19,6 +19,28 @@
 </div></div>
 </div>
 
+<h2 id="address">Server address</h2>
+<div class="card bg-base-100 border border-base-300"><div class="card-body">
+  <p class="muted text-sm">The address baked into new API keys, so a Mac can reach this server after pasting a key. Currently <span class="mono">{{.Address}}</span> ({{.AddressSource}}).</p>
+  {{if .AddressLocked}}
+  <p class="text-sm">Set by <code class="mono">SHELF_PUBLIC_URL</code> in the server's environment; change it there.</p>
+  {{else}}
+  <form method="post" action="/settings/address" class="flex items-end gap-2 flex-wrap">
+    <label class="form-control flex-1 min-w-64"><span class="label-text">Address</span><input id="address-input" class="input input-bordered input-sm w-full mono" name="address" value="{{.AddressSaved}}" placeholder="auto-detect" list="address-candidates"></label>
+    <button class="btn btn-sm btn-primary">Save</button>
+    <button class="btn btn-sm btn-ghost" type="button" onclick="document.getElementById('address-input').value=''">Clear</button>
+  </form>
+  {{if .Addresses}}
+  <div class="flex items-center gap-2 flex-wrap text-sm">
+    <span class="muted">Detected on this server:</span>
+    {{range .Addresses}}<button type="button" class="btn btn-xs {{if eq .Kind "netbird"}}btn-outline btn-success{{else}}btn-outline{{end}}" onclick="document.getElementById('address-input').value='http://{{.IP}}:{{$.Port}}'" title="{{.Iface}}">{{.Label}} <span class="mono">{{.IP}}</span></button>{{end}}
+  </div>
+  <datalist id="address-candidates">{{range .Addresses}}<option value="http://{{.IP}}:{{$.Port}}">{{.Label}}</option>{{end}}</datalist>
+  {{end}}
+  <p class="muted text-sm">Leave it empty to auto-detect: a NetBird interface is preferred, then the address this page was opened with. Running in Docker, the container cannot see the host's NetBird interface, so set the address here or with <code class="mono">SHELF_PUBLIC_URL</code>.</p>
+  {{end}}
+</div></div>
+
 <h2 id="explorer">Explorer</h2>
 <div class="card bg-base-100 border border-base-300"><div class="card-body">
   <form method="post" action="/settings/view" class="flex items-center gap-4 flex-wrap">

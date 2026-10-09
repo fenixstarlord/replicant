@@ -293,6 +293,15 @@ reads `shelf doctor --json` to report missing metadata tools with a link to `doc
   and `clients`/`drives.client_id`, both handled by `store.Taxonomy` (`ByGroup`, `ByClient`). The
   Drives page toggles between them, creates sets with the + button, and moves drives by
   drag-and-drop (`POST /drives/{id}/group` with `kind`). Empty sets persist until removed.
+- **Connection keys (2026-10-09):** an API key is handed out as one pasteable string,
+  `shelf://<token>@<host>:<port>` (`shelfs://` for https), built by `client.ConnectionString` and
+  read by `client.ParseConnection`; `shelf login <key>` and the menu bar app's single "Connection
+  key" field accept it, and the old `login <url> --token` form still works. The address comes from
+  `web.PublicURL`: `SHELF_PUBLIC_URL` > the `public_url` setting (Settings → Server address) > a
+  host in `SHELF_LISTEN` > a detected NetBird interface (`wt0`, or any 100.64.0.0/10 address) >
+  the request's host. Docker cannot see the host's NetBird interface, so set `SHELF_PUBLIC_URL`
+  there. Note: on this Mac NetBird runs in userspace mode and the server does not answer on its
+  own NetBird IP from the same machine; other peers reach it fine.
 - **Default explorer view** is a server setting (`default_view`, list unless changed) that a
   browser cookie can override; the Duplicates page was removed (other copies remain on clip and
   file pages).

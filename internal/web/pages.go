@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/fenixstarlord/indexserver/internal/bundle"
+	"github.com/fenixstarlord/indexserver/internal/client"
 	"github.com/fenixstarlord/indexserver/internal/scanner"
 	"github.com/fenixstarlord/indexserver/internal/store"
 )
@@ -47,6 +48,7 @@ func (s *Server) pageRoutes() {
 	m.Handle("POST /settings/jobs/{id}", auth(s.handleJobUpdate))
 	m.Handle("POST /settings/jobs/{id}/run", auth(s.handleJobRun))
 	m.Handle("POST /settings/jobs/{id}/delete", auth(s.handleJobDelete))
+	m.Handle("POST /settings/address", auth(s.handleSettingsAddress))
 	m.Handle("GET /settings/api-keys", auth(s.handleAPIKeys))
 	m.Handle("POST /settings/tokens", auth(s.handleTokenCreate))
 	m.Handle("POST /settings/tokens/{id}/revoke", auth(s.handleTokenRevoke))
@@ -360,10 +362,39 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	groups, _ := s.store.ListGroups(r.Context(), store.ByGroup)
 	clients, _ := s.store.ListGroups(r.Context(), store.ByClient)
+	addr, src := s.publicURL(r.Context(), r)
+	saved, _ := s.store.GetSetting(r.Context(), publicURLSetting)
 	s.render(w, r, "settings", map[string]any{"Title": "Settings", "Backups": s.listBackups(),
 		"DefaultView": s.defaultView(r), "Jobs": views, "Mounts": scanner.Mounts(), "Groups": groups,
 		"Clients": clients, "SchedEnabled": s.cfg.Sched != nil, "Hostname": hostname(),
+		"Address": addr, "AddressSource": src, "AddressSaved": saved, "AddressLocked": s.cfg.PublicURL != "",
+		"Addresses": detectAddresses(), "Port": listenPort(s.cfg.Listen),
 		"Message": r.URL.Query().Get("msg"), "Error": r.URL.Query().Get("err")})
+}
+
+// handleSettingsAddress saves the address baked into connection strings.
+// An empty value goes back to auto-detection.
+func (s *Server) handleSettingsAddress(w http.ResponseWriter, r *http.Request) {
+	v := strings.TrimSpace(r.FormValue("address"))
+	if v != "" {
+		if !strings.Contains(v, "://") {
+			v = "http://" + v
+		}
+		if _, err := url.Parse(v); err != nil {
+			http.Redirect(w, r, "/settings?err="+url.QueryEscape("Not a valid address: "+v)+"#address", http.StatusSeeOther)
+			return
+		}
+		v = strings.TrimRight(v, "/")
+	}
+	if err := s.store.SetSetting(r.Context(), publicURLSetting, v); err != nil {
+		s.fail(w, r, err, "save address")
+		return
+	}
+	msg := "Server address saved."
+	if v == "" {
+		msg = "Server address will be detected automatically."
+	}
+	http.Redirect(w, r, "/settings?msg="+url.QueryEscape(msg)+"#address", http.StatusSeeOther)
 }
 
 func hostname() string {
@@ -474,7 +505,8 @@ func (s *Server) handleAPIKeys(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err, "tokens")
 		return
 	}
-	s.render(w, r, "apikeys", map[string]any{"Title": "API keys", "Tokens": toks, "Host": r.Host,
+	addr, src := s.publicURL(r.Context(), r)
+	s.render(w, r, "apikeys", map[string]any{"Title": "API keys", "Tokens": toks, "Address": addr, "AddressSource": src,
 		"Message": r.URL.Query().Get("msg")})
 }
 
@@ -489,8 +521,14 @@ func (s *Server) handleTokenCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	toks, _ := s.store.ListTokens(r.Context())
-	s.render(w, r, "apikeys", map[string]any{"Title": "API keys", "Tokens": toks, "Host": r.Host,
-		"NewToken": plain, "NewTokenName": name})
+	addr, src := s.publicURL(r.Context(), r)
+	conn, err := client.ConnectionString(addr, plain)
+	if err != nil {
+		s.log.Warn("connection string", "address", addr, "err", err)
+		conn = plain
+	}
+	s.render(w, r, "apikeys", map[string]any{"Title": "API keys", "Tokens": toks, "Address": addr, "AddressSource": src,
+		"NewToken": plain, "NewTokenName": name, "Connection": conn})
 }
 
 func (s *Server) handleTokenRevoke(w http.ResponseWriter, r *http.Request) {

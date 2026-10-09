@@ -355,7 +355,7 @@ func TestAPIKeyCreateAndRevokeViaUI(t *testing.T) {
 	rec := httptest.NewRecorder()
 	s.ServeHTTP(rec, req)
 	body := rec.Body.String()
-	if rec.Code != 200 || !strings.Contains(body, "shelf_") || !strings.Contains(body, "MacBook Pro") || !strings.Contains(body, "shown only once") {
+	if rec.Code != 200 || !strings.Contains(body, "shelf://shelf_") || !strings.Contains(body, "MacBook Pro") || !strings.Contains(body, "shown only once") {
 		t.Fatalf("create key: %d %.300s", rec.Code, body)
 	}
 	toks, _ := s.store.ListTokens(context.Background())

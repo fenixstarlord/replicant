@@ -4,8 +4,7 @@ struct SettingsView: View {
     @EnvironmentObject var volumes: VolumeMonitor
     @EnvironmentObject var settings: AppSettings
     @EnvironmentObject var toolsCheck: ToolChecker
-    @State private var server = ""
-    @State private var token = ""
+    @State private var connection = ""
     @State private var message = ""
     @State private var busy = false
     @State private var newIgnore = ""
@@ -13,14 +12,21 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section("Server") {
-                TextField("Server URL", text: $server, prompt: Text("http://shelf.netbird.cloud:8080"))
-                SecureField("API key", text: $token, prompt: Text(settings.hasToken ? "saved (leave blank to keep)" : "shelf_…"))
+                if !settings.server.isEmpty {
+                    LabeledContent("Connected to") {
+                        Text(settings.server).textSelection(.enabled)
+                        if !settings.hasToken { Text("(no key saved)").foregroundStyle(.orange) }
+                    }
+                }
+                TextField("Connection key", text: $connection, prompt: Text("shelf://shelf_…@host:8080"))
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit { Task { await save() } }
                 HStack {
                     Button(busy ? "Checking…" : "Save and test") { Task { await save() } }
-                        .disabled(busy || server.isEmpty)
+                        .disabled(busy || connection.trimmingCharacters(in: .whitespaces).isEmpty)
                     if !message.isEmpty { Text(message).font(.caption).foregroundStyle(message.hasPrefix("OK") ? .green : .red) }
                 }
-                Text("Create a key on the server under API keys. Settings are stored in ~/.config/shelf/config.toml, shared with the shelf command.")
+                Text("Create a key on the server under API keys and paste it here; it includes the server address. Settings are stored in ~/.config/shelf/config.toml, shared with the shelf command.")
                     .font(.caption).foregroundStyle(.secondary)
             }
             Section("Ignore these drives") {
@@ -90,23 +96,22 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .onAppear { server = settings.server }
     }
 
     private func save() async {
         busy = true
         defer { busy = false }
-        var args = ["login", server.trimmingCharacters(in: .whitespaces)]
+        let value = connection.trimmingCharacters(in: .whitespacesAndNewlines)
         var stdin: String? = nil
-        if !token.isEmpty { stdin = token + "\n" } else {
-            // Keep the saved token: pass it back through stdin by reading the config.
-            if let saved = savedToken() { stdin = saved + "\n" } else { message = "Enter the API key"; return }
+        if !value.contains("@") {
+            // A bare server URL: keep the saved key, if there is one.
+            guard let saved = savedToken() else { message = "Paste the whole key from the server's API keys page"; return }
+            stdin = saved + "\n"
         }
-        _ = args
-        let (code, out) = await ShelfCLI.run(args, stdin: stdin)
+        let (code, out) = await ShelfCLI.run(["login", value], stdin: stdin)
         settings.reload()
         message = code == 0 ? "OK: " + out.trimmingCharacters(in: .whitespacesAndNewlines) : out.trimmingCharacters(in: .whitespacesAndNewlines)
-        if code == 0 { token = "" }
+        if code == 0 { connection = "" }
     }
 
     private func savedToken() -> String? {

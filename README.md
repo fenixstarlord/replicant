@@ -23,8 +23,8 @@ In another terminal:
 
 ```bash
 make build
-SHELF_DATA_DIR=./data ./bin/shelf-server token create laptop   # prints a token once
-./bin/shelf login http://127.0.0.1:8080 --token shelf_...
+SHELF_DATA_DIR=./data ./bin/shelf-server token create laptop   # prints a key once (or use the API keys page)
+./bin/shelf login 'shelf://shelf_...@127.0.0.1:8080'           # paste the key; it carries the server address
 ./bin/shelf doctor                                             # which extractors are available
 ./bin/shelf scan /Volumes/MyDrive                              # scan and push
 ```
@@ -34,7 +34,8 @@ Open <http://127.0.0.1:8080>, log in with the password, and the drive appears un
 ## CLI
 
 ```
-shelf login <server-url> [--token T]   save server + token to ~/.config/shelf/config.toml
+shelf login <key>                      save server + key to ~/.config/shelf/config.toml
+shelf login <server-url> [--token T]   same, with the key given separately (prompted if omitted)
 shelf doctor                           show extractors, tool availability, versions
 shelf scan /Volumes/X                  scan and push to the server
 shelf scan /Volumes/X -o x.shelf       scan to a bundle file (no network)
@@ -63,9 +64,9 @@ redline = "/Applications/REDCINE-X Professional/REDCINE-X PRO.app/Contents/MacOS
 
 `make app` builds `dist/Shelf.app`, a menu bar app with the `shelf` CLI bundled inside. Drag it to
 Applications and open it. From the drop-down, click a drive to scan it and push it to the server;
-Browse… scans a folder or network share instead. Settings… holds the server URL and API key
-(stored in the same `~/.config/shelf/config.toml` the CLI uses), drives to ignore, and launch at
-login. Scans run one at a time; a notification reports each result.
+Browse… scans a folder or network share instead. Settings… takes the connection key from the
+server's API keys page (one string with the address and the key, stored in the same
+`~/.config/shelf/config.toml` the CLI uses), drives to ignore, and launch at login. Scans run one at a time; a notification reports each result.
 
 ## Server
 
@@ -77,12 +78,13 @@ Environment variables:
 | `SHELF_DATA_DIR` | `/data` | where `shelf.db`, uploads and backups live |
 | `SHELF_LISTEN` | `:8080` | listen address |
 | `SHELF_SESSION_SECRET` | auto | cookie signing key; generated and persisted if unset |
+| `SHELF_PUBLIC_URL` | auto | address baked into API keys, e.g. `http://100.64.0.5:8080`; see Remote access |
 
 Commands:
 
 ```
 shelf-server                      serve (default)
-shelf-server token create <name>  mint an API key for the CLI (or use the API keys page in the web UI)
+shelf-server token create <name>  mint an API key (or use the API keys page in the web UI)
 shelf-server token list | revoke <id>
 shelf-server ingest <file.shelf>  import a bundle without HTTP
 shelf-server backup <path|dir>    consistent copy of the database (VACUUM INTO)
@@ -92,10 +94,19 @@ API (bearer token): `POST /api/scans` (bundle body), `GET /api/drives`, `GET /ap
 
 ### Remote access
 
-Run the server on the home server and reach it over NetBird. Bind to the NetBird or LAN
-interface only, for example `SHELF_LISTEN=100.64.0.5:8080`, and point the CLI at it:
-`shelf login http://shelf.netbird.cloud:8080`. The server does not terminate TLS; keep it off the
-public internet.
+Run the server on the home server and reach it over NetBird. An API key is a connection string
+such as `shelf://shelf_abc@100.64.0.5:8080`, so the Mac needs only one paste. The address in it
+is resolved in this order:
+
+1. `SHELF_PUBLIC_URL`, for Docker, where the container cannot see the host's interfaces.
+2. Settings → Server address in the web UI (the detected interfaces are offered as buttons).
+3. A host in `SHELF_LISTEN`, e.g. `SHELF_LISTEN=100.64.0.5:8080`, which also binds only there.
+4. The server's NetBird interface (`wt0`, or any 100.64.0.0/10 address), detected automatically
+   when the server runs directly on the host.
+5. The address the browser used to open the API keys page.
+
+The server does not terminate TLS; keep it off the public internet. For HTTPS behind a proxy, set
+`SHELF_PUBLIC_URL=https://…` and keys become `shelfs://…`.
 
 ### Docker
 

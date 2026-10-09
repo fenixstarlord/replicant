@@ -12,6 +12,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 	"text/tabwriter"
 	"time"
@@ -19,6 +20,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/fenixstarlord/indexserver/internal/bundle"
+	"github.com/fenixstarlord/indexserver/internal/client"
 	"github.com/fenixstarlord/indexserver/internal/sched"
 	"github.com/fenixstarlord/indexserver/internal/store"
 	"github.com/fenixstarlord/indexserver/internal/web"
@@ -93,6 +95,7 @@ func serve(parent context.Context) error {
 	scheduler := sched.New(st, log, version)
 	scheduler.Start(ctx)
 
+	listen := envOr("SHELF_LISTEN", ":8080")
 	handler, err := web.New(ctx, st, web.Config{
 		Password:      os.Getenv("SHELF_PASSWORD"),
 		PasswordHash:  os.Getenv("SHELF_PASSWORD_HASH"),
@@ -100,12 +103,13 @@ func serve(parent context.Context) error {
 		DataDir:       dataDir(),
 		Version:       version,
 		Sched:         scheduler,
+		Listen:        listen,
+		PublicURL:     os.Getenv("SHELF_PUBLIC_URL"),
 	}, log)
 	if err != nil {
 		return err
 	}
 
-	listen := envOr("SHELF_LISTEN", ":8080")
 	srv := &http.Server{
 		Addr:              listen,
 		Handler:           handler,
@@ -143,8 +147,17 @@ func newTokenCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.ErrOrStderr(), "token %d (%s) created. It is shown once; store it with:\n  shelf login <server-url> --token <token>\n", id, args[0])
-			fmt.Fprintln(cmd.OutOrStdout(), plain)
+			addr, src := web.PublicURL(cmd.Context(), st, os.Getenv("SHELF_PUBLIC_URL"), envOr("SHELF_LISTEN", ":8080"))
+			if addr == "" {
+				h, _ := os.Hostname()
+				addr, src = "http://"+h+":"+strings.TrimPrefix(envOr("SHELF_LISTEN", ":8080"), ":"), "hostname"
+			}
+			conn, err := client.ConnectionString(addr, plain)
+			if err != nil {
+				conn = plain
+			}
+			fmt.Fprintf(cmd.ErrOrStderr(), "key %d (%s) created. It is shown once. On the Mac, paste it into Shelf's Settings or run:\n  shelf login '<key>'\nServer address %s (%s); set SHELF_PUBLIC_URL or Settings → Server address to change it.\n", id, args[0], addr, src)
+			fmt.Fprintln(cmd.OutOrStdout(), conn)
 			return nil
 		},
 	})

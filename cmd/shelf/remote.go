@@ -32,28 +32,43 @@ func loadClient() (*client.Client, error) {
 func newLoginCmd() *cobra.Command {
 	var token string
 	cmd := &cobra.Command{
-		Use:   "login <server-url>",
-		Short: "Save the server address and an API token",
-		Long: `Store the server URL and an API token in ~/.config/shelf/config.toml.
-Create a token on the server with: shelf-server token create <name>
-The token is read from --token, or prompted for without echo.`,
+		Use:   "login <connection-key | server-url>",
+		Short: "Save the server address and an API key",
+		Long: `Store the server URL and an API key in ~/.config/shelf/config.toml.
+
+Create a key on the server's API keys page. It looks like
+  shelf://shelf_abc123@100.64.0.5:8080
+and carries the server address, so this is enough:
+  shelf login 'shelf://shelf_abc123@100.64.0.5:8080'
+
+A plain server URL also works; the key is then read from --token, or
+prompted for without echo.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			server, embedded, err := client.ParseConnection(args[0])
+			if err != nil {
+				return err
+			}
 			if token == "" {
-				var err error
-				token, err = promptSecret(cmd, "API token: ")
+				token = embedded
+			}
+			if token == "" {
+				token, err = promptSecret(cmd, "API key: ")
 				if err != nil {
 					return err
 				}
 			}
 			token = strings.TrimSpace(token)
-			c, err := client.New(args[0], token)
+			if token == "" {
+				return errors.New("an API key is required")
+			}
+			c, err := client.New(server, token)
 			if err != nil {
 				return err
 			}
 			me, err := c.Me(cmd.Context())
 			if err != nil {
-				return fmt.Errorf("could not verify token with %s: %w", c.Server, err)
+				return fmt.Errorf("could not verify the key with %s: %w", c.Server, err)
 			}
 			cfg, err := cliconfig.Load()
 			if err != nil {
@@ -64,11 +79,11 @@ The token is read from --token, or prompted for without echo.`,
 				return err
 			}
 			p, _ := cliconfig.Path()
-			fmt.Fprintf(cmd.OutOrStdout(), "logged in to %s as token %q (server %s); saved to %s\n", c.Server, me.TokenName, me.Version, p)
+			fmt.Fprintf(cmd.OutOrStdout(), "logged in to %s as key %q (server %s); saved to %s\n", c.Server, me.TokenName, me.Version, p)
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&token, "token", "", "API token (prompted if omitted)")
+	cmd.Flags().StringVar(&token, "token", "", "API key, if not part of the first argument (prompted if omitted)")
 	return cmd
 }
 

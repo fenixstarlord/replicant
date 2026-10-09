@@ -1,19 +1,24 @@
 {{define "content"}}
 <h1>API keys</h1>
-<p class="muted text-sm mt-1">The <code class="mono">shelf</code> command on your Mac uses a key to push scans. Create one per machine so you can revoke it later.</p>
+<p class="muted text-sm mt-1">Shelf on your Mac uses a key to push scans. Create one per machine so you can revoke it later. A key carries the server address, so there is one thing to paste.</p>
 {{if .Message}}<div role="alert" class="alert alert-success text-sm my-3">{{.Message}}</div>{{end}}
 {{if .NewToken}}
-<div role="alert" class="alert alert-success my-4 flex-col items-start gap-2">
-  <div><strong>New key{{if .NewTokenName}} “{{.NewTokenName}}”{{end}} created.</strong> It is shown only once; copy it now.</div>
-  <div class="flex items-center gap-2 w-full"><code id="newkey" class="mono bg-base-100 px-2 py-1 rounded flex-1 break-all">{{.NewToken}}</code><button type="button" class="btn btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('newkey').textContent).then(()=>{this.textContent='Copied'})">Copy</button></div>
-  <div class="text-sm">On the Mac: <code class="mono">shelf login http://{{.Host}} --token {{.NewToken}}</code></div>
-</div>
+<div class="card bg-base-100 border-2 border-success my-4"><div class="card-body gap-3">
+  <h2 class="card-title text-base mt-0">New key{{if .NewTokenName}} “{{.NewTokenName}}”{{end}} created</h2>
+  <p class="text-sm">It is shown only once. Copy it now and paste it into Shelf on the Mac (Settings → Connection key).</p>
+  <div class="join w-full">
+    <input id="newkey" class="input input-bordered mono join-item flex-1 min-w-0" readonly value="{{.Connection}}" onclick="this.select()">
+    <button type="button" class="btn btn-primary join-item" onclick="navigator.clipboard.writeText(document.getElementById('newkey').value).then(()=>{this.textContent='Copied'})">Copy</button>
+  </div>
+  <p class="muted text-sm">The key includes the server address <span class="mono">{{.Address}}</span> ({{.AddressSource}}). From a terminal: <code class="mono">shelf login '{{.Connection}}'</code></p>
+</div></div>
 {{end}}
 <div class="card bg-base-100 border border-base-300 my-4"><div class="card-body">
   <h2 class="card-title text-base mt-0">Create a key</h2>
   <form method="post" action="/settings/tokens" class="flex gap-2 items-end flex-wrap">
     <label class="form-control"><span class="label-text">Name</span><input class="input input-bordered input-sm w-64" name="name" placeholder="e.g. MacBook Pro" required></label>
     <button class="btn btn-primary btn-sm">Create key</button>
+    <span class="muted text-sm basis-full">New keys point to <span class="mono">{{.Address}}</span> ({{.AddressSource}}). <a href="/settings#address" class="link link-hover">Change</a></span>
   </form>
 </div></div>
 <div class="overflow-x-auto rounded-box border border-base-300 bg-base-100"><table class="table table-sm"><thead><tr><th>Name</th><th>Created</th><th>Last used</th><th></th></tr></thead><tbody>
