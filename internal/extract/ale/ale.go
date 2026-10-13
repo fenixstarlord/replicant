@@ -117,6 +117,10 @@ func (e *Extractor) lookup(c *clips.Clip) (Row, bool) {
 	return Row{}, false
 }
 
+// Input is empty: the extractor reads no clip file, only the ALEs it
+// loaded on first use.
+func (e *Extractor) Input(*clips.Clip) string { return "" }
+
 func (e *Extractor) Matches(c *clips.Clip) bool {
 	if len(e.files) == 0 {
 		return false

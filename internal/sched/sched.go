@@ -171,6 +171,7 @@ func (s *Scheduler) scan(ctx context.Context, j store.ScanJob, st *runState) (st
 		return store.IngestResult{}, fmt.Errorf("%s is not a directory", j.Path)
 	}
 	opts := scanner.Options{Fast: !j.Extract, Fingerprint: j.Fingerprint, Tools: s.tools, Version: s.version + " (server)"}
+	stopKeepalive := s.keepalive(ctx, st)
 	res, err := scanner.Run(ctx, j.Path, opts, func(p scanner.Progress) {
 		s.mu.Lock()
 		st.Stage, st.Done, st.Total = p.Stage, p.Done, p.Total
@@ -183,6 +184,7 @@ func (s *Scheduler) scan(ctx context.Context, j store.ScanJob, st *runState) (st
 			_ = s.store.UpdateActivity(ctx, st.activity, p.Stage, p.Done, p.Total, "", "")
 		}
 	})
+	stopKeepalive()
 	if err != nil {
 		return store.IngestResult{}, err
 	}
@@ -193,4 +195,40 @@ func (s *Scheduler) scan(ctx context.Context, j store.ScanJob, st *runState) (st
 		_ = s.store.UpdateActivity(ctx, st.activity, "ingest", 0, 0, res.Volume.Name, res.Volume.UUID)
 	}
 	return s.store.IngestFrom(ctx, res.Bundle(), "server", st.activity)
+}
+
+// keepalive re-writes a running scan's activity once a minute while no
+// progress has been reported, so a long read (a tape locate, one extractor
+// on a large file) does not get the scan presumed lost after 5 minutes.
+// The returned function stops it.
+func (s *Scheduler) keepalive(ctx context.Context, st *runState) func() {
+	if st.activity <= 0 {
+		return func() {}
+	}
+	done := make(chan struct{})
+	go func() {
+		t := time.NewTicker(time.Minute)
+		defer t.Stop()
+		for {
+			select {
+			case <-done:
+				return
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				s.mu.Lock()
+				stale := time.Since(st.reported) >= time.Minute
+				stage, d, total := st.Stage, st.Done, st.Total
+				if stale {
+					st.reported = time.Now()
+				}
+				s.mu.Unlock()
+				if stale {
+					_ = s.store.UpdateActivity(ctx, st.activity, stage, d, total, "", "")
+				}
+			}
+		}
+	}()
+	var once sync.Once
+	return func() { once.Do(func() { close(done) }) }
 }

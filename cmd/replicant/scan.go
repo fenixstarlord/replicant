@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -31,7 +33,30 @@ type scanFlags struct {
 	fast            bool
 	extractWorkers  int
 	clipTimeout     time.Duration
+	tape            tapeFlag
+	tapeStreamMB    int64
 }
+
+// tapeFlag is the --tape flag: auto, on or off.
+type tapeFlag struct{ mode scanner.TapeMode }
+
+func (t *tapeFlag) String() string {
+	if t.mode == "" {
+		return string(scanner.TapeAuto)
+	}
+	return string(t.mode)
+}
+
+func (t *tapeFlag) Set(s string) error {
+	m, err := scanner.ParseTapeMode(s)
+	if err != nil {
+		return err
+	}
+	t.mode = m
+	return nil
+}
+
+func (t *tapeFlag) Type() string { return "mode" }
 
 func (f *scanFlags) bind(cmd *cobra.Command) {
 	fl := cmd.Flags()
@@ -40,18 +65,30 @@ func (f *scanFlags) bind(cmd *cobra.Command) {
 	fl.BoolVar(&f.descendPackages, "descend-packages", false, "walk into macOS packages (.fcpbundle, .app, ...)")
 	fl.BoolVar(&f.keepFrames, "keep-frames", false, "keep individual ARRIRAW frame entries instead of only the clip")
 	fl.StringArrayVar(&f.skip, "skip", nil, "extra name or glob to skip (repeatable)")
-	fl.IntVar(&f.workers, "workers", 0, "concurrent hashing workers (default: CPU count)")
+	fl.IntVar(&f.workers, "workers", 0, "concurrent hashing workers (default: CPU count; 1 in tape mode)")
 	fl.BoolVar(&f.fast, "fast", false, "filesystem only, no metadata extraction")
-	fl.IntVar(&f.extractWorkers, "extract-workers", 0, "concurrent clips during extraction (default: CPUs, max 8)")
-	fl.DurationVar(&f.clipTimeout, "clip-timeout", 60*time.Second, "per-extractor timeout for one clip")
+	fl.IntVar(&f.extractWorkers, "extract-workers", 0, "concurrent clips during extraction (default: CPUs, max 8; 1 in tape mode)")
+	fl.DurationVar(&f.clipTimeout, "clip-timeout", 0, "per-extractor timeout for one clip (default 1m, 20m in tape mode; negative: no limit)")
+	fl.Var(&f.tape, "tape", "tape mode: read one file at a time in tape order (auto: when the volume is LTFS, on, off)")
+	fl.Lookup("tape").NoOptDefVal = string(scanner.TapeOn)
+	fl.Int64Var(&f.tapeStreamMB, "tape-stream-mb", scanner.DefaultTapeStreamMB, "tape mode: files up to this many MB are read front to back instead of at head and tail (0: always head and tail)")
 }
 
 func (f *scanFlags) options(tools cliconfig.Tools) scanner.Options {
 	return scanner.Options{
 		Fast: f.fast, Fingerprint: !f.noFingerprint, FullHash: f.fullHash, DescendPackages: f.descendPackages,
 		KeepFrames: f.keepFrames, Skip: f.skip, Workers: f.workers, ExtractWorkers: f.extractWorkers,
-		ClipTimeout: f.clipTimeout, Tools: tools, Version: version,
+		ClipTimeout: f.clipTimeout, Tape: f.tape.mode, StreamLimit: streamLimit(f.tapeStreamMB),
+		Tools: tools, Version: version,
 	}
+}
+
+// streamLimit converts --tape-stream-mb to scanner.Options.StreamLimit.
+func streamLimit(mb int64) int64 {
+	if mb <= 0 {
+		return -1
+	}
+	return mb << 20
 }
 
 // runScan runs the shared pipeline with terminal progress. rep, if not
@@ -59,26 +96,61 @@ func (f *scanFlags) options(tools cliconfig.Tools) scanner.Options {
 func runScan(cmd *cobra.Command, root string, f *scanFlags, rep *client.ActivityReporter) (*scanner.Result, error) {
 	ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	// After the first Ctrl-C, restore the default so a second one exits
+	// even while a tape read is still in progress.
+	context.AfterFunc(ctx, stop)
 	stderr := cmd.ErrOrStderr()
 	cfg, err := cliconfig.Load()
 	if err != nil {
 		return nil, err
 	}
-	hashPrinter := progressPrinter(stderr)
+	// Keep the server's activity alive through long reads (a tape locate,
+	// one extractor on a large file) that report no progress for minutes.
+	keepalive := time.NewTicker(time.Minute)
+	defer keepalive.Stop()
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-keepalive.C:
+				rep.Keepalive()
+			}
+		}
+	}()
+	hashPrinter, endLine := progressPrinter(stderr)
+	var printMu sync.Mutex
 	progress := func(p scanner.Progress) {
 		rep.Progress(p.Stage, p.Done, p.Total)
+		printMu.Lock()
+		defer printMu.Unlock()
 		switch p.Stage {
 		case "walk":
+			endLine()
 			fmt.Fprintf(stderr, "walked %d entries\n", p.Done)
+		case "tape":
+			endLine()
+			switch {
+			case p.Total == 0:
+				fmt.Fprintf(stderr, "tape mode: no file data to read\n")
+			case p.Done == 0:
+				fmt.Fprintf(stderr, "tape mode: no tape positions available, reading one file at a time in path order\n")
+			default:
+				fmt.Fprintf(stderr, "tape mode: tape positions for %d/%d files, reading one file at a time in tape order\n", p.Done, p.Total)
+			}
 		case "hash":
 			hashPrinter(p.Done, p.Total)
 		case "extract":
 			if p.Done%25 == 0 || p.Done == p.Total {
+				endLine()
 				fmt.Fprintf(stderr, "extracted %d/%d\n", p.Done, p.Total)
 			}
 		}
 	}
 	res, err := scanner.Run(ctx, root, f.options(cfg.Tools), progress)
+	printMu.Lock()
+	endLine()
+	printMu.Unlock()
 	if err != nil {
 		if ctx.Err() != nil {
 			rep.Finish("cancelled", "")
@@ -101,6 +173,15 @@ func runScan(cmd *cobra.Command, root string, f *scanFlags, rep *client.Activity
 		withMeta, withErr := res.MetaStats()
 		fmt.Fprintf(stderr, "extractors available: %s\n", strings.Join(names, ", "))
 		fmt.Fprintf(stderr, "extracted metadata for %d/%d clips (%d with errors) in %s\n", withMeta, len(res.Clips), withErr, res.ExtractTime.Round(time.Millisecond))
+		for _, t := range res.ExtractorTimes {
+			if t.Runs > 0 {
+				fmt.Fprintf(stderr, "  %-12s %d clips in %s (%d errors, %d timeouts)\n", t.Name, t.Runs, t.Total.Round(time.Millisecond), t.Errors, t.Timeouts)
+			}
+		}
+	}
+	if t := res.Tape; t != nil {
+		fmt.Fprintf(stderr, "tape: hashed %d files (%d positioned, %d streamed, %d head+tail, %d failed), %d backward reads, read %d bytes in %s\n",
+			t.Files, t.Positioned, t.Streamed, t.HeadTail, t.Failed, t.Backward, t.BytesRead, res.HashTime.Round(time.Millisecond))
 	}
 	return res, nil
 }

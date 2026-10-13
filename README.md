@@ -46,6 +46,14 @@ replicant dump /Volumes/X [--clips]        print what would be indexed as JSON l
 ```
 
 Scans never write to the scanned volume. Vendor tools get a temp directory on the Mac.
+
+**LTFS tapes.** When the scanned path is on an LTFS tape (for example one mounted by myLTO),
+`replicant scan` switches to tape mode on its own: one reader, one pass, files read in the order
+they lie on tape, small files streamed instead of seeked. Fingerprints are the same as on disk.
+`--tape` forces it on any volume, `--tape=off` disables it, `--tape-stream-mb` sets the largest
+file read front to back (default 1024), and `--clip-timeout` defaults to 20m on tape. Run it on
+the Mac that has the tape mounted, while the tape software is idle, and prefer `-o` so a failed
+upload doesn't throw the scan away. Details: [docs/design/tape-mode.md](docs/design/tape-mode.md).
 Which tools are needed for which formats, and where to get them: `docs/tools.md`.
 
 Metadata extraction uses external tools where a format needs one: ffprobe, ARRI's `art-cmd` and

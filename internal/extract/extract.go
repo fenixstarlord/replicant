@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -59,13 +60,39 @@ type Located interface {
 // Options controls a run.
 type Options struct {
 	Workers     int           // concurrent clips; 0 = NumCPU
-	ClipTimeout time.Duration // per extractor per clip; 0 = 60s
+	ClipTimeout time.Duration // per extractor per clip; 0 = DefaultClipTimeout, negative = no limit
+}
+
+// DefaultClipTimeout bounds one extractor on one clip when Options.ClipTimeout is zero.
+const DefaultClipTimeout = 60 * time.Second
+
+// clipTimeout resolves ClipTimeout; zero means no limit.
+func (o Options) clipTimeout() time.Duration {
+	switch {
+	case o.ClipTimeout == 0:
+		return DefaultClipTimeout
+	case o.ClipTimeout < 0:
+		return 0
+	}
+	return o.ClipTimeout
+}
+
+// Timing is how long one extractor spent across a run.
+type Timing struct {
+	Name     string
+	Runs     int // clips the extractor ran on
+	Errors   int // runs that returned an error, timeouts included
+	Timeouts int
+	Total    time.Duration
 }
 
 // Runner holds a set of extractors and their resolved availability.
 type Runner struct {
 	extractors []Extractor
 	status     []Status
+
+	mu      sync.Mutex
+	timings []Timing // parallel to extractors
 }
 
 // NewRunner checks every extractor's availability once.
@@ -79,12 +106,20 @@ func NewRunner(ctx context.Context, extractors []Extractor) *Runner {
 		}
 		r.extractors = append(r.extractors, e)
 		r.status = append(r.status, st)
+		r.timings = append(r.timings, Timing{Name: e.Name()})
 	}
 	return r
 }
 
 // Statuses returns availability for every registered extractor.
 func (r *Runner) Statuses() []Status { return append([]Status(nil), r.status...) }
+
+// Timings returns per-extractor run counts and time spent so far.
+func (r *Runner) Timings() []Timing {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]Timing(nil), r.timings...)
+}
 
 // Run extracts metadata for every clip, in place: it fills c.Meta,
 // c.Sources, c.Raw, and c.Errors. A clip that fails is still returned
@@ -95,11 +130,9 @@ func (r *Runner) Run(ctx context.Context, root string, cl []clips.Clip, opts Opt
 	if workers <= 0 {
 		workers = defaultWorkers()
 	}
-	timeout := opts.ClipTimeout
-	if timeout <= 0 {
-		timeout = 60 * time.Second
-	}
+	timeout := opts.clipTimeout()
 	root = filepath.Clean(root)
+	parent := ctx
 	g, ctx := errgroup.WithContext(ctx)
 	g.SetLimit(workers)
 	var done atomic.Int64
@@ -116,55 +149,180 @@ func (r *Runner) Run(ctx context.Context, root string, cl []clips.Clip, opts Opt
 			return nil
 		})
 	}
-	return g.Wait()
+	if err := g.Wait(); err != nil {
+		return err
+	}
+	// A cancel that lands while the last clips are running still cancels
+	// the run, so a partly extracted scan is never taken for a whole one.
+	return parent.Err()
+}
+
+// RunClip extracts metadata for one clip, in place, like Run does for each
+// clip.
+func (r *Runner) RunClip(ctx context.Context, root string, c *clips.Clip, opts Options) {
+	r.runClip(ctx, filepath.Clean(root), c, opts.clipTimeout())
 }
 
 func (r *Runner) runClip(ctx context.Context, root string, c *clips.Clip, timeout time.Duration) {
-	var results []meta.Result
-	var errs []string
+	j := r.startClip(root, c, timeout)
+	j.Finish(ctx)
+}
+
+// Inputter is implemented by extractors that read one file of the clip
+// other than its primary file, or none ("": a sidecar index loaded
+// earlier). Extractors without it read c.PrimaryFile(). Tape mode uses
+// the input to run each extractor when the tape reaches that file.
+type Inputter interface {
+	Input(c *clips.Clip) string
+}
+
+// ClipJob extracts one clip in steps, so that a caller can run each
+// extractor when it suits its own reads. Results are merged by priority
+// and registration order, so the order of steps does not change them.
+type ClipJob struct {
+	r       *Runner
+	root    string
+	c       *clips.Clip
+	timeout time.Duration
+	pending []int // extractors still to run, in registration order
+	results map[int]meta.Result
+	errs    map[int]string
+}
+
+// StartClip prepares a clip for extraction in steps. Nothing runs until
+// RunInput or Finish.
+func (r *Runner) StartClip(root string, c *clips.Clip, opts Options) *ClipJob {
+	return r.startClip(filepath.Clean(root), c, opts.clipTimeout())
+}
+
+func (r *Runner) startClip(root string, c *clips.Clip, timeout time.Duration) *ClipJob {
+	j := &ClipJob{r: r, root: root, c: c, timeout: timeout, results: map[int]meta.Result{}, errs: map[int]string{}}
 	for i, e := range r.extractors {
 		if !e.Matches(c) {
 			continue
 		}
 		if !r.status[i].Available {
-			errs = append(errs, fmt.Sprintf("%s: not available", e.Name()))
+			j.errs[i] = fmt.Sprintf("%s: not available", e.Name())
 			continue
 		}
-		cctx, cancel := context.WithTimeout(ctx, timeout)
-		res, err := e.Extract(cctx, root, c)
-		cancel()
-		if err != nil {
-			if errors.Is(err, context.DeadlineExceeded) {
-				err = fmt.Errorf("timed out after %s", timeout)
-			}
-			errs = append(errs, fmt.Sprintf("%s: %v", e.Name(), err))
-			if res == nil {
-				continue
-			}
+		j.pending = append(j.pending, i)
+	}
+	return j
+}
+
+// Inputs lists the file each pending extractor reads, in registration
+// order. A file may appear more than once.
+func (j *ClipJob) Inputs() []string {
+	out := make([]string, 0, len(j.pending))
+	for _, i := range j.pending {
+		out = append(out, j.input(i))
+	}
+	return out
+}
+
+func (j *ClipJob) input(i int) string {
+	if in, ok := j.r.extractors[i].(Inputter); ok {
+		return in.Input(j.c)
+	}
+	return j.c.PrimaryFile()
+}
+
+// RunInput runs the pending extractors that read input and returns how
+// many ran.
+func (j *ClipJob) RunInput(ctx context.Context, input string) int {
+	return j.run(ctx, func(i int) bool { return j.input(i) == input })
+}
+
+// Finish runs whatever is still pending and stores the merged result,
+// sources, raw output and errors on the clip.
+func (j *ClipJob) Finish(ctx context.Context) {
+	j.run(ctx, func(int) bool { return true })
+	// Extractors left over were stopped by cancellation; say so rather
+	// than leave a clip that silently lacks their sources.
+	for _, i := range j.pending {
+		j.errs[i] = fmt.Sprintf("%s: not run: %v", j.r.extractors[i].Name(), context.Cause(ctx))
+	}
+	j.pending = nil
+	idx := make([]int, 0, len(j.results))
+	for i := range j.results {
+		idx = append(idx, i)
+	}
+	// Merge order: by priority, then registration order.
+	sort.Slice(idx, func(a, b int) bool {
+		pa, pb := j.r.status[idx[a]].Priority, j.r.status[idx[b]].Priority
+		if pa != pb {
+			return pa < pb
 		}
-		if res != nil {
-			res.Source = e.Name()
-			results = append(results, *res)
+		return idx[a] < idx[b]
+	})
+	ordered := make([]meta.Result, 0, len(idx))
+	for _, i := range idx {
+		ordered = append(ordered, j.results[i])
+	}
+	var errs []string
+	for i := range j.r.extractors {
+		if msg, ok := j.errs[i]; ok {
+			errs = append(errs, msg)
 		}
-	}
-	// Stable merge order: by priority, then registration order.
-	order := make([]int, len(results))
-	for i := range order {
-		order[i] = i
-	}
-	prio := map[string]int{}
-	for i, e := range r.extractors {
-		prio[e.Name()] = r.status[i].Priority
-	}
-	sort.SliceStable(order, func(a, b int) bool { return prio[results[order[a]].Source] < prio[results[order[b]].Source] })
-	ordered := make([]meta.Result, len(results))
-	for i, j := range order {
-		ordered[i] = results[j]
 	}
 	m := meta.Merge(ordered)
 	m.Errors = errs
-	c.Meta = &m.Fields
-	c.Sources = m.Sources
-	c.Raw = m.Raw
-	c.Errors = errs
+	j.c.Meta = &m.Fields
+	j.c.Sources = m.Sources
+	j.c.Raw = m.Raw
+	j.c.Errors = errs
+}
+
+// run runs the pending extractors selected by want, in registration
+// order, and returns how many ran. Once ctx is done nothing more runs.
+func (j *ClipJob) run(ctx context.Context, want func(i int) bool) int {
+	ran := 0
+	rest := j.pending[:0]
+	for _, i := range j.pending {
+		if !want(i) || ctx.Err() != nil {
+			rest = append(rest, i)
+			continue
+		}
+		j.runOne(ctx, i)
+		ran++
+	}
+	j.pending = rest
+	return ran
+}
+
+func (j *ClipJob) runOne(ctx context.Context, i int) {
+	e := j.r.extractors[i]
+	cctx, cancel := ctx, context.CancelFunc(func() {})
+	if j.timeout > 0 {
+		cctx, cancel = context.WithTimeout(ctx, j.timeout)
+	}
+	start := time.Now()
+	res, err := e.Extract(cctx, j.root, j.c)
+	timedOut := err != nil && errors.Is(cctx.Err(), context.DeadlineExceeded)
+	cancel()
+	j.r.record(i, time.Since(start), err != nil, timedOut)
+	if err != nil {
+		if timedOut {
+			err = fmt.Errorf("timed out after %s", j.timeout)
+		}
+		j.errs[i] = fmt.Sprintf("%s: %v", e.Name(), err)
+	}
+	if res != nil {
+		res.Source = e.Name()
+		j.results[i] = *res
+	}
+}
+
+func (r *Runner) record(i int, d time.Duration, failed, timedOut bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	t := &r.timings[i]
+	t.Runs++
+	t.Total += d
+	if failed {
+		t.Errors++
+	}
+	if timedOut {
+		t.Timeouts++
+	}
 }

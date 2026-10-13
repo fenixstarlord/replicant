@@ -309,6 +309,14 @@ reads `replicant doctor --json` to report missing metadata tools with a link to 
   browser cookie can override; the Duplicates page was removed (other copies remain on clip and
   file pages).
 
+- **Tape mode (2026-10-12, ADR-003):** LTFS tapes (user mounts them with myLTO on another Mac)
+  are scanned by `internal/scanner/tape.go`: auto-detected from the `ltfs.volumeUUID` virtual
+  xattr (no `user.` prefix on macOS), one reader, one pass ordered by `ltfs.partition` +
+  `ltfs.startblock`, each extractor run when the tape reaches the file it reads (`extract.ClipJob`),
+  then that file hashed, files up to `--tape-stream-mb` (1024) streamed with
+  byte-identical fingerprints, 20 min clip timeout, tape UUID as drive identity. The manifest
+  records tape stats and per-extractor timings. Plan items 4-8 and the measurements to take are in
+  `docs/design/tape-mode.md`; nothing has been timed on a real tape yet.
 - **Partial scans (decided 2026-10-08):** a scan whose root is not the mount point is `is_partial`;
   latest and diffs are tracked per (drive, root); drive aggregates and default browsing prefer the
   latest full scan (`store.LatestScan`). Migration `0002_partial_scans.sql`.

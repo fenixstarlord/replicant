@@ -39,6 +39,25 @@ type Manifest struct {
 	Summary        scan.Summary    `json:"summary"`
 	ClipCount      int             `json:"clip_count"`
 	DurationMS     int64           `json:"duration_ms"`
+	// Tape is set for scans read in tape mode.
+	Tape *TapeStats `json:"tape,omitempty"`
+}
+
+// TapeStats records how a tape-mode scan read the volume, so runs on
+// different tapes and settings can be compared.
+type TapeStats struct {
+	Files        int   `json:"files"`          // files hashed
+	Positioned   int   `json:"positioned"`     // of those, files whose tape position came from LTFS
+	Streamed     int   `json:"streamed"`       // hashed by reading front to back
+	HeadTail     int   `json:"head_tail"`      // hashed from head and tail reads only
+	Failed       int   `json:"failed"`         // could not be hashed (read error)
+	BytesRead    int64 `json:"bytes_read"`     // bytes read by hashing
+	Backward     int   `json:"backward"`       // reads (hash or extractor) that lie before the previous read on tape
+	PositionMS   int64 `json:"position_ms"`    // time spent reading tape positions
+	HashMS       int64 `json:"hash_ms"`        // time spent hashing
+	ExtractMS    int64 `json:"extract_ms"`     // time spent in extractors
+	StreamLimit  int64 `json:"stream_limit"`   // largest file streamed; negative = never
+	ClipTimeoutS int64 `json:"clip_timeout_s"` // per-extractor clip timeout; -1 = no limit
 }
 
 // Options records how the scan was run.
@@ -49,13 +68,19 @@ type Options struct {
 	DescendPackages bool     `json:"descend_packages"`
 	KeepFrames      bool     `json:"keep_frames"`
 	Skip            []string `json:"skip"`
+	Tape            bool     `json:"tape,omitempty"` // read in tape mode: one reader, tape order
 }
 
-// ExtractorInfo records an extractor's availability at scan time.
+// ExtractorInfo records an extractor's availability at scan time and how
+// long it ran.
 type ExtractorInfo struct {
-	Name      string `json:"name"`
-	Version   string `json:"version,omitempty"`
-	Available bool   `json:"available"`
+	Name      string  `json:"name"`
+	Version   string  `json:"version,omitempty"`
+	Available bool    `json:"available"`
+	Runs      int     `json:"runs,omitempty"`
+	Errors    int     `json:"errors,omitempty"`
+	Timeouts  int     `json:"timeouts,omitempty"`
+	Seconds   float64 `json:"seconds,omitempty"`
 }
 
 // Bundle is a fully read scan bundle.

@@ -31,7 +31,10 @@ func (c *Client) UpdateActivity(ctx context.Context, id int64, upd api.ActivityU
 
 // ActivityReporter sends progress to the server at most every interval,
 // and never fails the scan: a server that cannot be reached is logged by
-// the caller and otherwise ignored. Zero value is a no-op reporter.
+// the caller and otherwise ignored. Progress updates go out from a
+// background sender that only ever holds the newest one, so a slow or
+// unreachable server never stalls the scan (on a tape that would stop the
+// drive). Zero value is a no-op reporter.
 type ActivityReporter struct {
 	c        *Client
 	id       int64
@@ -39,6 +42,9 @@ type ActivityReporter struct {
 	mu       sync.Mutex
 	last     time.Time
 	lastSent api.ActivityUpdate
+	seen     map[string]bool     // stages reported so far
+	queued   *api.ActivityUpdate // newest update not yet sent
+	wake     chan struct{}       // nudges the sender; closed by Finish
 	closed   bool
 }
 
@@ -75,14 +81,64 @@ func (r *ActivityReporter) Progress(stage string, done, total int) {
 	}
 	upd := api.ActivityUpdate{Stage: stage, Done: done, Total: total}
 	final := total > 0 && done == total
-	if time.Since(r.last) < r.interval && !final && stage == r.lastSent.Stage {
+	// A stage's first report and its final one go out at once; the rest are
+	// throttled, even when stages alternate (a tape scan switches between
+	// extract and hash for every clip).
+	if time.Since(r.last) < r.interval && !final && r.seen[stage] {
 		return
 	}
 	if upd == r.lastSent {
 		return
 	}
+	if r.seen == nil {
+		r.seen = map[string]bool{}
+	}
+	r.seen[stage] = true
 	r.last, r.lastSent = time.Now(), upd
-	_ = r.c.UpdateActivity(context.Background(), r.id, upd)
+	r.enqueue(upd)
+}
+
+// Keepalive re-sends the last progress when nothing has been sent for a
+// while, so the server does not presume the scan lost during one long
+// read (it does after 5 minutes of silence). Call it from a ticker.
+func (r *ActivityReporter) Keepalive() {
+	if r == nil || r.c == nil {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.closed || time.Since(r.last) < r.interval {
+		return
+	}
+	r.last = time.Now()
+	r.enqueue(r.lastSent)
+}
+
+// enqueue hands upd to the sender, replacing any update still waiting.
+// The caller holds r.mu.
+func (r *ActivityReporter) enqueue(upd api.ActivityUpdate) {
+	r.queued = &upd
+	if r.wake == nil {
+		r.wake = make(chan struct{}, 1)
+		go r.send(r.wake)
+	}
+	select {
+	case r.wake <- struct{}{}:
+	default: // a nudge is already pending
+	}
+}
+
+// send delivers queued updates until Finish closes wake.
+func (r *ActivityReporter) send(wake <-chan struct{}) {
+	for range wake {
+		r.mu.Lock()
+		upd := r.queued
+		r.queued = nil
+		r.mu.Unlock()
+		if upd != nil {
+			_ = r.c.UpdateActivity(context.Background(), r.id, *upd)
+		}
+	}
 }
 
 // Describe fills in the drive once the scanner has identified it.
@@ -96,7 +152,8 @@ func (r *ActivityReporter) Describe(driveName, volumeUUID string) {
 }
 
 // Finish closes the activity with a final status: "error" or "cancelled".
-// A successful push is closed by the upload itself.
+// A successful push is closed by the upload itself. Progress still queued
+// is dropped; the server ignores progress for a finished activity anyway.
 func (r *ActivityReporter) Finish(status, msg string) {
 	if r == nil || r.c == nil {
 		return
@@ -107,5 +164,9 @@ func (r *ActivityReporter) Finish(status, msg string) {
 		return
 	}
 	r.closed = true
+	r.queued = nil
+	if r.wake != nil {
+		close(r.wake)
+	}
 	_ = r.c.UpdateActivity(context.Background(), r.id, api.ActivityUpdate{Status: status, Error: msg})
 }

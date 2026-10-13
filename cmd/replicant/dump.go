@@ -69,17 +69,21 @@ Nothing is sent anywhere.`,
 
 // progressPrinter reports hashing progress. On a terminal it rewrites one
 // line; when stderr is redirected it prints a line every few thousand files.
-func progressPrinter(w io.Writer) func(done, total int) {
+// Call endLine before printing anything else, so a rewritten line that is
+// still open is not run into.
+func progressPrinter(w io.Writer) (print func(done, total int), endLine func()) {
 	tty := false
 	if f, ok := w.(*os.File); ok {
 		if fi, err := f.Stat(); err == nil && fi.Mode()&os.ModeCharDevice != 0 {
 			tty = true
 		}
 	}
-	return func(done, total int) {
+	open := false
+	print = func(done, total int) {
 		switch {
 		case tty && (done%50 == 0 || done == total):
 			fmt.Fprintf(w, "\rhashed %d/%d", done, total)
+			open = done != total
 			if done == total {
 				fmt.Fprint(w, "\n")
 			}
@@ -87,4 +91,11 @@ func progressPrinter(w io.Writer) func(done, total int) {
 			fmt.Fprintf(w, "hashed %d/%d\n", done, total)
 		}
 	}
+	endLine = func() {
+		if open {
+			fmt.Fprint(w, "\n")
+			open = false
+		}
+	}
+	return print, endLine
 }

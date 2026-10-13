@@ -25,24 +25,22 @@ func (Extractor) Name() string                             { return "sony-xml" }
 func (Extractor) Priority() int                            { return extract.PrioritySidecar }
 func (Extractor) Available(context.Context) (bool, string) { return true, "builtin" }
 
-func (Extractor) Matches(c *clips.Clip) bool {
-	for _, p := range c.SidecarsWithExt("xml") {
-		if strings.HasSuffix(strings.ToUpper(p), "M01.XML") {
-			return true
+func (Extractor) Matches(c *clips.Clip) bool { return m01(c) != "" }
+
+// Input is the clip's <stem>M01.XML, the only file this extractor reads.
+func (Extractor) Input(c *clips.Clip) string { return m01(c) }
+
+func m01(c *clips.Clip) string {
+	for _, s := range c.SidecarsWithExt("xml") {
+		if strings.HasSuffix(strings.ToUpper(s), "M01.XML") {
+			return s
 		}
 	}
-	return false
+	return ""
 }
 
 func (Extractor) Extract(ctx context.Context, root string, c *clips.Clip) (*meta.Result, error) {
-	var p string
-	for _, s := range c.SidecarsWithExt("xml") {
-		if strings.HasSuffix(strings.ToUpper(s), "M01.XML") {
-			p = s
-			break
-		}
-	}
-	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(p)))
+	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(m01(c))))
 	if err != nil {
 		return nil, err
 	}

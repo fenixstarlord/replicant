@@ -26,11 +26,20 @@ type Options struct {
 	DescendPackages bool
 	KeepFrames      bool
 	Skip            []string // extra skip patterns
-	Workers         int
-	ExtractWorkers  int
-	ClipTimeout     time.Duration
-	Tools           cliconfig.Tools
-	Version         string // scanner version recorded in the manifest
+	Workers         int      // concurrent hashing; ignored in tape mode
+	ExtractWorkers  int      // concurrent clips; ignored in tape mode
+	// ClipTimeout bounds one extractor on one clip. Zero means
+	// extract.DefaultClipTimeout, or TapeClipTimeout in tape mode;
+	// negative means no limit.
+	ClipTimeout time.Duration
+	// Tape selects tape mode (see tape.go). The zero value means TapeAuto.
+	Tape TapeMode
+	// StreamLimit is, in tape mode, the largest file read front to back
+	// instead of at head and tail. Zero means scan.DefaultStreamLimit;
+	// negative means never.
+	StreamLimit int64
+	Tools       cliconfig.Tools
+	Version     string // scanner version recorded in the manifest
 }
 
 // Progress reports a stage and its counters; Total is 0 when unknown.
@@ -51,7 +60,11 @@ type Result struct {
 	WalkTime    time.Duration
 	HashTime    time.Duration
 	ExtractTime time.Duration
-	opts        Options
+	// Tape is set when the scan ran in tape mode.
+	Tape *bundle.TapeStats
+	// ExtractorTimes holds per-extractor run counts and time spent.
+	ExtractorTimes []extract.Timing
+	opts           Options
 }
 
 // Run scans root. progress may be nil; it is called from several goroutines.
@@ -88,6 +101,13 @@ func Run(ctx context.Context, root string, opts Options, progress func(Progress)
 	res.WalkTime = time.Since(t0)
 	report(Progress{Stage: "walk", Done: len(entries), Total: len(entries)})
 
+	if opts.Tape.enabled(vol.LTFS) {
+		if err := runTape(ctx, abs, so, entries, res, opts, report); err != nil {
+			return nil, err
+		}
+		return res, nil
+	}
+
 	if so.Fingerprint || so.FullHash {
 		t1 := time.Now()
 		if err := scan.Hash(ctx, abs, entries, so, func(done, total int) { report(Progress{Stage: "hash", Done: done, Total: total}) }); err != nil {
@@ -107,6 +127,7 @@ func Run(ctx context.Context, root string, opts Options, progress func(Progress)
 			return nil, fmt.Errorf("extract: %w", err)
 		}
 		res.ExtractTime = time.Since(t2)
+		res.ExtractorTimes = runner.Timings()
 	}
 	return res, nil
 }
@@ -115,9 +136,15 @@ func Run(ctx context.Context, root string, opts Options, progress func(Progress)
 func (r *Result) Manifest() bundle.Manifest {
 	skip := append([]string(nil), scan.DefaultSkip...)
 	skip = append(skip, r.opts.Skip...)
+	times := map[string]extract.Timing{}
+	for _, t := range r.ExtractorTimes {
+		times[t.Name] = t
+	}
 	ext := make([]bundle.ExtractorInfo, 0, len(r.Extractors))
 	for _, s := range r.Extractors {
-		ext = append(ext, bundle.ExtractorInfo{Name: s.Name, Version: s.Version, Available: s.Available})
+		t := times[s.Name]
+		ext = append(ext, bundle.ExtractorInfo{Name: s.Name, Version: s.Version, Available: s.Available,
+			Runs: t.Runs, Errors: t.Errors, Timeouts: t.Timeouts, Seconds: t.Total.Seconds()})
 	}
 	return bundle.Manifest{
 		BundleVersion:  bundle.Version,
@@ -129,11 +156,13 @@ func (r *Result) Manifest() bundle.Manifest {
 		Options: bundle.Options{
 			Fast: r.opts.Fast, Fingerprint: r.opts.Fingerprint, FullHash: r.opts.FullHash,
 			DescendPackages: r.opts.DescendPackages, KeepFrames: r.opts.KeepFrames, Skip: skip,
+			Tape: r.Tape != nil,
 		},
 		Extractors: ext,
 		Summary:    scan.Summarize(r.Entries),
 		ClipCount:  len(r.Clips),
 		DurationMS: time.Since(r.Started).Milliseconds(),
+		Tape:       r.Tape,
 	}
 }
 

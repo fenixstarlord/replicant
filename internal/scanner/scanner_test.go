@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 )
 
@@ -12,8 +13,15 @@ func TestRunProducesBundle(t *testing.T) {
 	os.MkdirAll(filepath.Join(root, "A001"), 0o755)
 	os.WriteFile(filepath.Join(root, "A001", "A001C001.mov"), []byte("not really a movie"), 0o644)
 	os.WriteFile(filepath.Join(root, "notes.txt"), []byte("n"), 0o644)
-	var stages []string
-	res, err := Run(context.Background(), root, Options{Fingerprint: true, Version: "test"}, func(p Progress) { stages = append(stages, p.Stage) })
+	var (
+		mu     sync.Mutex
+		stages []string
+	)
+	res, err := Run(context.Background(), root, Options{Fingerprint: true, Version: "test"}, func(p Progress) {
+		mu.Lock() // called from several hash workers
+		stages = append(stages, p.Stage)
+		mu.Unlock()
+	})
 	if err != nil {
 		t.Fatal(err)
 	}

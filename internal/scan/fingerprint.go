@@ -75,7 +75,7 @@ func Hash(ctx context.Context, root string, entries []Entry, opts Options, progr
 	}
 	var total int
 	for i := range entries {
-		if needsHash(&entries[i]) {
+		if NeedsHash(&entries[i]) {
 			total++
 		}
 	}
@@ -84,7 +84,7 @@ func Hash(ctx context.Context, root string, entries []Entry, opts Options, progr
 	g.SetLimit(opts.workers())
 	for i := range entries {
 		e := &entries[i]
-		if !needsHash(e) {
+		if !NeedsHash(e) {
 			continue
 		}
 		g.Go(func() error {
@@ -117,6 +117,8 @@ func Hash(ctx context.Context, root string, entries []Entry, opts Options, progr
 	return g.Wait()
 }
 
-func needsHash(e *Entry) bool {
+// NeedsHash reports whether hashing applies to e: a regular file (not a
+// directory, package, or symlink) with no error recorded.
+func NeedsHash(e *Entry) bool {
 	return !e.IsDir && !e.IsSymlink && !e.IsPackage && e.Error == ""
 }

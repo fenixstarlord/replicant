@@ -28,6 +28,14 @@ func (Extractor) Matches(c *clips.Clip) bool {
 	return c.Kind == clips.KindBRAW && len(c.SidecarsWithExt("sidecar")) > 0
 }
 
+// Input is the clip's .sidecar file, the only file this extractor reads.
+func (Extractor) Input(c *clips.Clip) string {
+	if s := c.SidecarsWithExt("sidecar"); len(s) > 0 {
+		return s[0]
+	}
+	return ""
+}
+
 func (Extractor) Extract(ctx context.Context, root string, c *clips.Clip) (*meta.Result, error) {
 	p := c.SidecarsWithExt("sidecar")[0]
 	raw, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(p)))
