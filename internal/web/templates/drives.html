@@ -31,7 +31,7 @@
 <tbody>
 {{range .Drives}}<tr class="hover drive-row" draggable="true" data-drive-id="{{.ID}}" ondragstart="dragDrive(event)" ondragend="dragEnd(event)">
   <td><a href="/search?drive={{.ID}}" class="btn btn-ghost btn-sm btn-circle" title="Search this drive" aria-label="Search this drive">{{template "icon_search"}}</a></td>
-  <td><a href="/browse/{{.ID}}" class="link link-hover font-medium inline-flex items-center gap-2">{{template "icon_drive"}}{{.Name}}</a></td>
+  <td><span class="inline-flex items-center gap-1"><a href="/browse/{{.ID}}" class="link link-hover font-medium inline-flex items-center gap-2">{{template "icon_drive"}}{{.Name}}</a><button type="button" class="btn btn-ghost btn-xs btn-circle" title="Rename" aria-label="Rename {{.Name}}" data-drive-id="{{.ID}}" data-name="{{.Name}}" data-volume="{{.VolumeName}}" data-renamed="{{.Renamed}}" onclick="renameDrive(this)">{{template "icon_pencil"}}</button></span>{{if .Renamed}}<div class="muted text-xs">{{.VolumeName}}</div>{{end}}</td>
   <td>{{or .Label "—"}}</td>
   <td>{{or .Location "—"}}</td>
   <td class="muted">{{.FSType}}</td>
@@ -60,8 +60,28 @@
   <form method="dialog" class="modal-backdrop"><button>close</button></form>
 </dialog>
 
+<dialog id="rename-drive" class="modal">
+  <form method="post" id="rename-form" class="modal-box flex flex-col gap-3">
+    <input type="hidden" name="by" value="{{$by}}">
+    <h3 class="font-semibold">Rename drive</h3>
+    <label class="form-control flex flex-col gap-1"><span class="label-text">Name</span><input class="input input-bordered w-full" name="name" id="rename-name"><span class="muted text-xs" id="rename-hint"></span></label>
+    <div class="modal-action"><button type="button" class="btn" onclick="document.getElementById('rename-drive').close()">Cancel</button><button class="btn btn-primary">Save</button></div>
+  </form>
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
 <script>
 document.body.dataset.by = {{$by}};
+function renameDrive(btn) {
+  const d = btn.dataset, input = document.getElementById('rename-name');
+  document.getElementById('rename-form').action = '/drives/' + d.driveId + '/rename';
+  input.value = d.renamed === 'true' ? d.name : '';
+  input.placeholder = d.volume;
+  document.getElementById('rename-hint').textContent = "Leave empty to use the volume's name" + (d.volume ? ', ' + d.volume : '') + '.';
+  document.getElementById('rename-drive').showModal();
+  input.focus();
+  input.select();
+}
 let dragged = null;
 function dragDrive(e) { dragged = e.currentTarget.dataset.driveId; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', dragged); e.currentTarget.classList.add('opacity-50'); }
 function dragEnd(e) { e.currentTarget.classList.remove('opacity-50'); document.querySelectorAll('.group-zone').forEach(z => z.classList.remove('drop-target')); }

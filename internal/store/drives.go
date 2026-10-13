@@ -3,14 +3,19 @@ package store
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"time"
 )
 
 // Drive is a known drive with aggregates from its latest scan.
 type Drive struct {
-	ID            int64     `json:"id"`
-	VolumeUUID    string    `json:"volume_uuid"`
+	ID         int64  `json:"id"`
+	VolumeUUID string `json:"volume_uuid"`
+	// Name is the catalog name: the volume's own name unless the user
+	// renamed the drive (Renamed), in which case scans leave it alone.
 	Name          string    `json:"name"`
+	VolumeName    string    `json:"volume_name"` // as the volume reported it on its latest scan
+	Renamed       bool      `json:"renamed"`
 	Label         string    `json:"label"`
 	Location      string    `json:"location"`
 	Notes         string    `json:"notes"`
@@ -42,7 +47,7 @@ func (d Drive) SetIn(t Taxonomy) int64 {
 // ListDrives returns every drive with latest-scan aggregates, by name.
 func (s *Store) ListDrives(ctx context.Context) ([]Drive, error) {
 	rows, err := s.DB.QueryContext(ctx, `
-		SELECT d.id, d.volume_uuid, d.name, d.label, d.location, d.notes, d.fs_type,
+		SELECT d.id, d.volume_uuid, d.name, d.volume_name, d.renamed, d.label, d.location, d.notes, d.fs_type,
 		       d.capacity_bytes, d.free_bytes, d.media_name, d.first_seen, d.last_seen,
 		       (SELECT count(*) FROM scans s WHERE s.drive_id = d.id),
 		       coalesce(ls.file_count, 0), coalesce(ls.clip_count, 0), coalesce(ls.total_bytes, 0), ls.scanned_at,
@@ -62,7 +67,7 @@ func (s *Store) ListDrives(ctx context.Context) ([]Drive, error) {
 		var d Drive
 		var first, last string
 		var scanned sql.NullString
-		if err := rows.Scan(&d.ID, &d.VolumeUUID, &d.Name, &d.Label, &d.Location, &d.Notes, &d.FSType,
+		if err := rows.Scan(&d.ID, &d.VolumeUUID, &d.Name, &d.VolumeName, &d.Renamed, &d.Label, &d.Location, &d.Notes, &d.FSType,
 			&d.CapacityBytes, &d.FreeBytes, &d.MediaName, &first, &last,
 			&d.ScanCount, &d.FileCount, &d.ClipCount, &d.TotalBytes, &scanned, &d.GroupID, &d.GroupName, &d.ClientID, &d.ClientName); err != nil {
 			return nil, err
@@ -82,4 +87,26 @@ func (s *Store) UpdateDriveLabels(ctx context.Context, id int64, label, location
 	_, err := s.DB.ExecContext(ctx, `UPDATE drives SET label = ?, location = ?, notes = ? WHERE id = ?`,
 		label, location, notes, id)
 	return err
+}
+
+// RenameDrive sets a drive's catalog name. Scans keep that name from then
+// on. An empty name goes back to the volume's own name, which later scans
+// update again. It returns sql.ErrNoRows for an unknown drive.
+func (s *Store) RenameDrive(ctx context.Context, id int64, name string) error {
+	name = strings.TrimSpace(name)
+	var res sql.Result
+	var err error
+	if name == "" {
+		res, err = s.DB.ExecContext(ctx, `UPDATE drives SET name = CASE WHEN volume_name != '' THEN volume_name ELSE name END,
+			renamed = 0 WHERE id = ?`, id)
+	} else {
+		res, err = s.DB.ExecContext(ctx, `UPDATE drives SET name = ?, renamed = 1 WHERE id = ?`, name, id)
+	}
+	if err != nil {
+		return err
+	}
+	if n, err := res.RowsAffected(); err == nil && n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
 }

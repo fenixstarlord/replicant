@@ -28,17 +28,20 @@ const (
 
 // Manifest describes a scan.
 type Manifest struct {
-	BundleVersion  int             `json:"bundle_version"`
-	ScannerVersion string          `json:"scanner_version"`
-	ScannedAt      time.Time       `json:"scanned_at"`
-	Root           string          `json:"root"`           // absolute path that was scanned
-	Host           string          `json:"host,omitempty"` // computer that ran the scan
-	Volume         scan.Volume     `json:"volume"`
-	Options        Options         `json:"options"`
-	Extractors     []ExtractorInfo `json:"extractors"`
-	Summary        scan.Summary    `json:"summary"`
-	ClipCount      int             `json:"clip_count"`
-	DurationMS     int64           `json:"duration_ms"`
+	BundleVersion  int       `json:"bundle_version"`
+	ScannerVersion string    `json:"scanner_version"`
+	ScannedAt      time.Time `json:"scanned_at"`
+	Root           string    `json:"root"`           // absolute path that was scanned
+	Host           string    `json:"host,omitempty"` // computer that ran the scan
+	// DriveName is a catalog name the user chose for the drive when
+	// scanning. Empty keeps the server's name for it.
+	DriveName  string          `json:"drive_name,omitempty"`
+	Volume     scan.Volume     `json:"volume"`
+	Options    Options         `json:"options"`
+	Extractors []ExtractorInfo `json:"extractors"`
+	Summary    scan.Summary    `json:"summary"`
+	ClipCount  int             `json:"clip_count"`
+	DurationMS int64           `json:"duration_ms"`
 	// Tape is set for scans read in tape mode.
 	Tape *TapeStats `json:"tape,omitempty"`
 }

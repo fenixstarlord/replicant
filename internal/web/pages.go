@@ -37,6 +37,7 @@ func (s *Server) pageRoutes() {
 	m.Handle("GET /drives", auth(s.handleDrivesPage))
 	m.Handle("GET /drives/{id}", auth(s.handleDrivePage))
 	m.Handle("POST /drives/{id}", auth(s.handleDriveEdit))
+	m.Handle("POST /drives/{id}/rename", auth(s.handleDriveRename))
 	m.Handle("POST /drives/{id}/group", auth(s.handleDriveMove))
 	m.Handle("POST /drives/groups", auth(s.handleGroupCreate))
 	m.Handle("POST /drives/groups/{id}/delete", auth(s.handleGroupDelete))
@@ -162,6 +163,17 @@ func (s *Server) handleDriveEdit(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad form", http.StatusBadRequest)
 		return
 	}
+	// The form also carries the name it was showing (name_was), so saving
+	// other fields from a page loaded before a rename does not undo it.
+	if _, has := r.Form["name"]; has {
+		name := strings.TrimSpace(r.FormValue("name"))
+		if _, hasWas := r.Form["name_was"]; !hasWas || name != strings.TrimSpace(r.FormValue("name_was")) {
+			if err := s.store.RenameDrive(r.Context(), id, name); err != nil {
+				s.fail(w, r, err, "rename drive")
+				return
+			}
+		}
+	}
 	if err := s.store.UpdateDriveLabels(r.Context(), id, strings.TrimSpace(r.FormValue("label")),
 		strings.TrimSpace(r.FormValue("location")), strings.TrimSpace(r.FormValue("notes"))); err != nil {
 		s.fail(w, r, err, "update drive")
@@ -180,6 +192,33 @@ func (s *Server) handleDriveEdit(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	http.Redirect(w, r, fmt.Sprintf("/browse/%d", id), http.StatusSeeOther)
+}
+
+// handleDriveRename sets a drive's catalog name (empty: back to the
+// volume's own name) and returns to the drives list, grouped as "by" says.
+func (s *Server) handleDriveRename(w http.ResponseWriter, r *http.Request) {
+	id, err := pathID(r, "id")
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	if err := s.store.RenameDrive(r.Context(), id, r.FormValue("name")); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.NotFound(w, r)
+			return
+		}
+		s.fail(w, r, err, "rename drive")
+		return
+	}
+	next := "/drives"
+	if t := store.Taxonomy(r.FormValue("by")); t.Valid() {
+		next += "?by=" + string(t)
+	}
+	http.Redirect(w, r, next, http.StatusSeeOther)
 }
 
 // parseSearch reads the search form into a query.

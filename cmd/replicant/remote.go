@@ -138,22 +138,23 @@ func newUploadCmd() *cobra.Command {
 }
 
 func uploadBundle(cmd *cobra.Command, c *client.Client, path string) error {
-	return uploadBundleActivity(cmd, c, path, 0)
+	_, err := uploadBundleActivity(cmd, c, path, 0)
+	return err
 }
 
 // uploadBundleActivity uploads and, when activity is set, closes that
 // activity on the server with the stored scan.
-func uploadBundleActivity(cmd *cobra.Command, c *client.Client, path string, activity int64) error {
+func uploadBundleActivity(cmd *cobra.Command, c *client.Client, path string, activity int64) (api.IngestResponse, error) {
 	start := time.Now()
 	fmt.Fprintf(cmd.ErrOrStderr(), "uploading %s to %s\n", path, c.Server)
 	res, err := c.UploadActivity(cmd.Context(), path, activity)
 	if err != nil {
-		return err
+		return res, err
 	}
 	fmt.Fprintf(cmd.OutOrStdout(), "scan %d stored for drive %q: %d files, %d clips, +%d -%d ~%d (latest=%v) in %s\n",
 		res.ScanID, res.DriveName, res.Files, res.Clips, res.Added, res.Removed, res.Changed, res.IsLatest,
 		time.Since(start).Round(time.Millisecond))
-	return nil
+	return res, nil
 }
 
 func newDrivesCmd() *cobra.Command {

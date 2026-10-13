@@ -36,11 +36,11 @@ struct MenuContent: View {
         } else {
             ForEach(visible) { v in
                 Button {
-                    scans.scan(v.url)
+                    DriveNaming.scan(v, settings: settings, scans: scans)
                 } label: {
                     Label(v.name, systemImage: v.isInternal ? "internaldrive" : "externaldrive")
                 }
-                .disabled(scans.current == v.name)
+                .disabled(scans.currentURL == v.url)
             }
         }
         Divider()

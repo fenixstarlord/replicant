@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -30,13 +31,81 @@ type IngestResult struct {
 	FirstScan bool   `json:"first_scan"`
 }
 
-// driveKey identifies a drive: the volume UUID when we have one, otherwise
-// a stable fallback built from the volume name and filesystem.
-func driveKey(v scan.Volume) string {
-	if v.UUID != "" {
-		return v.UUID
+// driveKey identifies a drive; see scan.Volume.Key.
+func driveKey(v scan.Volume) string { return v.Key() }
+
+// upsertDrive records the drive a bundle came from and returns its id and
+// catalog name. chosen is a name the user gave at scan time ("" for none;
+// the volume's own name means "follow the volume" again). Only a bundle at
+// least as new as the drive's newest scan may change what the catalog
+// records about the volume, so a scan ingested late (an old -o file)
+// cannot undo a newer rename or bring back old capacity figures.
+func upsertDrive(ctx context.Context, tx *sql.Tx, vol scan.Volume, volName, chosen string, scannedAt time.Time, now string) (int64, string, error) {
+	key := driveKey(vol)
+	var (
+		id         int64
+		curName    string
+		curRenamed bool
+	)
+	err := tx.QueryRowContext(ctx, `SELECT id, name, renamed FROM drives WHERE volume_uuid = ?`, key).Scan(&id, &curName, &curRenamed)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		id = 0
+	case err != nil:
+		return 0, "", err
 	}
-	return "name:" + v.Name + "|" + v.FSType
+	if id != 0 {
+		newer, err := hasNewerScan(ctx, tx, id, scannedAt)
+		if err != nil {
+			return 0, "", err
+		}
+		if newer {
+			_, err := tx.ExecContext(ctx, `UPDATE drives SET last_seen = ? WHERE id = ?`, now, id)
+			return id, curName, err
+		}
+	}
+
+	name, renamed := volName, false
+	switch {
+	case chosen != "" && chosen != volName:
+		name, renamed = chosen, true
+	case chosen == "" && id != 0 && curRenamed:
+		name, renamed = curName, true
+	}
+	err = tx.QueryRowContext(ctx, `
+		INSERT INTO drives(volume_uuid, name, volume_name, renamed, fs_type, capacity_bytes, free_bytes, device, media_name, protocol, first_seen, last_seen)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(volume_uuid) DO UPDATE SET
+			name = excluded.name, renamed = excluded.renamed, volume_name = excluded.volume_name,
+			fs_type = excluded.fs_type,
+			capacity_bytes = excluded.capacity_bytes, free_bytes = excluded.free_bytes,
+			device = excluded.device, media_name = excluded.media_name, protocol = excluded.protocol,
+			last_seen = excluded.last_seen
+		RETURNING id`,
+		key, name, volName, renamed, vol.FSType, vol.TotalBytes, vol.FreeBytes, vol.Device, vol.MediaName, vol.Protocol, now, now,
+	).Scan(&id)
+	return id, name, err
+}
+
+// hasNewerScan reports whether the drive has a scan taken after t. Times
+// are compared parsed: stored RFC 3339 strings with trimmed fractions do
+// not sort as text.
+func hasNewerScan(ctx context.Context, tx *sql.Tx, driveID int64, t time.Time) (bool, error) {
+	rows, err := tx.QueryContext(ctx, `SELECT scanned_at FROM scans WHERE drive_id = ?`, driveID)
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var v string
+		if err := rows.Scan(&v); err != nil {
+			return false, err
+		}
+		if at, err := time.Parse(time.RFC3339Nano, v); err == nil && at.After(t) {
+			return true, nil
+		}
+	}
+	return false, rows.Err()
 }
 
 type fileSig struct {
@@ -62,6 +131,12 @@ func (s *Store) IngestFrom(ctx context.Context, b *bundle.Bundle, source string,
 		return res, err
 	}
 	if activityID > 0 {
+		// Show the drive under its catalog name, which may differ from the
+		// name the scanner reported when it started.
+		if _, uerr := s.DB.ExecContext(ctx, `UPDATE activity SET drive_name = ? WHERE id = ? AND status = 'running'`,
+			res.DriveName, activityID); uerr != nil {
+			return res, fmt.Errorf("activity name: %w", uerr)
+		}
 		if ferr := s.FinishActivity(ctx, activityID, "done", res.ScanID, ""); ferr != nil {
 			return res, fmt.Errorf("finish activity: %w", ferr)
 		}
@@ -92,24 +167,11 @@ func (s *Store) ingest(ctx context.Context, b *bundle.Bundle, source string) (re
 	m := b.Manifest
 	now := time.Now().UTC().Format(time.RFC3339)
 	vol := m.Volume
-	name := vol.Name
-	if name == "" {
-		name = vol.MountPoint
+	volName := vol.Name
+	if volName == "" {
+		volName = vol.MountPoint
 	}
-
-	// Drive upsert.
-	var driveID int64
-	err = tx.QueryRowContext(ctx, `
-		INSERT INTO drives(volume_uuid, name, fs_type, capacity_bytes, free_bytes, device, media_name, protocol, first_seen, last_seen)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT(volume_uuid) DO UPDATE SET
-			name = excluded.name, fs_type = excluded.fs_type,
-			capacity_bytes = excluded.capacity_bytes, free_bytes = excluded.free_bytes,
-			device = excluded.device, media_name = excluded.media_name, protocol = excluded.protocol,
-			last_seen = excluded.last_seen
-		RETURNING id`,
-		driveKey(vol), name, vol.FSType, vol.TotalBytes, vol.FreeBytes, vol.Device, vol.MediaName, vol.Protocol, now, now,
-	).Scan(&driveID)
+	driveID, name, err := upsertDrive(ctx, tx, vol, volName, strings.TrimSpace(m.DriveName), m.ScannedAt, now)
 	if err != nil {
 		return res, fmt.Errorf("drive upsert: %w", err)
 	}

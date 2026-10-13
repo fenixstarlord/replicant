@@ -81,7 +81,7 @@ struct CatalogView: View {
             Menu {
                 let visible = volumes.volumes.filter { !settings.isIgnored($0) }
                 ForEach(visible) { v in
-                    Button(v.name) { scans.scan(v.url) }.disabled(scans.current == v.name)
+                    Button(v.name) { DriveNaming.scan(v, settings: settings, scans: scans) }.disabled(scans.currentURL == v.url)
                 }
                 if visible.isEmpty { Text("No drives") }
                 Divider()

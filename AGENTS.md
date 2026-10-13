@@ -317,6 +317,20 @@ reads `replicant doctor --json` to report missing metadata tools with a link to 
   byte-identical fingerprints, 20 min clip timeout, tape UUID as drive identity. The manifest
   records tape stats and per-extractor timings. Plan items 4-8 and the measurements to take are in
   `docs/design/tape-mode.md`; nothing has been timed on a real tape yet.
+- **Drive names (2026-10-13):** `drives.name` is the catalog name shown everywhere. It follows the
+  volume's name until the drive is renamed (`drives.renamed`, migration 0006); `volume_name` keeps
+  what the volume reports. Rename on the server (Drives list pencil, `POST /drives/{id}/rename`, or
+  the Name field on the drive page; empty goes back to the volume name) or at scan time with
+  `replicant scan --name` (bundle `manifest.drive_name`; the volume's own name means "follow the
+  volume" again). Only a bundle at least as new as the drive's newest scan may change its name or
+  volume fields (`upsertDrive`). History rows show the drive's current name. Renaming never touches
+  the drive itself (hard rule 1). The menu bar app asks for a name the first time a drive is picked
+  on that Mac (`DriveNaming.swift`, one dialog per drive, pre-filled from `replicant drive --json`),
+  passes `--name` only when it differs from what the catalog would store, and remembers the drive
+  (UserDefaults `namedVolumes`, by volume UUID or name) only after the named scan succeeded; the
+  name travels in a `ScanRequest` that re-checks the mounted volume before running. Volumes diskutil
+  cannot describe (network shares, FUSE) are named after their mount point, so they no longer all
+  share the key `name:|smbfs`; rows stored under that old key are not migrated.
 - **Partial scans (decided 2026-10-08):** a scan whose root is not the mount point is `is_partial`;
   latest and diffs are tracked per (drive, root); drive aggregates and default browsing prefer the
   latest full scan (`store.LatestScan`). Migration `0002_partial_scans.sql`.

@@ -718,3 +718,64 @@ func TestActivityAPIAndHistory(t *testing.T) {
 		t.Errorf("history lacks the backfilled scan")
 	}
 }
+
+func TestRenameDrive(t *testing.T) {
+	s, c, res := seedPages(t)
+	ctx := context.Background()
+	name := func() store.Drive {
+		t.Helper()
+		d, err := s.store.GetDrive(ctx, res.DriveID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return d
+	}
+
+	// From the drives list: the rename modal posts here.
+	rec := post(t, s, c, fmt.Sprintf("/drives/%d/rename", res.DriveID), url.Values{"name": {"Day 1 · A cam"}, "by": {"client"}})
+	if rec.Code != 303 || rec.Header().Get("Location") != "/drives?by=client" {
+		t.Fatalf("rename = %d %q", rec.Code, rec.Header().Get("Location"))
+	}
+	if d := name(); d.Name != "Day 1 · A cam" || !d.Renamed || d.VolumeName != "Shelf9" {
+		t.Errorf("after rename: %+v", d)
+	}
+	if code, body := get(t, s, c, "/drives"); code != 200 || !strings.Contains(body, "Day 1 · A cam") || !strings.Contains(body, "Shelf9") {
+		t.Errorf("drives page = %d, missing the new or the volume name", code)
+	}
+	// The redirect is built from a known grouping, never from the request.
+	for _, by := range []string{"https://evil.example/", "/\t/evil.example/", ""} {
+		if rec := post(t, s, c, fmt.Sprintf("/drives/%d/rename", res.DriveID), url.Values{"name": {"x"}, "by": {by}}); rec.Header().Get("Location") != "/drives" {
+			t.Errorf("by %q redirected to %q", by, rec.Header().Get("Location"))
+		}
+	}
+	if rec := post(t, s, c, "/drives/999/rename", url.Values{"name": {"x"}}); rec.Code != 404 {
+		t.Errorf("unknown drive = %d, want 404", rec.Code)
+	}
+
+	// From the drive page: an empty name goes back to the volume's name,
+	// and saving other fields with the name left empty keeps it that way.
+	if rec := post(t, s, c, fmt.Sprintf("/drives/%d", res.DriveID), url.Values{"name": {""}, "label": {"silver LaCie"}, "location": {""}, "notes": {""}}); rec.Code != 303 {
+		t.Fatalf("edit = %d", rec.Code)
+	}
+	if d := name(); d.Name != "Shelf9" || d.Renamed || d.Label != "silver LaCie" {
+		t.Errorf("after clearing the name: %+v", d)
+	}
+	if code, body := get(t, s, c, fmt.Sprintf("/browse/%d", res.DriveID)); code != 200 || !strings.Contains(body, `name="name" value=""`) {
+		t.Errorf("drive page = %d, name field should be empty for a drive that was not renamed", code)
+	}
+
+	// A drive page loaded before a rename does not undo it when other
+	// fields are saved: the form says which name it was showing.
+	post(t, s, c, fmt.Sprintf("/drives/%d/rename", res.DriveID), url.Values{"name": {"Named elsewhere"}})
+	post(t, s, c, fmt.Sprintf("/drives/%d", res.DriveID), url.Values{"name": {""}, "name_was": {""}, "label": {""}, "location": {"Shelf B"}, "notes": {""}})
+	if d := name(); d.Name != "Named elsewhere" || d.Location != "Shelf B" {
+		t.Errorf("stale form undid a rename: %+v", d)
+	}
+
+	// Without a name field (older forms), the name is left alone.
+	post(t, s, c, fmt.Sprintf("/drives/%d/rename", res.DriveID), url.Values{"name": {"Kept"}})
+	post(t, s, c, fmt.Sprintf("/drives/%d", res.DriveID), url.Values{"label": {""}, "location": {""}, "notes": {""}})
+	if d := name(); d.Name != "Kept" || !d.Renamed {
+		t.Errorf("edit without a name field changed the name: %+v", d)
+	}
+}

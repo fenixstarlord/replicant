@@ -8,7 +8,19 @@ struct Volume: Identifiable, Hashable {
     let name: String
     let isInternal: Bool
     let isRoot: Bool
+    var uuid: String? = nil
     var id: String { url.path }
+    /// Identifies the drive across mounts on this Mac: its volume UUID, or its
+    /// name when the filesystem has none.
+    var stableKey: String { Self.stableKey(uuid: uuid, name: name) }
+
+    static func stableKey(uuid: String?, name: String) -> String { uuid.map { "uuid:" + $0 } ?? "name:" + name }
+
+    /// The stableKey of the volume mounted at url right now, if any.
+    static func stableKey(of url: URL) -> String? {
+        guard let v = try? url.resourceValues(forKeys: [.volumeUUIDStringKey, .volumeNameKey]) else { return nil }
+        return stableKey(uuid: v.volumeUUIDString, name: v.volumeName ?? url.lastPathComponent)
+    }
 }
 
 /// Watches the volumes mounted on this Mac.
@@ -33,14 +45,15 @@ final class VolumeMonitor: ObservableObject {
     }
 
     func refresh() {
-        let keys: [URLResourceKey] = [.volumeNameKey, .volumeIsInternalKey, .volumeIsRootFileSystemKey, .volumeIsBrowsableKey]
+        let keys: [URLResourceKey] = [.volumeNameKey, .volumeIsInternalKey, .volumeIsRootFileSystemKey, .volumeIsBrowsableKey, .volumeUUIDStringKey]
         let urls = FileManager.default.mountedVolumeURLs(includingResourceValuesForKeys: keys, options: [.skipHiddenVolumes]) ?? []
         var out: [Volume] = []
         for url in urls {
             guard let values = try? url.resourceValues(forKeys: Set(keys)) else { continue }
             if values.volumeIsBrowsable == false { continue }
             let name = values.volumeName ?? url.lastPathComponent
-            out.append(Volume(url: url, name: name, isInternal: values.volumeIsInternal ?? false, isRoot: values.volumeIsRootFileSystem ?? false))
+            out.append(Volume(url: url, name: name, isInternal: values.volumeIsInternal ?? false, isRoot: values.volumeIsRootFileSystem ?? false,
+                              uuid: values.volumeUUIDString))
         }
         volumes = out.sorted { a, b in
             if a.isRoot != b.isRoot { return !a.isRoot }

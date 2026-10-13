@@ -101,7 +101,12 @@ final class AutoScanner: ObservableObject {
         let (code, out) = await ReplicantCLI.run(["drives", "--json"])
         guard code == 0, let data = out.data(using: .utf8),
               let rows = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return }
-        catalog = rows.compactMap { $0["name"] as? String }.sorted()
+        // Rules match mounted volumes by their own name, so offer the name the
+        // volume reports, not a catalog name the drive may have been given.
+        catalog = rows.compactMap { row in
+            if let v = row["volume_name"] as? String, !v.isEmpty { return v }
+            return row["name"] as? String
+        }.sorted()
     }
 
     /// Every drive name that can have a rule, mounted or not: mounted
@@ -142,7 +147,7 @@ final class AutoScanner: ObservableObject {
         for v in volumes.volumes where allowed(v) {
             guard let interval = rule(for: v.name).interval else { continue }
             if let last = lastScanned[v.url.path], Date().timeIntervalSince(last) < interval { continue }
-            if scans.current == v.name || scans.queue.contains(v.url) { continue }
+            if scans.currentURL == v.url || scans.queue.contains(v.url) { continue }
             scans.scan(v.url)
         }
     }

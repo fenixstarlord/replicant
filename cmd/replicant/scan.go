@@ -92,8 +92,9 @@ func streamLimit(mb int64) int64 {
 }
 
 // runScan runs the shared pipeline with terminal progress. rep, if not
-// nil, also sends progress to the server.
-func runScan(cmd *cobra.Command, root string, f *scanFlags, rep *client.ActivityReporter) (*scanner.Result, error) {
+// nil, also sends progress to the server, showing the drive as driveName
+// when one is given.
+func runScan(cmd *cobra.Command, root string, f *scanFlags, rep *client.ActivityReporter, driveName string) (*scanner.Result, error) {
 	ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	// After the first Ctrl-C, restore the default so a second one exits
@@ -160,7 +161,11 @@ func runScan(cmd *cobra.Command, root string, f *scanFlags, rep *client.Activity
 		return nil, err
 	}
 	v := res.Volume
-	rep.Describe(v.Name, v.UUID)
+	shown := v.Name
+	if driveName != "" {
+		shown = driveName
+	}
+	rep.Describe(shown, v.UUID)
 	fmt.Fprintf(stderr, "volume %q uuid=%s fs=%s mount=%s\n", v.Name, v.UUID, v.FSType, v.MountPoint)
 	fmt.Fprintf(stderr, "grouped %d clips: %v\n", len(res.Clips), clips.Summary(res.Clips))
 	if !f.fast {
@@ -188,8 +193,9 @@ func runScan(cmd *cobra.Command, root string, f *scanFlags, rep *client.Activity
 
 func newScanCmd() *cobra.Command {
 	var (
-		f      scanFlags
-		output string
+		f         scanFlags
+		output    string
+		driveName string
 	)
 	cmd := &cobra.Command{
 		Use:   "scan <path>",
@@ -212,15 +218,21 @@ by 'replicant login'.`,
 				abs, _ := filepath.Abs(args[0])
 				host, _ := os.Hostname()
 				var aerr error
-				rep, aerr = client.NewActivityReporter(cmd.Context(), c, api.ActivityStart{Host: host, DriveName: filepath.Base(abs), Root: abs})
+				shown := filepath.Base(abs)
+				if driveName != "" {
+					shown = driveName
+				}
+				rep, aerr = client.NewActivityReporter(cmd.Context(), c, api.ActivityStart{Host: host, DriveName: shown, Root: abs})
 				if aerr != nil {
 					fmt.Fprintf(cmd.ErrOrStderr(), "note: could not report progress to the server: %v\n", aerr)
 				}
 			}
-			res, err := runScan(cmd, args[0], &f, rep)
+			res, err := runScan(cmd, args[0], &f, rep, driveName)
 			if err != nil {
 				return err
 			}
+			m := res.Manifest()
+			m.DriveName = driveName
 			if c != nil {
 				tmp, err := os.CreateTemp("", "replicant-push-*.replicant")
 				if err != nil {
@@ -230,7 +242,7 @@ by 'replicant login'.`,
 				defer os.Remove(tmp.Name())
 				output = tmp.Name()
 			}
-			if err := writeBundleFile(output, res.Manifest(), res.Entries, res.Clips); err != nil {
+			if err := writeBundleFile(output, m, res.Entries, res.Clips); err != nil {
 				rep.Finish("error", err.Error())
 				return err
 			}
@@ -238,9 +250,14 @@ by 'replicant login'.`,
 			fmt.Fprintf(cmd.ErrOrStderr(), "wrote %s (%d bytes) in %s\n", output, st.Size(), time.Since(res.Started).Round(time.Millisecond))
 			if c != nil {
 				rep.Progress("upload", 0, 0)
-				if err := uploadBundleActivity(cmd, c, output, rep.ID()); err != nil {
+				stored, err := uploadBundleActivity(cmd, c, output, rep.ID())
+				if err != nil {
 					rep.Finish("error", err.Error())
 					return err
+				}
+				if driveName != "" && stored.DriveName != driveName {
+					fmt.Fprintf(cmd.ErrOrStderr(), "note: the server kept the name %q, not %q (an older server, or it has a newer scan of this drive)\n",
+						stored.DriveName, driveName)
 				}
 				return nil
 			}
@@ -249,6 +266,7 @@ by 'replicant login'.`,
 	}
 	f.bind(cmd)
 	cmd.Flags().StringVarP(&output, "output", "o", "", "write the bundle to this file instead of pushing")
+	cmd.Flags().StringVar(&driveName, "name", "", "catalog name for the drive, kept on later scans; the volume's own name makes it follow the volume again (default: leave the catalog name as it is)")
 	return cmd
 }
 

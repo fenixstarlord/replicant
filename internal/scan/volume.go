@@ -1,5 +1,7 @@
 package scan
 
+import "path/filepath"
+
 // Volume identifies the filesystem that contains a scanned path.
 type Volume struct {
 	MountPoint string `json:"mount_point"`
@@ -15,6 +17,15 @@ type Volume struct {
 	LTFS bool `json:"ltfs,omitempty"`
 }
 
+// Key identifies the drive in the catalog: the volume UUID when there is
+// one, otherwise a fallback built from the volume name and filesystem.
+func (v Volume) Key() string {
+	if v.UUID != "" {
+		return v.UUID
+	}
+	return "name:" + v.Name + "|" + v.FSType
+}
+
 // VolumeInfo describes the volume containing path. Mount point,
 // filesystem type, and capacity come from the OS; on macOS the UUID,
 // volume name, and device details come from diskutil. On an LTFS tape the
@@ -27,6 +38,12 @@ func VolumeInfo(path string) (Volume, error) {
 		return Volume{}, err
 	}
 	fillVolumeDetails(&v)
+	if v.Name == "" && v.MountPoint != "" && v.MountPoint != "/" {
+		// diskutil knows nothing about network shares and FUSE mounts;
+		// name them after their mount point, as on Linux, so they do not
+		// all share one catalog key.
+		v.Name = filepath.Base(v.MountPoint)
+	}
 	tape, ok := DetectLTFS(path)
 	if !ok && v.MountPoint != "" {
 		tape, ok = DetectLTFS(v.MountPoint)

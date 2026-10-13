@@ -77,6 +77,7 @@
         <div class="stat py-2"><div class="stat-title">Catalogued</div><div class="stat-value text-lg">{{n .Drive.FileCount}} files</div><div class="stat-desc">{{n .Drive.ClipCount}} clips · {{bytes .Drive.TotalBytes}}</div></div>
       </div>
       <dl class="kv">
+        {{if .Drive.Renamed}}<dt>Volume name</dt><dd>{{.Drive.VolumeName}}</dd>{{end}}
         <dt>UUID</dt><dd class="mono text-xs break-all">{{.Drive.VolumeUUID}}</dd>
         {{if .Drive.MediaName}}<dt>Media</dt><dd>{{.Drive.MediaName}}</dd>{{end}}
         <dt>First seen</dt><dd>{{datetime .Drive.FirstSeen}}</dd>
@@ -86,6 +87,8 @@
     <div>
       <h2 class="text-base mt-0">Where is it?</h2>
       <form method="post" action="/drives/{{$d}}" class="flex flex-col gap-2">
+        <input type="hidden" name="name_was" value="{{if .Drive.Renamed}}{{.Drive.Name}}{{end}}">
+        <label class="form-control flex flex-col gap-1"><span class="label-text">Name</span><input class="input input-bordered input-sm w-full" name="name" value="{{if .Drive.Renamed}}{{.Drive.Name}}{{end}}" placeholder="{{.Drive.VolumeName}}"><span class="muted text-xs">Leave empty to use the volume's name{{if .Drive.VolumeName}}, {{.Drive.VolumeName}}{{end}}.</span></label>
         <label class="form-control"><span class="label-text">Label</span><input class="input input-bordered input-sm" name="label" value="{{.Drive.Label}}" placeholder="e.g. 2TB silver LaCie"></label>
         <label class="form-control"><span class="label-text">Location</span><input class="input input-bordered input-sm" name="location" value="{{.Drive.Location}}" placeholder="e.g. Shelf B, box 3"></label>
         <label class="form-control"><span class="label-text">Notes</span><input class="input input-bordered input-sm" name="notes" value="{{.Drive.Notes}}"></label>

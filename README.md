@@ -42,6 +42,8 @@ replicant scan /Volumes/X -o x.replicant       scan to a bundle file (no network
 replicant scan /Volumes/X --fast           filesystem only, no metadata extraction
 replicant upload x.replicant                   push a bundle later
 replicant drives                           list drives known to the server
+replicant drive /Volumes/X [--json]        how the catalog knows the drive at a path (no files read)
+replicant scan /Volumes/X --name "Day 1 A cam"   scan and give the drive a catalog name
 replicant dump /Volumes/X [--clips]        print what would be indexed as JSON lines
 ```
 
@@ -78,7 +80,9 @@ first launch on another Mac is right-click → Open.
 ## Menu bar app (macOS)
 
 `make app` builds `dist/Replicant Client.app`, a menu bar app with the `replicant` CLI bundled inside. Drag it to
-Applications and open it. From the drop-down, click a drive to scan it and push it to the server;
+Applications and open it. From the drop-down, click a drive to scan it and push it to the server.
+The first time you pick a drive on that Mac, the app asks what the catalog should call it
+(suggesting its current catalog name, or the volume's name); later clicks scan straight away.
 Browse… scans a folder or network share instead. Settings… takes the connection key from the
 server's API keys page (one string with the address and the key, stored in the same
 `~/.config/replicant/config.toml` the CLI uses), drives to ignore, automatic scans (a global "scan any
@@ -87,6 +91,11 @@ rescans), and launch at login. Both apps check GitHub Releases on launch and eve
 shows an "Update to vX.Y.Z…" item in the menu, a notification, and a download button in Settings. Scans run one at a time; a notification reports each result.
 
 ## Server
+
+Drives show under a catalog name. It is the volume's own name until you rename the drive: the
+pencil next to it on the Drives page, the Name field on the drive's page, or `replicant scan --name`.
+A renamed drive keeps its name on later scans; clearing the name goes back to the volume's name.
+Renaming only changes the catalog, never the drive.
 
 Environment variables:
 

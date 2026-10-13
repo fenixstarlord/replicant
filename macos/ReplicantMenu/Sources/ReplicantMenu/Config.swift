@@ -12,11 +12,21 @@ final class AppSettings: ObservableObject {
         didSet { UserDefaults.standard.set(Array(ignored).sorted(), forKey: "ignoredVolumes") }
     }
     @Published var launchAtLogin: Bool = SMAppService.mainApp.status == .enabled
+    /// Drives (Volume.stableKey) already named on this Mac; choosing one of
+    /// them from a menu scans it straight away.
+    private var named: Set<String> {
+        didSet { UserDefaults.standard.set(Array(named).sorted(), forKey: "namedVolumes") }
+    }
 
     init() {
         ignored = Set(UserDefaults.standard.stringArray(forKey: "ignoredVolumes") ?? [])
+        named = Set(UserDefaults.standard.stringArray(forKey: "namedVolumes") ?? [])
         reload()
     }
+
+    func wasNamed(_ v: Volume) -> Bool { named.contains(v.stableKey) }
+
+    func markNamed(_ v: Volume) { named.insert(v.stableKey) }
 
     static var configURL: URL {
         if let p = ReplicantCLI.environment["REPLICANT_CONFIG"] ?? ProcessInfo.processInfo.environment["REPLICANT_CONFIG"], !p.isEmpty { return URL(fileURLWithPath: p) }

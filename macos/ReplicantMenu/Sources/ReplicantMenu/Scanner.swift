@@ -63,15 +63,30 @@ struct ScanRecord: Identifiable {
     let summary: String
 }
 
+/// A scan waiting to run, or running.
+struct ScanRequest {
+    let url: URL
+    /// Catalog name for the drive (`replicant scan --name`), if one was chosen.
+    var name: String? = nil
+    /// Volume.stableKey of the drive the name was chosen for; checked again
+    /// before the scan runs, so the name never lands on another drive
+    /// mounted at the same path.
+    var volumeKey: String? = nil
+    /// Called once the scan ends: whether it succeeded with the name applied.
+    var onDone: ((Bool) -> Void)? = nil
+}
+
 /// Runs scans one at a time through `replicant scan <path>` and reports progress.
 @MainActor
 final class ScanManager: ObservableObject {
     @Published private(set) var current: String? = nil      // display name
+    @Published private(set) var currentURL: URL? = nil       // what is being scanned
     @Published private(set) var status: String = ""          // last progress line
-    @Published private(set) var queue: [URL] = []
+    @Published private(set) var queue: [URL] = []            // waiting, for display
     @Published private(set) var recent: [ScanRecord] = []
     /// Called after every scan with the path and whether it succeeded.
     var onFinished: ((URL, Bool) -> Void)?
+    private var pending: [ScanRequest] = []
     private var process: Process?
 
     var isScanning: Bool { current != nil }
@@ -80,29 +95,64 @@ final class ScanManager: ObservableObject {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
     }
 
-    func scan(_ url: URL) {
-        if current != nil || queue.contains(url) {
-            if !queue.contains(url) { queue.append(url) }
+    /// Scans url now, or queues it behind the running scan.
+    func scan(_ url: URL) { scan(ScanRequest(url: url)) }
+
+    /// Scans a request now, or queues it. A plain request for something
+    /// already running or queued is dropped; a named one replaces a queued
+    /// plain one, or is queued behind a running scan of the same path.
+    func scan(_ req: ScanRequest) {
+        if let i = pending.firstIndex(where: { $0.url == req.url }) {
+            if req.name != nil {
+                pending[i].onDone?(false)
+                pending[i] = req
+            } else {
+                req.onDone?(false)
+            }
             return
         }
-        Task { await run(url) }
+        if currentURL == req.url && req.name == nil {
+            req.onDone?(false)
+            return
+        }
+        if currentURL != nil {
+            pending.append(req)
+            queue = pending.map(\.url)
+            return
+        }
+        start(req)
+    }
+
+    /// Marks the request as running at once, so a second call in the same
+    /// turn queues instead of starting a parallel scan.
+    private func start(_ req: ScanRequest) {
+        current = req.name ?? req.url.lastPathComponent
+        currentURL = req.url
+        status = "Starting…"
+        Task { await run(req) }
     }
 
     func cancel() {
         process?.interrupt()
     }
 
-    private func run(_ url: URL) async {
-        let name = url.lastPathComponent
-        current = name
-        status = "Starting…"
+    private func run(_ req: ScanRequest) async {
+        let url = req.url
+        var chosen = req.name
+        if chosen != nil, let key = req.volumeKey, Volume.stableKey(of: url) != key {
+            // Another drive is mounted at this path now; the name was not for it.
+            chosen = nil
+        }
+        let name = current ?? url.lastPathComponent
         guard let cli = ReplicantCLI.url else {
             finish(url, name: name, ok: false, summary: "replicant CLI not found")
+            req.onDone?(false)
+            next()
             return
         }
         let p = Process()
         p.executableURL = cli
-        p.arguments = ["scan", url.path]
+        p.arguments = chosen.map { ["scan", "--name", $0, url.path] } ?? ["scan", url.path]
         ReplicantCLI.apply(to: p)
         let errPipe = Pipe(), outPipe = Pipe()
         p.standardError = errPipe
@@ -134,16 +184,23 @@ final class ScanManager: ObservableObject {
             ? (stdout.split(separator: "\n").last.map(String.init) ?? "done")
             : (code == 2 || status.contains("interrupt") ? "cancelled" : status)
         finish(url, name: name, ok: ok, summary: summary)
-        if let next = queue.first {
-            queue.removeFirst()
-            await run(next)
-        }
+        req.onDone?(ok && chosen != nil)
+        next()
+    }
+
+    /// Starts the next queued scan, if any.
+    private func next() {
+        guard !pending.isEmpty else { return }
+        let req = pending.removeFirst()
+        queue = pending.map(\.url)
+        start(req)
     }
 
     private func finish(_ url: URL, name: String, ok: Bool, summary: String) {
         recent.insert(ScanRecord(path: url.path, name: name, finished: Date(), ok: ok, summary: summary), at: 0)
         if recent.count > 10 { recent.removeLast() }
         current = nil
+        currentURL = nil
         status = ""
         onFinished?(url, ok)
         NotificationCenter.default.post(name: .scanFinished, object: nil)

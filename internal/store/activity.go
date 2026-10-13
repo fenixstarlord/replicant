@@ -104,8 +104,11 @@ func (s *Store) LoseServerActivity(ctx context.Context) error {
 	return err
 }
 
-const activityColumns = `a.id, a.host, a.source, a.drive_name, a.volume_uuid, a.root, a.stage, a.done, a.total, a.status, a.error,
-	a.scan_id, s.drive_id, a.started_at, a.updated_at, a.finished_at FROM activity a LEFT JOIN scans s ON s.id = a.scan_id`
+// activityColumns shows a stored scan under its drive's current catalog
+// name, so history follows renames; other rows keep the reported name.
+const activityColumns = `a.id, a.host, a.source, coalesce(d.name, a.drive_name), a.volume_uuid, a.root, a.stage, a.done, a.total, a.status, a.error,
+	a.scan_id, s.drive_id, a.started_at, a.updated_at, a.finished_at
+	FROM activity a LEFT JOIN scans s ON s.id = a.scan_id LEFT JOIN drives d ON d.id = s.drive_id`
 
 func scanActivity(rows *sql.Rows) (Activity, error) {
 	var a Activity
