@@ -91,15 +91,32 @@ func streamLimit(mb int64) int64 {
 	return mb << 20
 }
 
-// runScan runs the shared pipeline with terminal progress. rep, if not
-// nil, also sends progress to the server, showing the drive as driveName
-// when one is given.
-func runScan(cmd *cobra.Command, root string, f *scanFlags, rep *client.ActivityReporter, driveName string) (*scanner.Result, error) {
+// scanContext is the context of a scan command, from start to the end of
+// the upload: cancelled by SIGINT or SIGTERM, so the app's Cancel, quit and
+// eject stop a scan cleanly at any stage, and, when the macOS app started
+// the command, once the app has gone.
+func scanContext(cmd *cobra.Command) (context.Context, context.CancelFunc) {
 	ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 	// After the first Ctrl-C, restore the default so a second one exits
 	// even while a tape read is still in progress.
 	context.AfterFunc(ctx, stop)
+	if os.Getenv("REPLICANT_EXIT_WITH_PARENT") == "1" {
+		// If the app quits or crashes, stop rather than keep the drive busy
+		// with nobody to report to.
+		ctx = cancelWhenOrphaned(ctx, os.Getppid, time.Second)
+	}
+	return ctx, stop
+}
+
+// finishedReadingLine starts the stderr line printed once a scan has
+// closed every file on the drive. The macOS app watches for it: from then
+// on an eject no longer needs to stop the scan. Keep it stable.
+const finishedReadingLine = "finished reading "
+
+// runScan runs the shared pipeline with terminal progress. rep, if not
+// nil, also sends progress to the server, showing the drive as driveName
+// when one is given.
+func runScan(ctx context.Context, cmd *cobra.Command, root string, f *scanFlags, rep *client.ActivityReporter, driveName string) (*scanner.Result, error) {
 	stderr := cmd.ErrOrStderr()
 	cfg, err := cliconfig.Load()
 	if err != nil {
@@ -152,6 +169,9 @@ func runScan(cmd *cobra.Command, root string, f *scanFlags, rep *client.Activity
 	printMu.Lock()
 	endLine()
 	printMu.Unlock()
+	if err == nil {
+		fmt.Fprintf(stderr, "%s%s\n", finishedReadingLine, res.Root)
+	}
 	if err != nil {
 		if ctx.Err() != nil {
 			rep.Finish("cancelled", "")
@@ -206,6 +226,8 @@ is written to a file; without it the bundle is pushed to the server configured
 by 'replicant login'.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx, stop := scanContext(cmd)
+			defer stop()
 			var c *client.Client
 			if output == "" {
 				var err error
@@ -222,12 +244,12 @@ by 'replicant login'.`,
 				if driveName != "" {
 					shown = driveName
 				}
-				rep, aerr = client.NewActivityReporter(cmd.Context(), c, api.ActivityStart{Host: host, DriveName: shown, Root: abs})
+				rep, aerr = client.NewActivityReporter(ctx, c, api.ActivityStart{Host: host, DriveName: shown, Root: abs})
 				if aerr != nil {
 					fmt.Fprintf(cmd.ErrOrStderr(), "note: could not report progress to the server: %v\n", aerr)
 				}
 			}
-			res, err := runScan(cmd, args[0], &f, rep, driveName)
+			res, err := runScan(ctx, cmd, args[0], &f, rep, driveName)
 			if err != nil {
 				return err
 			}
@@ -250,8 +272,12 @@ by 'replicant login'.`,
 			fmt.Fprintf(cmd.ErrOrStderr(), "wrote %s (%d bytes) in %s\n", output, st.Size(), time.Since(res.Started).Round(time.Millisecond))
 			if c != nil {
 				rep.Progress("upload", 0, 0)
-				stored, err := uploadBundleActivity(cmd, c, output, rep.ID())
+				stored, err := uploadBundleActivity(ctx, cmd, c, output, rep.ID())
 				if err != nil {
+					if ctx.Err() != nil {
+						rep.Finish("cancelled", "")
+						return ctx.Err()
+					}
 					rep.Finish("error", err.Error())
 					return err
 				}
@@ -288,4 +314,27 @@ func writeBundleFile(path string, m bundle.Manifest, entries []scan.Entry, cl []
 		return err
 	}
 	return os.Rename(tmpName, path)
+}
+
+// cancelWhenOrphaned returns a context that is cancelled once the parent
+// process has exited: the process is re-parented, so getppid changes.
+func cancelWhenOrphaned(parent context.Context, getppid func() int, every time.Duration) context.Context {
+	ctx, cancel := context.WithCancel(parent)
+	ppid := getppid()
+	go func() {
+		t := time.NewTicker(every)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				if getppid() != ppid {
+					cancel()
+					return
+				}
+			}
+		}
+	}()
+	return ctx
 }

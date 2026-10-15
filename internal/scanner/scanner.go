@@ -5,6 +5,7 @@ package scanner
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -68,11 +69,29 @@ type Result struct {
 }
 
 // Run scans root. progress may be nil; it is called from several goroutines.
+// If root goes away during the scan (its drive is ejected or unplugged),
+// Run stops and returns an error wrapping ErrRootGone.
 func Run(ctx context.Context, root string, opts Options, progress func(Progress)) (*Result, error) {
 	abs, err := filepath.Abs(root)
 	if err != nil {
 		return nil, err
 	}
+	ctx, gone, stopWatch, err := watchRoot(ctx, abs)
+	if err != nil {
+		return nil, err
+	}
+	defer stopWatch()
+	res, err := run(ctx, abs, opts, progress)
+	// The watch checks once a second; look again now, whether the scan
+	// failed (a drive pulled out before the first check makes the walk
+	// fail) or finished (pulled out during the last second).
+	if errors.Is(context.Cause(ctx), ErrRootGone) || (ctx.Err() == nil && gone()) {
+		return nil, fmt.Errorf("%w: %s", ErrRootGone, abs)
+	}
+	return res, err
+}
+
+func run(ctx context.Context, abs string, opts Options, progress func(Progress)) (*Result, error) {
 	report := func(p Progress) {
 		if progress != nil {
 			progress(p)

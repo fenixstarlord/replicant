@@ -48,7 +48,7 @@ struct MenuContent: View {
         if !scans.recent.isEmpty {
             Menu("Recent scans") {
                 ForEach(scans.recent) { r in
-                    Text("\(r.ok ? "✓" : "✕") \(r.name) · \(r.summary)")
+                    Text("\(r.outcome.symbol) \(r.name) · \(r.summary)")
                 }
             }
         }

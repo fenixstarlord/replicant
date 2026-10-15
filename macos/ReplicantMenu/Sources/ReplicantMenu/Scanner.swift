@@ -10,6 +10,9 @@ enum ReplicantCLI {
     static func apply(to p: Process) {
         var env = ProcessInfo.processInfo.environment
         env["PATH"] = (env["PATH"] ?? "/usr/bin:/bin") + ":/opt/homebrew/bin:/usr/local/bin"
+        // A scan stops by itself if the app quits or crashes, so it never keeps
+        // a drive busy with nobody to report to.
+        env["REPLICANT_EXIT_WITH_PARENT"] = "1"
         for (k, v) in environment { env[k] = v }
         p.environment = env
     }
@@ -53,13 +56,31 @@ enum ReplicantCLI {
     }
 }
 
-/// One finished or failed scan, for the Recent submenu.
+/// How a scan ended.
+enum ScanOutcome: Sendable {
+    case succeeded
+    case failed
+    case cancelled        // Cancel scan
+    case stoppedForEject  // stopped so the drive could be ejected
+    case driveRemoved     // the drive went away mid-scan (CLI exit 3)
+    case quit             // stopped because the app quit
+
+    var symbol: String {
+        switch self {
+        case .succeeded: "✓"
+        case .failed: "✕"
+        default: "⏹"
+        }
+    }
+}
+
+/// One finished, failed or stopped scan, for the Recent submenu.
 struct ScanRecord: Identifiable {
     let id = UUID()
     let path: String
     let name: String
     let finished: Date
-    let ok: Bool
+    let outcome: ScanOutcome
     let summary: String
 }
 
@@ -72,8 +93,10 @@ struct ScanRequest {
     /// before the scan runs, so the name never lands on another drive
     /// mounted at the same path.
     var volumeKey: String? = nil
-    /// Called once the scan ends: whether it succeeded with the name applied.
+    /// Called once the request ends: whether it was scanned with the name applied.
     var onDone: ((Bool) -> Void)? = nil
+    /// Started by an auto-scan rule rather than by the user.
+    var automatic = false
 }
 
 /// Runs scans one at a time through `replicant scan <path>` and reports progress.
@@ -84,15 +107,30 @@ final class ScanManager: ObservableObject {
     @Published private(set) var status: String = ""          // last progress line
     @Published private(set) var queue: [URL] = []            // waiting, for display
     @Published private(set) var recent: [ScanRecord] = []
-    /// Called after every scan with the path and whether it succeeded.
-    var onFinished: ((URL, Bool) -> Void)?
+    /// Called after every scan with the path and how it ended.
+    var onFinished: ((URL, ScanOutcome) -> Void)?
     private var pending: [ScanRequest] = []
-    private var process: Process?
+    private var observers: [NSObjectProtocol] = []
 
     var isScanning: Bool { current != nil }
 
     init() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        // Quitting stops the running scan and its tools (a crash is covered by
+        // the CLI itself, see REPLICANT_EXIT_WITH_PARENT).
+        observers.append(NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification, object: nil, queue: .main
+        ) { _ in
+            ActiveScan.shared.stop(.quit, timeout: 2)
+        })
+        // A drive being ejected: forget queued scans of it (EjectWatcher stops
+        // the running one).
+        observers.append(NotificationCenter.default.addObserver(
+            forName: .volumeEjecting, object: nil, queue: .main
+        ) { [weak self] note in
+            guard let volume = note.object as? String else { return }
+            MainActor.assumeIsolated { self?.dropQueued(onVolume: volume) }
+        })
     }
 
     /// Scans url now, or queues it behind the running scan.
@@ -102,6 +140,15 @@ final class ScanManager: ObservableObject {
     /// already running or queued is dropped; a named one replaces a queued
     /// plain one, or is queued behind a running scan of the same path.
     func scan(_ req: ScanRequest) {
+        if ActiveScan.shared.isEjecting(req.url.path) {
+            if req.automatic {
+                req.onDone?(false)
+                return
+            }
+            // The user picked the drive, so it is still there (an eject that
+            // did not go through).
+            ActiveScan.shared.clearEjecting(covering: req.url.path)
+        }
         if let i = pending.firstIndex(where: { $0.url == req.url }) {
             if req.name != nil {
                 pending[i].onDone?(false)
@@ -133,7 +180,15 @@ final class ScanManager: ObservableObject {
     }
 
     func cancel() {
-        process?.interrupt()
+        ActiveScan.shared.interrupt(.user)
+    }
+
+    private func dropQueued(onVolume volume: String) {
+        let dropped = pending.filter { ActiveScan.shared.isEjecting($0.url.path) }
+        guard !dropped.isEmpty else { return }
+        pending.removeAll { ActiveScan.shared.isEjecting($0.url.path) }
+        queue = pending.map(\.url)
+        dropped.forEach { $0.onDone?(false) }
     }
 
     private func run(_ req: ScanRequest) async {
@@ -145,7 +200,7 @@ final class ScanManager: ObservableObject {
         }
         let name = current ?? url.lastPathComponent
         guard let cli = ReplicantCLI.url else {
-            finish(url, name: name, ok: false, summary: "replicant CLI not found")
+            finish(url, name: name, outcome: .failed, summary: "replicant CLI not found")
             req.onDone?(false)
             next()
             return
@@ -157,56 +212,110 @@ final class ScanManager: ObservableObject {
         let errPipe = Pipe(), outPipe = Pipe()
         p.standardError = errPipe
         p.standardOutput = outPipe
-        process = p
 
         // Stream stderr for progress; collect stdout for the result line.
         errPipe.fileHandleForReading.readabilityHandler = { [weak self] h in
             let chunk = String(decoding: h.availableData, as: UTF8.self)
             guard !chunk.isEmpty else { return }
+            // The CLI has closed every file on the drive (it is writing or
+            // uploading the bundle now): an eject need not stop it.
+            if chunk.contains("finished reading ") { ActiveScan.shared.doneReading() }
             let lines = chunk.replacingOccurrences(of: "\r", with: "\n").split(separator: "\n").map(String.init)
             if let last = lines.last(where: { !$0.trimmingCharacters(in: .whitespaces).isEmpty }) {
                 Task { @MainActor in self?.status = last }
             }
         }
         // stdout carries only the final result line; read it after exit.
+        guard ActiveScan.shared.begin(path: url.path) else {
+            // The drive started ejecting before the scan could start.
+            current = nil
+            currentURL = nil
+            status = ""
+            req.onDone?(false)
+            next()
+            return
+        }
         let code: Int32 = await withCheckedContinuation { cont in
-            p.terminationHandler = { proc in cont.resume(returning: proc.terminationStatus) }
-            do { try p.run() } catch {
+            p.terminationHandler = { proc in
+                ActiveScan.shared.ended()
+                cont.resume(returning: proc.terminationStatus)
+            }
+            do {
+                try p.run()
+                ActiveScan.shared.attach(pid: p.processIdentifier)
+            } catch {
+                ActiveScan.shared.ended()
                 cont.resume(returning: 127)
                 Task { @MainActor in self.status = "\(error)" }
             }
         }
         errPipe.fileHandleForReading.readabilityHandler = nil
         let stdout = String(decoding: outPipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
-        process = nil
-        let ok = code == 0
-        let summary = ok
-            ? (stdout.split(separator: "\n").last.map(String.init) ?? "done")
-            : (code == 2 || status.contains("interrupt") ? "cancelled" : status)
-        finish(url, name: name, ok: ok, summary: summary)
-        req.onDone?(ok && chosen != nil)
+        let outcome = Self.outcome(code: code, stopped: ActiveScan.shared.stopReason)
+        let summary: String
+        switch outcome {
+        case .succeeded: summary = stdout.split(separator: "\n").last.map(String.init) ?? "done"
+        case .failed: summary = status
+        case .cancelled: summary = "cancelled"
+        case .stoppedForEject: summary = "stopped so the drive could be ejected"
+        case .driveRemoved: summary = "the drive went away during the scan; nothing was stored"
+        case .quit: summary = "stopped because Replicant quit"
+        }
+        finish(url, name: name, outcome: outcome, summary: summary)
+        req.onDone?(outcome == .succeeded && chosen != nil)
         next()
     }
 
-    /// Starts the next queued scan, if any.
-    private func next() {
-        guard !pending.isEmpty else { return }
-        let req = pending.removeFirst()
-        queue = pending.map(\.url)
-        start(req)
+    /// Classifies a finished scan from the CLI's exit code (0 ok, 3 drive
+    /// gone, 130 interrupted) and whether the app stopped it.
+    nonisolated static func outcome(code: Int32, stopped: StopReason?) -> ScanOutcome {
+        if code == 0 { return .succeeded }
+        switch stopped {
+        case .eject?: return .stoppedForEject
+        case .quit?: return .quit
+        case .user?: return .cancelled
+        case nil: break
+        }
+        switch code {
+        case 3: return .driveRemoved
+        case 130: return .cancelled
+        default: return .failed
+        }
     }
 
-    private func finish(_ url: URL, name: String, ok: Bool, summary: String) {
-        recent.insert(ScanRecord(path: url.path, name: name, finished: Date(), ok: ok, summary: summary), at: 0)
+    /// Starts the next queued scan, if any, skipping drives being ejected.
+    private func next() {
+        while !pending.isEmpty {
+            let req = pending.removeFirst()
+            queue = pending.map(\.url)
+            if ActiveScan.shared.isEjecting(req.url.path) {
+                req.onDone?(false)
+                continue
+            }
+            start(req)
+            return
+        }
+    }
+
+    private func finish(_ url: URL, name: String, outcome: ScanOutcome, summary: String) {
+        recent.insert(ScanRecord(path: url.path, name: name, finished: Date(), outcome: outcome, summary: summary), at: 0)
         if recent.count > 10 { recent.removeLast() }
         current = nil
         currentURL = nil
         status = ""
-        onFinished?(url, ok)
+        onFinished?(url, outcome)
         NotificationCenter.default.post(name: .scanFinished, object: nil)
+        let title: String
+        switch outcome {
+        case .succeeded: title = "Scanned \(name)"
+        case .failed: title = "Scan of \(name) failed"
+        case .stoppedForEject: title = "Stopped scanning \(name) so it could be ejected"
+        case .driveRemoved: title = "Scan of \(name) stopped"
+        case .cancelled, .quit: return // the user asked for it
+        }
         let content = UNMutableNotificationContent()
-        content.title = ok ? "Scanned \(name)" : "Scan of \(name) failed"
-        content.body = summary
+        content.title = title
+        content.body = outcome == .stoppedForEject ? "Nothing was stored. Scan it again next time it is connected." : summary
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil))
     }
 }

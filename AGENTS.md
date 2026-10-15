@@ -288,6 +288,24 @@ UserDefaults) and launch-at-login are app-only (UserDefaults, SMAppService).
 with an ad-hoc signature. Keep CLI output lines stable; the app shows the last stderr line, and
 reads `replicant doctor --json` to report missing metadata tools with a link to `docs/tools.md`.
 
+Ejecting and quitting (2026-10-14): a scan keeps files open on the drive, so macOS refused to eject
+a drive being scanned. `EjectGuard.swift` registers a DiskArbitration unmount-approval callback:
+when a volume the running scan reads is about to be unmounted (its root is on the volume or
+contains it, symlinks resolved), it stops the scan (SIGINT, up to 3 s, then SIGKILL of the CLI and
+its tool children) and approves; queued automatic scans of that volume are dropped (the mark is
+cleared after 5 s if the unmount did not happen, and a scan the user starts clears it). Once the
+CLI prints `finished reading <root>` (stable line, after `scanner.Run`) it holds nothing on the
+drive, so an eject during the bundle write or upload is approved without stopping it. Quitting stops the scan the same way, and every CLI the app starts gets
+`REPLICANT_EXIT_WITH_PARENT=1`, so a scan stops by itself within a second if the app dies.
+`ScanManager` reports a `ScanOutcome` (succeeded, failed, cancelled, stopped for eject, drive
+removed, quit) from the CLI exit code and the stop reason; `AutoScan` retries a failed scan after
+5, 10, 20, 40 minutes and so on (capped by the drive's interval and 6 h) instead of every 60 s, waits
+a full interval after a cancel, and ignores ejects. CLI exit codes: 0 ok, 1 failed, 3 the scanned
+drive or folder went away (`scanner.ErrRootGone`: `scanner.Run` checks the root's device every
+second and once more at the end, and aborts instead of storing a scan of missing files; a stat error
+other than "does not exist" must persist for 3 checks), 130 interrupted. The scan command's signal
+context covers the whole command, upload included, so a cancel at any stage exits 130 cleanly.
+
 ## Decisions, continued
 
 - **Server scans (2026-10-09):** `scan_jobs` table + `internal/sched`; one job at a time, 30 s

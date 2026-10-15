@@ -138,16 +138,16 @@ func newUploadCmd() *cobra.Command {
 }
 
 func uploadBundle(cmd *cobra.Command, c *client.Client, path string) error {
-	_, err := uploadBundleActivity(cmd, c, path, 0)
+	_, err := uploadBundleActivity(cmd.Context(), cmd, c, path, 0)
 	return err
 }
 
 // uploadBundleActivity uploads and, when activity is set, closes that
 // activity on the server with the stored scan.
-func uploadBundleActivity(cmd *cobra.Command, c *client.Client, path string, activity int64) (api.IngestResponse, error) {
+func uploadBundleActivity(ctx context.Context, cmd *cobra.Command, c *client.Client, path string, activity int64) (api.IngestResponse, error) {
 	start := time.Now()
 	fmt.Fprintf(cmd.ErrOrStderr(), "uploading %s to %s\n", path, c.Server)
-	res, err := c.UploadActivity(cmd.Context(), path, activity)
+	res, err := c.UploadActivity(ctx, path, activity)
 	if err != nil {
 		return res, err
 	}

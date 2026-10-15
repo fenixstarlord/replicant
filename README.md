@@ -83,7 +83,10 @@ first launch on another Mac is right-click → Open.
 Applications and open it. From the drop-down, click a drive to scan it and push it to the server.
 The first time you pick a drive on that Mac, the app asks what the catalog should call it
 (suggesting its current catalog name, or the volume's name); later clicks scan straight away.
-Browse… scans a folder or network share instead. Settings… takes the connection key from the
+Browse… scans a folder or network share instead. Ejecting a drive that is being scanned stops
+the scan first, so the eject goes through, and quitting the app stops any running scan. A drive
+with an automatic interval rule whose scan fails is retried after 5, 10, 20 minutes and so on,
+not every minute. Settings… takes the connection key from the
 server's API keys page (one string with the address and the key, stored in the same
 `~/.config/replicant/config.toml` the CLI uses), drives to ignore, automatic scans (a global "scan any
 external drive when it is mounted" switch, plus per-drive rules for on-mount and/or interval

@@ -14,6 +14,7 @@ struct ReplicantMenuApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
 
     init() {
+        EjectWatcher.start()
         let volumes = VolumeMonitor(), scans = ScanManager(), settings = AppSettings(), local = LocalServer(), updates = UpdateChecker()
         _volumes = StateObject(wrappedValue: volumes)
         _scans = StateObject(wrappedValue: scans)

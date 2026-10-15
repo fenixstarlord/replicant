@@ -38,8 +38,12 @@ final class AutoScanner: ObservableObject {
     private let scans: ScanManager
     private let settings: AppSettings
     private var observer: NSObjectProtocol?
+    private var unmountObserver: NSObjectProtocol?
     private var timer: Timer?
     private var known: Set<String>
+    /// Per volume path: no automatic retry before `until`, after a failed or
+    /// cancelled scan; `failures` counts failures in a row for the back-off.
+    private var retry: [String: (until: Date, failures: Int)] = [:]
 
     init(volumes: VolumeMonitor, scans: ScanManager, settings: AppSettings) {
         self.volumes = volumes
@@ -56,14 +60,18 @@ final class AutoScanner: ObservableObject {
         known = Set(volumes.volumes.map(\.id))
         remember()
 
-        scans.onFinished = { [weak self] url, ok in
-            guard let self, ok else { return }
-            lastScanned[url.path] = Date()
-            defaults.set(lastScanned, forKey: "autoScanLast")
+        scans.onFinished = { [weak self] url, outcome in
+            self?.finished(url, outcome)
         }
         observer = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didMountNotification, object: nil, queue: .main) { [weak self] note in
             let url = note.userInfo?[NSWorkspace.volumeURLUserInfoKey] as? URL
             Task { @MainActor in self?.mounted(url) }
+        }
+        // A back-off belongs to the drive that failed: forget it when that drive
+        // goes, so another drive mounted at the same path starts fresh.
+        unmountObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didUnmountNotification, object: nil, queue: .main) { [weak self] note in
+            guard let path = (note.userInfo?[NSWorkspace.volumeURLUserInfoKey] as? URL)?.path else { return }
+            Task { @MainActor in self?.retry.removeValue(forKey: path) }
         }
         timer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.tick() }
@@ -73,6 +81,7 @@ final class AutoScanner: ObservableObject {
 
     deinit {
         if let observer { NSWorkspace.shared.notificationCenter.removeObserver(observer) }
+        if let unmountObserver { NSWorkspace.shared.notificationCenter.removeObserver(unmountObserver) }
         timer?.invalidate()
     }
 
@@ -129,6 +138,47 @@ final class AutoScanner: ObservableObject {
         return rule(for: v.name).onMount || (allOnMount && !v.isInternal)
     }
 
+    // MARK: results
+
+    /// Records how a scan ended, for the interval rules. A failure is retried
+    /// after a growing pause rather than at the next minute's check; a cancel
+    /// waits for the drive's next interval; an eject or a removed drive
+    /// changes nothing (the drive is gone).
+    private func finished(_ url: URL, _ outcome: ScanOutcome) {
+        let path = url.path
+        switch outcome {
+        case .succeeded:
+            lastScanned[path] = Date()
+            defaults.set(lastScanned, forKey: "autoScanLast")
+            retry[path] = nil
+        case .failed:
+            let n = (retry[path]?.failures ?? 0) + 1
+            retry[path] = (Date().addingTimeInterval(Self.backoff(failures: n, interval: interval(forPath: path))), n)
+        case .cancelled:
+            retry[path] = (Date().addingTimeInterval(interval(forPath: path) ?? Self.maxBackoff), retry[path]?.failures ?? 0)
+        case .driveRemoved where volumes.volumes.contains(where: { $0.url.path == path }):
+            // "Removed", yet still mounted: the scan lost its folder some other
+            // way (a network hiccup); back off like any failure.
+            finished(url, .failed)
+        case .stoppedForEject, .driveRemoved, .quit:
+            break
+        }
+    }
+
+    nonisolated static let maxBackoff: TimeInterval = 6 * 3600
+
+    /// The pause before the next automatic try after `failures` failures in
+    /// a row: 5, 10, 20, 40 minutes and so on, never longer than the drive's
+    /// interval or 6 hours.
+    nonisolated static func backoff(failures: Int, interval: TimeInterval?) -> TimeInterval {
+        let pause = 5 * 60 * pow(2, Double(min(max(failures, 1), 12) - 1))
+        return min(pause, interval ?? maxBackoff, maxBackoff)
+    }
+
+    private func interval(forPath path: String) -> TimeInterval? {
+        volumes.volumes.first { $0.url.path == path }.flatMap { rule(for: $0.name).interval }
+    }
+
     // MARK: triggers
 
     private func mounted(_ url: URL?) {
@@ -138,7 +188,7 @@ final class AutoScanner: ObservableObject {
         let added = current.subtracting(known)
         known = current
         for v in volumes.volumes where (added.contains(v.id) || v.url == url) && scansOnMount(v) {
-            scans.scan(v.url)
+            scans.scan(ScanRequest(url: v.url, automatic: true))
         }
     }
 
@@ -147,8 +197,9 @@ final class AutoScanner: ObservableObject {
         for v in volumes.volumes where allowed(v) {
             guard let interval = rule(for: v.name).interval else { continue }
             if let last = lastScanned[v.url.path], Date().timeIntervalSince(last) < interval { continue }
+            if let r = retry[v.url.path], Date() < r.until { continue }
             if scans.currentURL == v.url || scans.queue.contains(v.url) { continue }
-            scans.scan(v.url)
+            scans.scan(ScanRequest(url: v.url, automatic: true))
         }
     }
 }
