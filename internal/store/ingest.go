@@ -64,6 +64,22 @@ func upsertDrive(ctx context.Context, tx *sql.Tx, vol scan.Volume, volName, chos
 			return id, curName, err
 		}
 	}
+	// A pre-scan profile does not create a catalog drive. Apply its current
+	// name/taxonomy only on first ingest, atomically with the scan. Later ingests
+	// keep web/profile edits, even if an older client sends a stale scan name.
+	newDrive := id == 0
+	var profileName string
+	var profileGroup, profileClient sql.NullInt64
+	perr := tx.QueryRowContext(ctx, `SELECT name,group_id,client_id FROM drive_profiles WHERE volume_key=?`, key).Scan(&profileName, &profileGroup, &profileClient)
+	if perr != nil && !errors.Is(perr, sql.ErrNoRows) {
+		return 0, "", perr
+	}
+	if perr == nil {
+		chosen = ""
+		if newDrive {
+			chosen = profileName
+		}
+	}
 
 	name, renamed := volName, false
 	switch {
@@ -84,6 +100,9 @@ func upsertDrive(ctx context.Context, tx *sql.Tx, vol scan.Volume, volName, chos
 		RETURNING id`,
 		key, name, volName, renamed, vol.FSType, vol.TotalBytes, vol.FreeBytes, vol.Device, vol.MediaName, vol.Protocol, now, now,
 	).Scan(&id)
+	if err == nil && newDrive && perr == nil {
+		_, err = tx.ExecContext(ctx, `UPDATE drives SET group_id=?,client_id=? WHERE id=?`, profileGroup, profileClient, id)
+	}
 	return id, name, err
 }
 

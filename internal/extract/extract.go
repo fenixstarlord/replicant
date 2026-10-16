@@ -59,8 +59,44 @@ type Located interface {
 
 // Options controls a run.
 type Options struct {
-	Workers     int           // concurrent clips; 0 = NumCPU
-	ClipTimeout time.Duration // per extractor per clip; 0 = DefaultClipTimeout, negative = no limit
+	Workers     int            // concurrent clips; 0 = NumCPU
+	ClipTimeout time.Duration  // per extractor per clip; 0 = DefaultClipTimeout, negative = no limit
+	Progress    func(Progress) // StartClip events; called synchronously
+}
+
+// Progress describes one extractor operation, including deliberate skips.
+type Progress struct {
+	Extractor string
+	Input     string
+	Event     string // start, finish, skip
+	Elapsed   time.Duration
+	Detail    string // error or reason for skipping
+}
+
+// Skipper can avoid redundant I/O using successful results already collected
+// for this clip. Results are supplied in registration order.
+type Skipper interface {
+	SkipReason(c *clips.Clip, previous []meta.Result) string
+}
+
+// Preparer loads shared metadata before Matches is called. Matches must not
+// perform filesystem I/O; preparation receives the scan's cancellation context.
+type Preparer interface {
+	Prepare(context.Context) error
+}
+
+func (r *Runner) prepare(ctx context.Context) error {
+	for i, e := range r.extractors {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if p, ok := e.(Preparer); ok && r.status[i].Available {
+			if err := p.Prepare(ctx); err != nil {
+				return fmt.Errorf("prepare %s: %w", e.Name(), err)
+			}
+		}
+	}
+	return nil
 }
 
 // DefaultClipTimeout bounds one extractor on one clip when Options.ClipTimeout is zero.
@@ -126,6 +162,12 @@ func (r *Runner) Timings() []Timing {
 // with its errors recorded. progress, if non-nil, is called from worker
 // goroutines.
 func (r *Runner) Run(ctx context.Context, root string, cl []clips.Clip, opts Options, progress func(done, total int)) error {
+	if len(cl) == 0 {
+		return ctx.Err()
+	}
+	if err := r.prepare(ctx); err != nil {
+		return err
+	}
 	workers := opts.Workers
 	if workers <= 0 {
 		workers = defaultWorkers()
@@ -159,8 +201,12 @@ func (r *Runner) Run(ctx context.Context, root string, cl []clips.Clip, opts Opt
 
 // RunClip extracts metadata for one clip, in place, like Run does for each
 // clip.
-func (r *Runner) RunClip(ctx context.Context, root string, c *clips.Clip, opts Options) {
+func (r *Runner) RunClip(ctx context.Context, root string, c *clips.Clip, opts Options) error {
+	if err := r.prepare(ctx); err != nil {
+		return err
+	}
 	r.runClip(ctx, filepath.Clean(root), c, opts.clipTimeout())
+	return ctx.Err()
 }
 
 func (r *Runner) runClip(ctx context.Context, root string, c *clips.Clip, timeout time.Duration) {
@@ -177,22 +223,29 @@ type Inputter interface {
 }
 
 // ClipJob extracts one clip in steps, so that a caller can run each
-// extractor when it suits its own reads. Results are merged by priority
-// and registration order, so the order of steps does not change them.
+// extractor when it suits its own reads. Collected results are merged by
+// priority and registration order; optional extractors can use earlier results
+// to skip redundant reads.
 type ClipJob struct {
-	r       *Runner
-	root    string
-	c       *clips.Clip
-	timeout time.Duration
-	pending []int // extractors still to run, in registration order
-	results map[int]meta.Result
-	errs    map[int]string
+	r        *Runner
+	root     string
+	c        *clips.Clip
+	timeout  time.Duration
+	pending  []int // extractors still to run, in registration order
+	results  map[int]meta.Result
+	errs     map[int]string
+	progress func(Progress)
 }
 
-// StartClip prepares a clip for extraction in steps. Nothing runs until
-// RunInput or Finish.
-func (r *Runner) StartClip(root string, c *clips.Clip, opts Options) *ClipJob {
-	return r.startClip(filepath.Clean(root), c, opts.clipTimeout())
+// StartClip prepares shared metadata and matches a clip for extraction in steps.
+// Individual extractors run in RunInput or Finish.
+func (r *Runner) StartClip(ctx context.Context, root string, c *clips.Clip, opts Options) (*ClipJob, error) {
+	if err := r.prepare(ctx); err != nil {
+		return nil, err
+	}
+	j := r.startClip(filepath.Clean(root), c, opts.clipTimeout())
+	j.progress = opts.Progress
+	return j, nil
 }
 
 func (r *Runner) startClip(root string, c *clips.Clip, timeout time.Duration) *ClipJob {
@@ -283,20 +336,39 @@ func (j *ClipJob) run(ctx context.Context, want func(i int) bool) int {
 			rest = append(rest, i)
 			continue
 		}
-		j.runOne(ctx, i)
-		ran++
+		if j.runOne(ctx, i) {
+			ran++
+		}
 	}
 	j.pending = rest
 	return ran
 }
 
-func (j *ClipJob) runOne(ctx context.Context, i int) {
+func (j *ClipJob) runOne(ctx context.Context, i int) bool {
 	e := j.r.extractors[i]
+	report := func(event string, elapsed time.Duration, detail string) {
+		if j.progress != nil {
+			j.progress(Progress{Extractor: e.Name(), Input: j.input(i), Event: event, Elapsed: elapsed, Detail: detail})
+		}
+	}
+	if s, ok := e.(Skipper); ok {
+		previous := make([]meta.Result, 0, len(j.results))
+		for k := range j.r.extractors {
+			if r, ok := j.results[k]; ok && j.errs[k] == "" {
+				previous = append(previous, r)
+			}
+		}
+		if reason := s.SkipReason(j.c, previous); reason != "" {
+			report("skip", 0, reason)
+			return false
+		}
+	}
 	cctx, cancel := ctx, context.CancelFunc(func() {})
 	if j.timeout > 0 {
 		cctx, cancel = context.WithTimeout(ctx, j.timeout)
 	}
 	start := time.Now()
+	report("start", 0, "")
 	res, err := e.Extract(cctx, j.root, j.c)
 	timedOut := err != nil && errors.Is(cctx.Err(), context.DeadlineExceeded)
 	cancel()
@@ -311,6 +383,8 @@ func (j *ClipJob) runOne(ctx context.Context, i int) {
 		res.Source = e.Name()
 		j.results[i] = *res
 	}
+	report("finish", time.Since(start), j.errs[i])
+	return true
 }
 
 func (r *Runner) record(i int, d time.Duration, failed, timedOut bool) {

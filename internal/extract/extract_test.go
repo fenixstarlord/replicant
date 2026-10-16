@@ -41,7 +41,15 @@ func TestClipTimeoutAndTimings(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			r := NewRunner(context.Background(), []Extractor{slowExtractor{delay: 150 * time.Millisecond}})
 			c := clips.Clip{ID: "c"}
-			r.RunClip(context.Background(), t.TempDir(), &c, Options{ClipTimeout: tc.timeout})
+			events := []Progress{}
+			job, err := r.StartClip(t.Context(), t.TempDir(), &c, Options{
+				ClipTimeout: tc.timeout,
+				Progress:    func(p Progress) { events = append(events, p) },
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			job.Finish(context.Background())
 			timedOut := len(c.Errors) == 1 && strings.Contains(c.Errors[0], "timed out after")
 			if timedOut != tc.wantTimeout {
 				t.Errorf("errors = %v, want timeout %v", c.Errors, tc.wantTimeout)
@@ -52,6 +60,12 @@ func TestClipTimeoutAndTimings(t *testing.T) {
 			}
 			if got := tm[0].Timeouts == 1 && tm[0].Errors == 1; got != tc.wantTimeout {
 				t.Errorf("timings = %+v, want timeout %v", tm[0], tc.wantTimeout)
+			}
+			if len(events) != 2 || events[0].Event != "start" || events[1].Event != "finish" {
+				t.Fatalf("progress events = %+v", events)
+			}
+			if events[1].Elapsed <= 0 || strings.Contains(events[1].Detail, "timed out after") != tc.wantTimeout {
+				t.Errorf("completion did not report duration/timeout: %+v", events[1])
 			}
 		})
 	}

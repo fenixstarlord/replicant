@@ -27,23 +27,22 @@
 </div>
 <div class="overflow-x-auto rounded-box border border-base-300 bg-base-100 min-h-14">
 <table class="table">
-<thead><tr><th class="w-8"></th><th>Name</th><th>Label</th><th>Location</th><th>Filesystem</th><th class="num">Capacity</th><th>Used</th><th class="num">Free</th><th class="num">Files</th><th class="num">Clips</th><th class="num">Scans</th><th>Last scan</th><th class="w-8"></th></tr></thead>
+<thead><tr><th class="w-8"></th><th>Name</th><th>Label</th><th>Location</th><th>Filesystem</th><th class="num">Capacity</th><th class="num">Free</th><th class="num">Files</th><th class="num">Clips</th><th class="num">Scans</th><th>Last scan</th><th class="w-8"></th></tr></thead>
 <tbody>
 {{range .Drives}}<tr class="hover drive-row" draggable="true" data-drive-id="{{.ID}}" ondragstart="dragDrive(event)" ondragend="dragEnd(event)">
   <td><a href="/search?drive={{.ID}}" class="btn btn-ghost btn-sm btn-circle" title="Search this drive" aria-label="Search this drive">{{template "icon_search"}}</a></td>
-  <td><span class="inline-flex items-center gap-1"><a href="/browse/{{.ID}}" class="link link-hover font-medium inline-flex items-center gap-2">{{template "icon_drive"}}{{.Name}}</a><button type="button" class="btn btn-ghost btn-xs btn-circle" title="Rename" aria-label="Rename {{.Name}}" data-drive-id="{{.ID}}" data-name="{{.Name}}" data-volume="{{.VolumeName}}" data-renamed="{{.Renamed}}" onclick="renameDrive(this)">{{template "icon_pencil"}}</button></span>{{if .Renamed}}<div class="muted text-xs">{{.VolumeName}}</div>{{end}}</td>
+  <td><span class="inline-flex items-center gap-1"><a href="/browse/{{.ID}}" class="link link-hover font-medium inline-flex items-center gap-2">{{template "icon_drive"}}{{.Name}}</a><button type="button" class="btn btn-ghost btn-xs btn-circle" title="Rename" aria-label="Rename {{.Name}}" data-drive-id="{{.ID}}" data-name="{{.Name}}" data-volume="{{.VolumeName}}" data-renamed="{{.Renamed}}" onclick="renameDrive(this)">{{template "icon_pencil"}}</button></span>{{if .Renamed}}<div class="muted text-xs">{{.VolumeName}}</div>{{end}}{{if gt .CapacityBytes 0}}<div class="mt-1"><progress class="progress progress-success w-full" value="{{pct (used .CapacityBytes .FreeBytes) .CapacityBytes}}" max="100" aria-label="Storage used on {{.Name}}" title="{{bytes (used .CapacityBytes .FreeBytes)}} used of {{bytes .CapacityBytes}}"></progress></div>{{end}}</td>
   <td>{{or .Label "—"}}</td>
   <td>{{or .Location "—"}}</td>
   <td class="muted">{{.FSType}}</td>
   <td class="num">{{bytes .CapacityBytes}}</td>
-  <td><progress class="progress progress-primary w-24" value="{{pct (used .CapacityBytes .FreeBytes) .CapacityBytes}}" max="100"></progress></td>
   <td class="num">{{bytes .FreeBytes}}</td>
   <td class="num">{{n .FileCount}}</td>
   <td class="num">{{n .ClipCount}}</td>
   <td class="num">{{.ScanCount}}</td>
   <td>{{datetime .LastScannedAt}}</td>
   <td class="muted cursor-grab text-right" title="Drag to move">{{template "icon_grip"}}</td>
-</tr>{{else}}<tr><td colspan="13" class="muted text-center py-4">Drop a drive here.</td></tr>{{end}}
+</tr>{{else}}<tr><td colspan="12" class="muted text-center py-4">Drop a drive here.</td></tr>{{end}}
 </tbody>
 </table>
 </div>

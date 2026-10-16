@@ -41,6 +41,7 @@ final class CatalogWindow: NSObject, NSWindowDelegate {
 
 /// The catalog page with a small header: back, forward, reload, scan.
 struct CatalogView: View {
+    @EnvironmentObject var profiles: DriveProfiles
     @EnvironmentObject var local: LocalServer
     @EnvironmentObject var volumes: VolumeMonitor
     @EnvironmentObject var scans: ScanManager
@@ -76,12 +77,17 @@ struct CatalogView: View {
                 ProgressView().controlSize(.small)
                 Text("Scanning \(name)").font(.callout)
                 Text(scans.status).font(.caption).foregroundStyle(.secondary).lineLimit(1).frame(maxWidth: 360, alignment: .trailing)
-                Button("Cancel") { scans.cancel() }.controlSize(.small)
+                Button("Cancel") { scans.cancel() }.controlSize(.small).disabled(scans.isCancelling)
             }
             Menu {
                 let visible = volumes.volumes.filter { !settings.isIgnored($0) }
                 ForEach(visible) { v in
-                    Button(v.name) { DriveNaming.scan(v, settings: settings, scans: scans) }.disabled(scans.currentURL == v.url)
+                    Button((profiles.profile(for: v)?.indexed == true ? "✓ " : "") + profiles.label(for: v)) {
+                        profiles.requestScan(v.url)
+                    }.disabled(scans.currentURL == v.url)
+                    if let p = profiles.profile(for: v), p.indexed || p.configured {
+                        Button("Settings for \(profiles.label(for: v))…", systemImage: "gearshape") { profiles.requestScan(v.url, edit: true) }
+                    }
                 }
                 if visible.isEmpty { Text("No drives") }
                 Divider()
@@ -103,7 +109,7 @@ struct CatalogView: View {
         panel.canChooseFiles = false
         panel.prompt = "Scan"
         panel.message = "Choose a drive, network share, or folder to scan."
-        if panel.runModal() == .OK, let url = panel.url { scans.scan(url) }
+        if panel.runModal() == .OK, let url = panel.url { profiles.requestScan(url) }
     }
 }
 

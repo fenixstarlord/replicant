@@ -9,6 +9,7 @@ struct MenuContent: View {
     @EnvironmentObject var autoScan: AutoScanner
     @EnvironmentObject var local: LocalServer
     @EnvironmentObject var updates: UpdateChecker
+    @EnvironmentObject var profiles: DriveProfiles
 
     var body: some View {
         if let r = updates.available {
@@ -22,7 +23,7 @@ struct MenuContent: View {
         if let name = scans.current {
             Text("Scanning \(name)")
             Text(scans.status).font(.caption)
-            Button("Cancel scan") { scans.cancel() }
+            Button("Cancel scan") { scans.cancel() }.disabled(scans.isCancelling)
             if !scans.queue.isEmpty { Text("Queued: \(scans.queue.map(\.lastPathComponent).joined(separator: ", "))") }
             Divider()
         }
@@ -35,14 +36,24 @@ struct MenuContent: View {
             Text("No drives").foregroundStyle(.secondary)
         } else {
             ForEach(visible) { v in
-                Button {
-                    DriveNaming.scan(v, settings: settings, scans: scans)
-                } label: {
-                    Label(v.name, systemImage: v.isInternal ? "internaldrive" : "externaldrive")
+                HStack {
+                    Button { profiles.requestScan(v.url) } label: {
+                        Label(profiles.label(for: v), systemImage: v.isInternal ? "internaldrive" : "externaldrive")
+                            .lineLimit(2).frame(maxWidth: .infinity, alignment: .leading)
+                    }.buttonStyle(.plain).disabled(scans.currentURL == v.url)
+                    if profiles.profile(for: v)?.indexed == true {
+                        Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+                            .help("Indexed in the server catalog").accessibilityLabel("Previously indexed")
+                    }
+                    if let p = profiles.profile(for: v), p.indexed || p.configured {
+                        Button { profiles.requestScan(v.url, edit: true) } label: { Image(systemName: "gearshape") }
+                            .buttonStyle(.borderless).help("Drive scan settings")
+                            .accessibilityLabel("Settings for \(profiles.label(for: v))")
+                    }
                 }
-                .disabled(scans.currentURL == v.url)
             }
         }
+        if !profiles.message.isEmpty { Text(profiles.message).font(.caption).foregroundStyle(.secondary) }
         Divider()
         Button("Browse…") { browse() }
         if !scans.recent.isEmpty {
@@ -59,6 +70,7 @@ struct MenuContent: View {
                 .disabled(toolsCheck.checking)
         }
         Button("Quit Replicant") { NSApplication.shared.terminate(nil) }
+            .task { await profiles.refresh() }
     }
 
     private func showSettings() {
@@ -84,7 +96,7 @@ struct MenuContent: View {
         panel.message = "Choose a drive, network share, or folder to scan."
         NSApp.activate(ignoringOtherApps: true)
         if panel.runModal() == .OK, let url = panel.url {
-            scans.scan(url)
+            profiles.requestScan(url)
         }
     }
 }

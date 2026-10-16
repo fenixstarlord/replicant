@@ -22,6 +22,7 @@ final class ActiveScan: @unchecked Sendable {
     private var pid: pid_t = 0         // 0 until the process has started
     private var reading = false        // the CLI may still have files open on the drive
     private var stopPending = false    // asked to stop before the process started
+    private var forcePending = false   // grace period expired before attach
     private var exited: DispatchGroup? // left once the process has exited
     private var reason: StopReason?
     /// Volumes being ejected, and when; automatic scans of them are not started.
@@ -38,6 +39,7 @@ final class ActiveScan: @unchecked Sendable {
         pid = 0
         reading = true
         stopPending = false
+        forcePending = false
         reason = nil
         let g = DispatchGroup()
         g.enter()
@@ -51,7 +53,8 @@ final class ActiveScan: @unchecked Sendable {
         lock.lock(); defer { lock.unlock() }
         guard path != nil else { return } // already exited
         self.pid = pid
-        if stopPending { kill(pid, SIGINT) }
+        if forcePending { kill(pid, SIGKILL) }
+        else if stopPending { kill(pid, SIGINT) }
     }
 
     /// Records that the CLI has closed every file on the drive (it printed
@@ -70,6 +73,7 @@ final class ActiveScan: @unchecked Sendable {
         pid = 0
         reading = false
         stopPending = false
+        forcePending = false
         lock.unlock()
         g?.leave()
     }
@@ -90,13 +94,17 @@ final class ActiveScan: @unchecked Sendable {
         return Self.contains(v, path) || Self.contains(path, v)
     }
 
-    /// Asks the scan to stop (SIGINT; the CLI exits within a second) without
-    /// waiting.
-    func interrupt(_ why: StopReason) {
+    /// Interrupts immediately, then force-stops this generation after the grace
+    /// period. Never blocks the UI; a blocked LTFS read cannot delay escalation.
+    func interrupt(_ why: StopReason, timeout: TimeInterval = 3) {
         lock.lock(); defer { lock.unlock() }
         guard path != nil else { return }
+        let gen = generation
         if reason == nil { reason = why }
         if pid > 0 { kill(pid, SIGINT) } else { stopPending = true }
+        DispatchQueue.global().asyncAfter(deadline: .now() + timeout) { [self] in
+            forceStop(generation: gen)
+        }
     }
 
     /// Stops the scan and waits up to timeout for it to exit, then kills it
@@ -117,14 +125,18 @@ final class ActiveScan: @unchecked Sendable {
         // The CLI did not stop in time (a read stuck in the kernel, or the
         // process is suspended). Kill its tools, then the CLI, unless it has
         // exited meanwhile and the pid could belong to something else.
-        lock.lock()
-        let p = generation == gen && path != nil ? pid : 0
-        lock.unlock()
-        if p > 0 {
-            for child in Self.children(of: p) { kill(child, SIGKILL) }
-            kill(p, SIGKILL)
-        }
+        forceStop(generation: gen)
         return g.wait(timeout: .now() + 1) == .success
+    }
+
+    private func forceStop(generation gen: Int) {
+        lock.lock(); defer { lock.unlock() }
+        guard generation == gen, path != nil else { return }
+        // attach can race the deadline. Remember escalation even without a PID.
+        forcePending = true
+        guard pid > 0 else { return }
+        for child in Self.descendants(of: pid).reversed() { kill(child, SIGKILL) }
+        kill(pid, SIGKILL)
     }
 
     func markEjecting(_ volume: String) {
@@ -172,6 +184,16 @@ final class ActiveScan: @unchecked Sendable {
         var buf = [pid_t](repeating: 0, count: 64)
         let n = proc_listchildpids(pid, &buf, Int32(buf.count * MemoryLayout<pid_t>.size))
         return n > 0 ? Array(buf.prefix(Int(n))).filter { $0 > 0 } : []
+    }
+
+    private static func descendants(of pid: pid_t) -> [pid_t] {
+        var result = children(of: pid)
+        var i = 0
+        while i < result.count {
+            result.append(contentsOf: children(of: result[i]))
+            i += 1
+        }
+        return result
     }
 }
 

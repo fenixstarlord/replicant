@@ -420,10 +420,10 @@ func TestBrowseFragmentsAndViewCookie(t *testing.T) {
 	}
 }
 
-type fakeSched struct{ ran []int64 }
+type fakeSched struct{ ran chan int64 }
 
 func (f *fakeSched) RunJob(ctx context.Context, id int64) (store.IngestResult, error) {
-	f.ran = append(f.ran, id)
+	f.ran <- id
 	return store.IngestResult{}, nil
 }
 func (f *fakeSched) Running(id int64) (string, int, int, time.Time, bool) {
@@ -443,7 +443,7 @@ func post(t *testing.T, s *Server, c *http.Cookie, path string, form url.Values)
 
 func TestDefaultViewGroupsAndScanJobs(t *testing.T) {
 	s, c, res := seedPages(t)
-	fs := &fakeSched{}
+	fs := &fakeSched{ran: make(chan int64, 1)}
 	s.cfg.Sched = fs
 
 	// Default view: list unless changed; a cookie overrides; saving resets the cookie.
@@ -493,12 +493,13 @@ func TestDefaultViewGroupsAndScanJobs(t *testing.T) {
 	if rec := post(t, s, c, fmt.Sprintf("/settings/jobs/%d/run", jobs[0].ID), nil); rec.Code != 303 {
 		t.Errorf("run = %d", rec.Code)
 	}
-	deadline := time.Now().Add(3 * time.Second)
-	for len(fs.ran) == 0 && time.Now().Before(deadline) {
-		time.Sleep(10 * time.Millisecond)
-	}
-	if len(fs.ran) != 1 || fs.ran[0] != jobs[0].ID {
-		t.Errorf("scheduler not asked to run: %v", fs.ran)
+	select {
+	case id := <-fs.ran:
+		if id != jobs[0].ID {
+			t.Errorf("scheduler asked to run %d, want %d", id, jobs[0].ID)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("scheduler not asked to run")
 	}
 	if rec := post(t, s, c, fmt.Sprintf("/settings/jobs/%d", jobs[0].ID), url.Values{"label": {"Archive 2"}, "interval": {"0"}, "enabled": {"1"}}); rec.Code != 303 {
 		t.Errorf("update = %d", rec.Code)

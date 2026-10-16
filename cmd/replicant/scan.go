@@ -20,10 +20,14 @@ import (
 	"github.com/fenixstarlord/replicant/internal/clips"
 	"github.com/fenixstarlord/replicant/internal/scan"
 	"github.com/fenixstarlord/replicant/internal/scanner"
+	"github.com/fenixstarlord/replicant/internal/scanprofile"
 )
 
 // scanFlags are shared by `scan` and `dump`.
 type scanFlags struct {
+	extractors      []string
+	profile         bool
+	expectedVolume  string
 	fullHash        bool
 	noFingerprint   bool
 	descendPackages bool
@@ -60,13 +64,14 @@ func (t *tapeFlag) Type() string { return "mode" }
 
 func (f *scanFlags) bind(cmd *cobra.Command) {
 	fl := cmd.Flags()
+	fl.StringSliceVar(&f.extractors, "extractors", nil, "metadata extractor allowlist (comma-separated; empty disables all)")
 	fl.BoolVar(&f.fullHash, "full-hash", false, "hash entire file contents (slow)")
 	fl.BoolVar(&f.noFingerprint, "no-fingerprint", false, "skip the head+tail fingerprint")
 	fl.BoolVar(&f.descendPackages, "descend-packages", false, "walk into macOS packages (.fcpbundle, .app, ...)")
 	fl.BoolVar(&f.keepFrames, "keep-frames", false, "keep individual ARRIRAW frame entries instead of only the clip")
 	fl.StringArrayVar(&f.skip, "skip", nil, "extra name or glob to skip (repeatable)")
 	fl.IntVar(&f.workers, "workers", 0, "concurrent hashing workers (default: CPU count; 1 in tape mode)")
-	fl.BoolVar(&f.fast, "fast", false, "filesystem only, no metadata extraction")
+	fl.BoolVar(&f.fast, "fast", false, "skip metadata extraction (still fingerprints files unless --no-fingerprint)")
 	fl.IntVar(&f.extractWorkers, "extract-workers", 0, "concurrent clips during extraction (default: CPUs, max 8; 1 in tape mode)")
 	fl.DurationVar(&f.clipTimeout, "clip-timeout", 0, "per-extractor timeout for one clip (default 1m, 20m in tape mode; negative: no limit)")
 	fl.Var(&f.tape, "tape", "tape mode: read one file at a time in tape order (auto: when the volume is LTFS, on, off)")
@@ -76,6 +81,7 @@ func (f *scanFlags) bind(cmd *cobra.Command) {
 
 func (f *scanFlags) options(tools cliconfig.Tools) scanner.Options {
 	return scanner.Options{
+		Extractors: f.extractors, ExpectedVolume: f.expectedVolume,
 		Fast: f.fast, Fingerprint: !f.noFingerprint, FullHash: f.fullHash, DescendPackages: f.descendPackages,
 		KeepFrames: f.keepFrames, Skip: f.skip, Workers: f.workers, ExtractWorkers: f.extractWorkers,
 		ClipTimeout: f.clipTimeout, Tape: f.tape.mode, StreamLimit: streamLimit(f.tapeStreamMB),
@@ -117,31 +123,56 @@ const finishedReadingLine = "finished reading "
 // nil, also sends progress to the server, showing the drive as driveName
 // when one is given.
 func runScan(ctx context.Context, cmd *cobra.Command, root string, f *scanFlags, rep *client.ActivityReporter, driveName string) (*scanner.Result, error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	stderr := cmd.ErrOrStderr()
 	cfg, err := cliconfig.Load()
 	if err != nil {
 		return nil, err
 	}
-	// Keep the server's activity alive through long reads (a tape locate,
-	// one extractor on a large file) that report no progress for minutes.
-	keepalive := time.NewTicker(time.Minute)
+	hashPrinter, endLine := progressPrinter(stderr)
+	var printMu sync.Mutex
+	var active scanner.Progress
+	var activeSince time.Time
+	// Keep both the server and the menu-bar app informed during a tape locate.
+	keepalive := time.NewTicker(30 * time.Second)
 	defer keepalive.Stop()
+	keepaliveDone := make(chan struct{})
+	defer func() {
+		cancel()
+		<-keepaliveDone
+	}()
 	go func() {
+		defer close(keepaliveDone)
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-keepalive.C:
 				rep.Keepalive()
+				printMu.Lock()
+				if active.Event == "start" {
+					p := active
+					p.Event, p.Elapsed = "waiting", time.Since(activeSince)
+					printTapeProgress(stderr, p)
+				}
+				printMu.Unlock()
 			}
 		}
 	}()
-	hashPrinter, endLine := progressPrinter(stderr)
-	var printMu sync.Mutex
 	progress := func(p scanner.Progress) {
 		rep.Progress(p.Stage, p.Done, p.Total)
 		printMu.Lock()
 		defer printMu.Unlock()
+		active = p
+		if p.Event != "" {
+			if p.Event == "start" {
+				activeSince = time.Now()
+			}
+			endLine()
+			printTapeProgress(stderr, p)
+			return
+		}
 		switch p.Stage {
 		case "walk":
 			endLine()
@@ -165,8 +196,29 @@ func runScan(ctx context.Context, cmd *cobra.Command, root string, f *scanFlags,
 			}
 		}
 	}
-	res, err := scanner.Run(ctx, root, f.options(cfg.Tools), progress)
+	opts := f.options(cfg.Tools)
+	if f.profile {
+		c, err := client.New(cfg.Server, cfg.Token)
+		if err != nil {
+			return nil, err
+		}
+		opts.Profile = func(ctx context.Context, key string) (*scanprofile.Settings, error) {
+			p, err := resolveProfile(ctx, c, key, stderr)
+			if err != nil {
+				return nil, err
+			}
+			if cmd.Flags().Changed("no-fingerprint") {
+				p.Fingerprint = !f.noFingerprint
+			}
+			if cmd.Flags().Changed("extractors") {
+				p.Extractors = append([]string{}, f.extractors...)
+			}
+			return &p.Settings, nil
+		}
+	}
+	res, err := scanner.Run(ctx, root, opts, progress)
 	printMu.Lock()
+	active = scanner.Progress{}
 	endLine()
 	printMu.Unlock()
 	if err == nil {
@@ -291,6 +343,8 @@ by 'replicant login'.`,
 		},
 	}
 	f.bind(cmd)
+	cmd.Flags().BoolVar(&f.profile, "profile", false, "use the volume's shared server scan settings (explicit flags override them)")
+	cmd.Flags().StringVar(&f.expectedVolume, "expect-volume", "", "refuse to scan if the mounted volume's catalog key changed")
 	cmd.Flags().StringVarP(&output, "output", "o", "", "write the bundle to this file instead of pushing")
 	cmd.Flags().StringVar(&driveName, "name", "", "catalog name for the drive, kept on later scans; the volume's own name makes it follow the volume again (default: leave the catalog name as it is)")
 	return cmd

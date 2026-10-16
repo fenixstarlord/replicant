@@ -1,14 +1,157 @@
 package ffprobe
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/fenixstarlord/replicant/internal/clips"
+	"github.com/fenixstarlord/replicant/internal/extract"
 	"github.com/fenixstarlord/replicant/internal/meta"
 )
+
+// Use captured output, with a fake process that records its arguments. No
+// media is opened; the test verifies the actual command boundary and mapping.
+func fakeProbe(t *testing.T) (bin, argsPath string, raw []byte) {
+	t.Helper()
+	dir := t.TempDir()
+	bin, argsPath = filepath.Join(dir, "ffprobe"), filepath.Join(dir, "args")
+	raw = golden(t, "mp4.json")
+	output := filepath.Join(dir, "output.json")
+	if err := os.WriteFile(output, raw, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PROBE_ARGS", argsPath)
+	t.Setenv("PROBE_OUTPUT", output)
+	script := `#!/bin/sh
+if [ "$1" = "-version" ]; then echo 'ffprobe version test'; exit 0; fi
+printf '%s\n' "$@" > "$PROBE_ARGS"
+cat "$PROBE_OUTPUT"
+`
+	if err := os.WriteFile(bin, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	return bin, argsPath, raw
+}
+
+func TestTapeProbeCommandAndMetadata(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		file     string
+		tape     bool
+		headOnly bool
+	}{
+		{name: "tape MXF", file: "clip.MXF", tape: true, headOnly: true},
+		{name: "disk MXF", file: "clip.MXF"},
+		{name: "tape MOV", file: "clip.mov", tape: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			bin, argsPath, raw := fakeProbe(t)
+			e := &Extractor{Path: bin, Tape: tc.tape}
+			c := &clips.Clip{Files: []string{tc.file}}
+			r, err := e.Extract(t.Context(), t.TempDir(), c)
+			if err != nil {
+				t.Fatal(err)
+			}
+			args, err := os.ReadFile(argsPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, flag := range []string{"-seekable\n0\n", "-nofind_stream_info\n"} {
+				if strings.Contains(string(args), flag) != tc.headOnly {
+					t.Errorf("unexpected probe arguments: %s", args)
+				}
+			}
+			f := r.Fields
+			if tc.headOnly {
+				if f.DurationS != nil || f.FrameCount != nil || f.TCEnd != nil {
+					t.Errorf("unreliable timing escaped: %+v", f)
+				}
+			} else if f.DurationS == nil || f.FrameCount == nil || f.TCEnd == nil {
+				t.Error("normal probing lost timing metadata")
+			}
+			if f.TCStart == nil || f.Width == nil || f.FPS == nil {
+				t.Error("head probe lost unrelated metadata")
+			}
+			if !bytes.Equal(r.Raw, bytes.TrimSpace(raw)) {
+				t.Error("raw output was changed")
+			}
+		})
+	}
+}
+
+type sidecarResult struct {
+	source   string
+	duration *float64
+	err      error
+}
+
+func (s sidecarResult) Name() string                           { return s.source }
+func (sidecarResult) Priority() int                            { return extract.PrioritySidecar }
+func (sidecarResult) Available(context.Context) (bool, string) { return true, "test" }
+func (sidecarResult) Matches(*clips.Clip) bool                 { return true }
+func (sidecarResult) Input(*clips.Clip) string                 { return "clip.xml" }
+func (s sidecarResult) Extract(context.Context, string, *clips.Clip) (*meta.Result, error) {
+	return &meta.Result{Fields: meta.Fields{DurationS: s.duration}, Raw: []byte(`{}`)}, s.err
+}
+
+func TestTapeSkipRequiresSuccessfulEarlierSidecar(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		sidecar    sidecarResult
+		mediaFirst bool
+		wantSkip   bool
+	}{
+		{name: "ALE", sidecar: sidecarResult{source: "ale", duration: meta.Float(10)}, wantSkip: true},
+		{name: "Sony", sidecar: sidecarResult{source: "sony-xml", duration: meta.Float(10)}, wantSkip: true},
+		{name: "missing duration", sidecar: sidecarResult{source: "ale"}},
+		{name: "zero duration", sidecar: sidecarResult{source: "ale", duration: meta.Float(0)}},
+		{name: "failed sidecar", sidecar: sidecarResult{
+			source: "ale", duration: meta.Float(10), err: errors.New("read failed"),
+		}},
+		{name: "sidecar later on tape", sidecar: sidecarResult{source: "sony-xml", duration: meta.Float(10)}, mediaFirst: true},
+		{name: "unrelated source", sidecar: sidecarResult{source: "other", duration: meta.Float(10)}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			bin, argsPath, _ := fakeProbe(t)
+			r := extract.NewRunner(t.Context(), []extract.Extractor{tc.sidecar, &Extractor{Path: bin, Tape: true}})
+			c := &clips.Clip{Files: []string{"clip.mxf"}}
+			events := []extract.Progress{}
+			job, err := r.StartClip(t.Context(), t.TempDir(), c, extract.Options{Progress: func(p extract.Progress) {
+				events = append(events, p)
+			}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tc.mediaFirst {
+				job.RunInput(t.Context(), "clip.mxf")
+			}
+			job.RunInput(t.Context(), "clip.xml")
+			job.Finish(t.Context())
+			_, err = os.Stat(argsPath)
+			if errors.Is(err, os.ErrNotExist) != tc.wantSkip {
+				t.Errorf("probe invocation: stat = %v, want skip %v", err, tc.wantSkip)
+			}
+			skipped := false
+			for _, p := range events {
+				if p.Extractor == "ffprobe" && p.Event == "skip" {
+					skipped = true
+				}
+			}
+			if skipped != tc.wantSkip {
+				t.Errorf("skip event = %v, want %v", skipped, tc.wantSkip)
+			}
+			if tc.wantSkip && (c.Meta.DurationS == nil || c.Sources["duration_s"] != tc.sidecar.source) {
+				t.Error("skipping lost sidecar duration or provenance")
+			}
+		})
+	}
+}
 
 func golden(t *testing.T, name string) []byte {
 	t.Helper()

@@ -13,9 +13,75 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/fenixstarlord/replicant/internal/cliconfig"
 	"github.com/fenixstarlord/replicant/internal/clips"
 	"github.com/fenixstarlord/replicant/internal/scan"
 )
+
+func TestTapePreloadsALEsInPhysicalOrder(t *testing.T) {
+	for _, stopEarly := range []bool{false, true} {
+		name := "complete"
+		if stopEarly {
+			name = "cancel after first ALE"
+		}
+		t.Run(name, func(t *testing.T) {
+			root := t.TempDir()
+			raw, err := os.ReadFile("../../testdata/sidecars/arri_alexa35_arricore.ale")
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, file := range []string{"a.ale", "z.ale"} {
+				if err := os.WriteFile(filepath.Join(root, file), raw, 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			const media = "A_0001C001_260930_084650_c1BY9.mxf"
+			if err := os.WriteFile(filepath.Join(root, media), []byte("placeholder"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			fakePositions(t, root, map[string]int64{"a.ale": 200, "z.ale": 100, media: 300})
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			reads := []string{}
+			events := []Progress{}
+			traceTapeRead = func(what, rel string) { reads = append(reads, what+" "+rel) }
+			t.Cleanup(func() { traceTapeRead = nil })
+			res, err := Run(ctx, root, Options{
+				Tape:  TapeOn,
+				Tools: cliconfig.Tools{FFprobe: "/nonexistent/ffprobe", ArtCmd: "/nonexistent/art-cmd", REDline: "/nonexistent/REDline"},
+			}, func(p Progress) {
+				if p.Stage == "ale" {
+					events = append(events, p)
+					if stopEarly && p.Event == "finish" {
+						cancel()
+					}
+				}
+			})
+			if stopEarly {
+				if !errors.Is(err, context.Canceled) || res != nil || !reflect.DeepEqual(reads, []string{"ale z.ale"}) {
+					t.Fatalf("did not stop preload: %v, reads %v", err, reads)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(reads) < 2 || !reflect.DeepEqual(reads[:2], []string{"ale z.ale", "ale a.ale"}) {
+				t.Fatalf("ALEs not read first in tape order: %v", reads)
+			}
+			if len(events) != 4 || events[0].Done != 0 || events[0].Total != 2 || events[3].Done != 2 {
+				t.Fatalf("preload progress: %+v", events)
+			}
+			c := res.Clips[0]
+			if c.Meta.DurationS == nil || c.Sources["duration_s"] != "ale" || len(c.Raw["ale"]) == 0 {
+				t.Fatal("prepared ALE metadata/provenance lost")
+			}
+			if res.ExtractTime <= 0 {
+				t.Fatal("preload was not timed")
+			}
+		})
+	}
+}
 
 func TestParseTapeMode(t *testing.T) {
 	for in, want := range map[string]TapeMode{"": TapeAuto, "auto": TapeAuto, "ON": TapeOn, " off ": TapeOff} {
@@ -372,7 +438,7 @@ func TestRunTapeStopsOnCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	hashed := 0
 	_, err := Run(ctx, root, Options{Fast: true, Fingerprint: true, Tape: TapeOn, StreamLimit: -1}, func(p Progress) {
-		if p.Stage == "hash" {
+		if p.Stage == "hash" && p.Event == "finish" {
 			hashed++
 			cancel()
 		}

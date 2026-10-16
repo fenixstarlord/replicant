@@ -9,9 +9,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -23,14 +26,14 @@ import (
 	"github.com/fenixstarlord/replicant/internal/scan"
 )
 
-// Extractor indexes every ALE on the drive once, lazily, then answers
-// per clip.
+// Extractor indexes ALEs once in Prepare, then matches clips without I/O.
 type Extractor struct {
-	root    string
-	files   []string // relative paths of .ale files
-	once    sync.Once
-	rows    map[string]Row // key: lowercase clip name or source file name
-	loadErr []string
+	root       string
+	files      []string // relative paths of .ale files
+	once       sync.Once
+	rows       map[string]Row // key: lowercase clip name or source file name
+	loadErr    []string
+	prepareErr error
 }
 
 // Row is one ALE data row: column name -> value, plus where it came from.
@@ -56,17 +59,70 @@ func (e *Extractor) Priority() int { return extract.PrioritySidecar }
 
 func (e *Extractor) Available(context.Context) (bool, string) { return true, "builtin" }
 
-func (e *Extractor) load() {
-	e.rows = map[string]Row{}
-	for _, rel := range e.files {
-		abs := filepath.Join(e.root, filepath.FromSlash(rel))
-		f, err := os.Open(abs)
-		if err != nil {
-			e.loadErr = append(e.loadErr, fmt.Sprintf("%s: %v", rel, err))
-			continue
+// LoadProgress reports one ALE read. Done counts completed files, including
+// failed reads. A start event is emitted before opening the file.
+type LoadProgress struct {
+	Path     string
+	Done     int
+	Total    int
+	Finished bool
+	Elapsed  time.Duration
+	Err      error
+}
+
+// Prepare loads the index before clips are matched, in directory-entry order.
+func (e *Extractor) Prepare(ctx context.Context) error {
+	return e.PrepareInOrder(ctx, nil, nil)
+}
+
+// PrepareInOrder lets tape scans load ALEs in physical order before any clip
+// is matched. Duplicate keys retain their original directory-entry precedence,
+// regardless of read order. Prepare/PrepareInOrder must precede Matches.
+func (e *Extractor) PrepareInOrder(
+	ctx context.Context,
+	less func(a, b string) bool,
+	progress func(LoadProgress),
+) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	e.once.Do(func() {
+		files := slices.Clone(e.files)
+		if less != nil {
+			sort.SliceStable(files, func(i, j int) bool { return less(files[i], files[j]) })
 		}
-		heading, rows, err := ParseReader(f)
-		f.Close()
+		e.prepareErr = e.load(ctx, files, progress)
+	})
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return e.prepareErr
+}
+
+func (e *Extractor) load(ctx context.Context, files []string, progress func(LoadProgress)) error {
+	e.rows = map[string]Row{}
+	rank := make(map[string]int, len(e.files))
+	for i, rel := range e.files {
+		rank[rel] = i
+	}
+	for i, rel := range files {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		start := time.Now()
+		if progress != nil {
+			progress(LoadProgress{Path: rel, Done: i, Total: len(files)})
+		}
+		heading, rows, err := e.readFile(ctx, rel)
+		if progress != nil {
+			progress(LoadProgress{
+				Path: rel, Done: i + 1, Total: len(files), Finished: true,
+				Elapsed: time.Since(start), Err: err,
+			})
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		if err != nil {
 			e.loadErr = append(e.loadErr, fmt.Sprintf("%s: %v", rel, err))
 			continue
@@ -74,12 +130,25 @@ func (e *Extractor) load() {
 		for _, r := range rows {
 			row := Row{File: rel, Heading: heading, Values: r}
 			for _, key := range matchKeys(r) {
-				if _, exists := e.rows[key]; !exists {
+				if old, exists := e.rows[key]; !exists || rank[rel] < rank[old.File] {
 					e.rows[key] = row
 				}
 			}
 		}
 	}
+	return nil
+}
+
+func (e *Extractor) readFile(ctx context.Context, rel string) (map[string]string, []map[string]string, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, nil, err
+	}
+	f, err := os.Open(filepath.Join(e.root, filepath.FromSlash(rel)))
+	if err != nil {
+		return nil, nil, err
+	}
+	defer f.Close()
+	return parseReader(ctx, f)
 }
 
 // matchKeys lists the lowercase keys a row can be found under.
@@ -104,7 +173,6 @@ func matchKeys(r map[string]string) []string {
 }
 
 func (e *Extractor) lookup(c *clips.Clip) (Row, bool) {
-	e.once.Do(e.load)
 	if len(e.rows) == 0 {
 		return Row{}, false
 	}
@@ -118,7 +186,7 @@ func (e *Extractor) lookup(c *clips.Clip) (Row, bool) {
 }
 
 // Input is empty: the extractor reads no clip file, only the ALEs it
-// loaded on first use.
+// loaded during preparation.
 func (e *Extractor) Input(*clips.Clip) string { return "" }
 
 func (e *Extractor) Matches(c *clips.Clip) bool {
@@ -130,6 +198,9 @@ func (e *Extractor) Matches(c *clips.Clip) bool {
 }
 
 func (e *Extractor) Extract(ctx context.Context, root string, c *clips.Clip) (*meta.Result, error) {
+	if err := e.Prepare(ctx); err != nil {
+		return nil, err
+	}
 	row, ok := e.lookup(c)
 	if !ok {
 		return nil, fmt.Errorf("no ALE row for %s", c.Name)
@@ -143,13 +214,41 @@ func (e *Extractor) Extract(ctx context.Context, root string, c *clips.Clip) (*m
 
 // ParseReader parses an ALE: a Heading section of key/value lines, a
 // Column line of tab-separated names, and Data rows.
-func ParseReader(r interface{ Read([]byte) (int, error) }) (heading map[string]string, rows []map[string]string, err error) {
+func ParseReader(r io.Reader) (heading map[string]string, rows []map[string]string, err error) {
+	return parseReader(context.Background(), r)
+}
+
+// Cancellation cannot interrupt a kernel read on LTFS. Check before each read
+// and each buffered line so no more work is issued when that read returns.
+type contextReader struct {
+	ctx context.Context
+	r   io.Reader
+}
+
+func (r contextReader) Read(p []byte) (int, error) {
+	if err := r.ctx.Err(); err != nil {
+		return 0, err
+	}
+	n, err := r.r.Read(p)
+	if cerr := r.ctx.Err(); cerr != nil {
+		return 0, cerr
+	}
+	return n, err
+}
+
+func parseReader(ctx context.Context, r io.Reader) (heading map[string]string, rows []map[string]string, err error) {
 	heading = map[string]string{}
-	sc := bufio.NewScanner(r)
+	sc := bufio.NewScanner(contextReader{ctx: ctx, r: r})
 	sc.Buffer(make([]byte, 1<<20), 16<<20)
 	section := ""
 	var columns []string
-	for sc.Scan() {
+	for {
+		if err := ctx.Err(); err != nil {
+			return nil, nil, err
+		}
+		if !sc.Scan() {
+			break
+		}
 		line := strings.TrimRight(sc.Text(), "\r")
 		switch strings.TrimSpace(line) {
 		case "Heading":

@@ -15,6 +15,7 @@ import (
 
 	"github.com/fenixstarlord/replicant/internal/cliconfig"
 	"github.com/fenixstarlord/replicant/internal/scanner"
+	"github.com/fenixstarlord/replicant/internal/scanprofile"
 	"github.com/fenixstarlord/replicant/internal/store"
 )
 
@@ -171,6 +172,16 @@ func (s *Scheduler) scan(ctx context.Context, j store.ScanJob, st *runState) (st
 		return store.IngestResult{}, fmt.Errorf("%s is not a directory", j.Path)
 	}
 	opts := scanner.Options{Fast: !j.Extract, Fingerprint: j.Fingerprint, Tools: s.tools, Version: s.version + " (server)"}
+	opts.Profile = func(ctx context.Context, key string) (*scanprofile.Settings, error) {
+		p, err := s.store.DriveProfile(ctx, key)
+		if err != nil {
+			return nil, err
+		}
+		if !p.Configured {
+			return nil, nil
+		}
+		return &p.Settings, nil
+	}
 	stopKeepalive := s.keepalive(ctx, st)
 	res, err := scanner.Run(ctx, j.Path, opts, func(p scanner.Progress) {
 		s.mu.Lock()

@@ -37,6 +37,7 @@ func (d *driveInfo) lookup(drives []store.Drive) {
 
 func newDriveCmd() *cobra.Command {
 	var asJSON bool
+	var identityOnly bool
 	cmd := &cobra.Command{
 		Use:   "drive <path>",
 		Short: "Show how the catalog knows the drive at a path",
@@ -50,7 +51,17 @@ result is printed even when the server cannot be reached ("error" says why).`,
 			if err != nil {
 				return err
 			}
-			vol, err := scan.VolumeInfo(abs)
+			var vol scan.Volume
+			// LTFS virtual identity attributes are index-backed. Menu lookups do
+			// not need statfs capacity, which can wait behind a tape locate.
+			if tape, ok := scan.DetectLTFS(abs); identityOnly && ok {
+				vol = scan.Volume{UUID: tape.UUID, Name: tape.Name, FSType: "ltfs", LTFS: true, MountPoint: abs}
+				if vol.Name == "" {
+					vol.Name = filepath.Base(abs)
+				}
+			} else {
+				vol, err = scan.VolumeInfo(abs)
+			}
 			if err != nil {
 				return err
 			}
@@ -58,7 +69,9 @@ result is printed even when the server cannot be reached ("error" says why).`,
 			if info.VolumeName == "" {
 				info.VolumeName = vol.MountPoint
 			}
-			if c, err := loadClient(); err != nil {
+			if identityOnly {
+				// Used by the menu to match a mounted volume to cached profiles.
+			} else if c, err := loadClient(); err != nil {
 				info.Error = err.Error()
 			} else {
 				ctx, cancel := context.WithTimeout(cmd.Context(), 10*time.Second)
@@ -88,5 +101,6 @@ result is printed even when the server cannot be reached ("error" says why).`,
 		},
 	}
 	cmd.Flags().BoolVar(&asJSON, "json", false, "print the result as JSON")
+	cmd.Flags().BoolVar(&identityOnly, "identity-only", false, "identify the mounted volume without contacting the server")
 	return cmd
 }

@@ -21,6 +21,8 @@ import (
 // Extractor runs ffprobe. Path may be empty to search PATH.
 type Extractor struct {
 	Path string
+	// Tape avoids random seeks when probing MXF files on LTFS.
+	Tape bool
 }
 
 func (e *Extractor) Name() string  { return "ffprobe" }
@@ -51,6 +53,27 @@ func (e *Extractor) Matches(c *clips.Clip) bool {
 	}
 	ext := strings.ToLower(strings.TrimPrefix(path.Ext(c.PrimaryFile()), "."))
 	return ext != "" && !skipExt[ext]
+}
+
+func (e *Extractor) tapeMXF(c *clips.Clip) bool {
+	return e.Tape && strings.EqualFold(path.Ext(c.PrimaryFile()), ".mxf")
+}
+
+// SkipReason avoids reading an MXF when an already-read sidecar supplied
+// duration. Merely finding a sidecar (which may be unreadable) is not enough.
+func (e *Extractor) SkipReason(c *clips.Clip, previous []meta.Result) string {
+	if !e.tapeMXF(c) {
+		return ""
+	}
+	for _, r := range previous {
+		if r.Source != "ale" && r.Source != "sony-xml" {
+			continue
+		}
+		if r.Fields.DurationS != nil && *r.Fields.DurationS > 0 {
+			return "tape MXF: duration supplied by " + r.Source
+		}
+	}
+	return ""
 }
 
 // Output is the subset of ffprobe's JSON we map. The full output is kept
@@ -89,8 +112,12 @@ type Stream struct {
 
 func (e *Extractor) Extract(ctx context.Context, root string, c *clips.Clip) (*meta.Result, error) {
 	abs := filepath.Join(root, filepath.FromSlash(c.PrimaryFile()))
-	cmd := exec.CommandContext(ctx, e.bin(), "-v", "error", "-print_format", "json",
-		"-show_format", "-show_streams", abs)
+	args := []string{"-v", "error", "-print_format", "json", "-show_format", "-show_streams"}
+	if e.tapeMXF(c) {
+		args = append(args, "-seekable", "0", "-nofind_stream_info")
+	}
+	args = append(args, abs)
+	cmd := exec.CommandContext(ctx, e.bin(), args...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
@@ -101,7 +128,15 @@ func (e *Extractor) Extract(ctx context.Context, root string, c *clips.Clip) (*m
 		}
 		return nil, fmt.Errorf("ffprobe: %s", firstLine(msg))
 	}
-	return Parse(out, c.PrimaryFile())
+	r, err := Parse(out, c.PrimaryFile())
+	if err == nil && e.tapeMXF(c) {
+		// Without the footer/index, MXF duration can be wrong. Keep the raw
+		// output verbatim, but do not publish it or values derived from it.
+		r.Fields.DurationS = nil
+		r.Fields.FrameCount = nil
+		r.Fields.TCEnd = nil
+	}
+	return r, err
 }
 
 // Parse maps ffprobe JSON output for the named file into fields.

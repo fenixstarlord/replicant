@@ -37,6 +37,7 @@ final class AutoScanner: ObservableObject {
     private let volumes: VolumeMonitor
     private let scans: ScanManager
     private let settings: AppSettings
+    private let profiles: DriveProfiles
     private var observer: NSObjectProtocol?
     private var unmountObserver: NSObjectProtocol?
     private var timer: Timer?
@@ -45,10 +46,11 @@ final class AutoScanner: ObservableObject {
     /// cancelled scan; `failures` counts failures in a row for the back-off.
     private var retry: [String: (until: Date, failures: Int)] = [:]
 
-    init(volumes: VolumeMonitor, scans: ScanManager, settings: AppSettings) {
+    init(volumes: VolumeMonitor, scans: ScanManager, settings: AppSettings, profiles: DriveProfiles) {
         self.volumes = volumes
         self.scans = scans
         self.settings = settings
+        self.profiles = profiles
         allOnMount = defaults.bool(forKey: "autoScanOnMount")
         if let data = defaults.data(forKey: "autoScanRules"), let r = try? JSONDecoder().decode([String: AutoScanRule].self, from: data) {
             rules = r
@@ -188,7 +190,7 @@ final class AutoScanner: ObservableObject {
         let added = current.subtracting(known)
         known = current
         for v in volumes.volumes where (added.contains(v.id) || v.url == url) && scansOnMount(v) {
-            scans.scan(ScanRequest(url: v.url, automatic: true))
+            profiles.requestScan(v.url, automatic: true)
         }
     }
 
@@ -199,7 +201,7 @@ final class AutoScanner: ObservableObject {
             if let last = lastScanned[v.url.path], Date().timeIntervalSince(last) < interval { continue }
             if let r = retry[v.url.path], Date() < r.until { continue }
             if scans.currentURL == v.url || scans.queue.contains(v.url) { continue }
-            scans.scan(ScanRequest(url: v.url, automatic: true))
+            profiles.requestScan(v.url, automatic: true)
         }
     }
 }

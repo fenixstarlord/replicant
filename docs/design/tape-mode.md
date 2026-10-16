@@ -1,7 +1,8 @@
 # Tape mode (LTFS)
 
-Status: items 1-3 implemented 2026-10-12 (ADR-003). Items 4-8 are planned. Nothing here has been
-timed on a real tape yet; see "Measurements to take".
+Status: items 1-3 implemented 2026-10-12 (ADR-003). Tape-aware MXF probing and live CLI/app
+progress added 2026-10-16; remaining work under items 4-8 is below. A live tape scan on
+2026-10-16 confirmed the MXF seek bottleneck; corrected performance still needs a tape trial.
 
 ## Why
 
@@ -50,16 +51,28 @@ stack through macFUSE. An audit on 2026-10-12 found that a default scan fights t
   on this copy) and still gets its fingerprint from head and tail when those are readable.
 - **Timeouts.** The per-extractor clip timeout defaults to 20 minutes in tape mode (1 minute
   otherwise), and a negative `--clip-timeout` means no limit.
+- **MXF probing.** In tape mode only, ffprobe is skipped when an already-read, successful ALE
+  or Sony XML result supplied a positive duration. If the sidecar is missing, failed, lacks
+  duration, or lies later on tape, ffprobe uses `-seekable 0 -nofind_stream_info`. This avoids
+  its random MXF seeks; duration, frame count and derived end timecode from that probe are
+  discarded because they can be wrong without the footer/index. Its raw JSON is retained.
+  Other formats and disk-mode probes use the normal arguments. Skipping can mean relying on
+  the sidecar's timecode/audio fields when no vendor extractor supplies them.
 - **Numbers for later.** The manifest records `options.tape`, a `tape` block (files, positioned,
   streamed, head_tail, failed, bytes_read, backward, position/hash/extract milliseconds, stream
   limit, clip timeout, -1 for none) and per-extractor runs, errors, timeouts and seconds. The CLI
   prints a summary of them. `backward` counts reads (hash or extractor) that lie before the previous read on
-  tape; it should be zero. The server keeps only `options.tape` and the extractor numbers (in
+   tape, including the transition from ALE preparation to the media pass. The server keeps only `options.tape` and the extractor numbers (in
   `scans.options_json` / `extractors_json`); the `tape` block survives only in an `-o` bundle and
   in the CLI output, so measurements should use `-o`.
-- **Long silences.** A tape read can go minutes without progress. The CLI and server scans send a
-  keepalive once a minute so the server does not mark the scan "lost" after 5 minutes, and the
+- **Long silences.** A tape read can go minutes without progress. The CLI sends a keepalive
+  every 30 seconds and server scans every minute so the server does not mark the scan "lost" after 5 minutes, and the
   activity reporter throttles alternating extract/hash updates instead of sending two per clip.
+  The CLI (including when piped to the menu-bar app) reports every tape hash/extractor start,
+  completion, error/timeout and deliberate probe skip, with the file and elapsed time. While an
+  operation is blocked it prints a waiting line every 30 seconds; this indicates elapsed wait,
+   not measured transfer progress. ALE preparation reports the actual ALE path and completed/total
+   file counts, including read errors and elapsed waits.
   A second Ctrl-C exits at once.
 
 ## Plan
@@ -68,13 +81,15 @@ stack through macFUSE. An audit on 2026-10-12 found that a default scan fights t
 2. **One pass in tape order.** Done. See above.
 3. **Stream small files instead of seeking.** Done. The 1 GiB default comes from the reposition
    cost (~2 s plus the locate) against 300-400 MB/s streaming; measure and retune.
-4. **Stop ffprobe walking MXF files.** Skip ffprobe on MXF when an ALE row or Sony XML already
-   supplied duration (art-cmd's export has none). Otherwise pass `-seekable 0 -nofind_stream_info`,
-   which read one contiguous 27 MB at the head of the ALEXA 35 file with timecode and audio intact
-   but a wrong duration, so drop DurationS/FrameCount from that run. Longer term, a small Go MXF
-   reader that reads the RIP, footer and header partitions once. Also load ALEs in tape order
-   before the pass (today the first clip's `Matches` reads them all, a one-time detour), and look at
-   art-cmd opening each MXF twice.
+4. **Stop ffprobe walking MXF files.** Probe skipping and non-seeking fallback implemented
+   2026-10-16 (see above). The earlier disk-side experiment with these flags read one contiguous
+   27 MB at the head of an ALEXA 35 file with timecode and audio intact but a wrong duration.
+   Longer term, a small Go MXF reader that reads the RIP, footer and header partitions once.
+    **ALE preparation done 2026-10-16:** load ALEs in physical tape order before the media pass,
+    with cancellation checks between files and parser reads. Clip matching performs no I/O.
+    Original duplicate-row precedence is retained regardless of read order. This preliminary pass
+    can cause a backward move when the media pass begins; those moves count in `backward`.
+    Still planned: look at art-cmd opening each MXF twice.
 5. **Hash after grouping in disk mode too,** so dropped ARRIRAW frames are never read. Tape mode
    already does this. Note the behaviour change: today a file whose hash fails is left out of clip
    grouping.
@@ -90,15 +105,26 @@ stack through macFUSE. An audit on 2026-10-12 found that a default scan fights t
    second source if present.
 8. **App and CLI.**
    - Keep the bundle when an upload fails (today `defer os.Remove` discards hours of tape reading).
-   - Show progress during long reads. The non-TTY printer reports hashing only every 5,000 files, so
-     the menu bar app shows almost nothing on tape.
+    - **Done 2026-10-16:** show per-file/per-extractor progress and elapsed waits during long tape
+      reads, including when stderr is a pipe to the menu-bar app.
+    - **Done 2026-10-16:** Cancel shows “Cancelling…” and sends SIGINT, then after 3 seconds
+      sends SIGKILL to the scanner and its tool descendants if needed. The deadline is tied to
+      that scan, including cancellation before process launch. Late progress cannot overwrite
+      the cancellation state. A Go context cannot itself interrupt a blocked LTFS kernel read.
    - Do not auto-scan or interval-rescan LTFS volumes from the menu bar app, or pass tape flags. A
      failed or cancelled tape scan currently becomes an interval retry.
-   - Fix the `--fast` help text, which says "filesystem only" although fingerprinting still reads
-     data.
+   - **Done 2026-10-16:** `--fast` help explicitly says fingerprinting still runs unless
+     `--no-fingerprint` is set.
    - Let the menu bar app pass scan options.
 
 ## Measurements to take
+
+Observed 2026-10-16 on Quantum LTFS LE 2.4.6.1 via myLTO: a nearly four-hour scan had an
+ffprobe process spending 16 minutes on a 140 GB ARRI MXF with only 0.07 s CPU time. Process
+samples showed ffprobe blocked in `read` and LTFS in `tape_seek → iokit_locate → SCSI`.
+`ltfs.volumeUUID` and `ltfs.startblock` were readable. This confirms a positioning bottleneck,
+not the precise number of seeks or the absence of a drive-level problem. No additional media
+reads were issued during diagnosis.
 
 On the Mac where myLTO mounts the tape, with myLTO idle and no Finder window open on the tape:
 

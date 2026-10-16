@@ -31,9 +31,10 @@ enum ReplicantCLI {
     }
 
     /// Runs the CLI to completion, returning exit code and combined output.
-    static func run(_ args: [String], stdin: String? = nil) async -> (Int32, String) {
+    static func run(_ args: [String], stdin: String? = nil, timeout: TimeInterval = 30) async -> (Int32, String) {
         guard let url else { return (127, "replicant CLI not found") }
         return await withCheckedContinuation { cont in
+          DispatchQueue.global(qos: .utility).async {
             let p = Process()
             p.executableURL = url
             p.arguments = args
@@ -47,11 +48,17 @@ enum ReplicantCLI {
                 inPipe.fileHandleForWriting.write(stdin.data(using: .utf8)!)
                 try? inPipe.fileHandleForWriting.close()
             }
-            p.terminationHandler = { proc in
+            do {
+                try p.run()
+                let deadline = DispatchWorkItem { if p.isRunning { kill(p.processIdentifier, SIGKILL) } }
+                DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: deadline)
+                // Drain while running: a large profile/drive list can fill the pipe.
                 let data = out.fileHandleForReading.readDataToEndOfFile()
-                cont.resume(returning: (proc.terminationStatus, String(decoding: data, as: UTF8.self)))
-            }
-            do { try p.run() } catch { cont.resume(returning: (127, "\(error)")) }
+                p.waitUntilExit()
+                deadline.cancel()
+                cont.resume(returning: (p.terminationStatus, String(decoding: data, as: UTF8.self)))
+            } catch { cont.resume(returning: (127, "\(error)")) }
+          }
         }
     }
 }
@@ -97,6 +104,8 @@ struct ScanRequest {
     var onDone: ((Bool) -> Void)? = nil
     /// Started by an auto-scan rule rather than by the user.
     var automatic = false
+    var profileKey: String? = nil
+    var displayName: String? = nil
 }
 
 /// Runs scans one at a time through `replicant scan <path>` and reports progress.
@@ -105,11 +114,13 @@ final class ScanManager: ObservableObject {
     @Published private(set) var current: String? = nil      // display name
     @Published private(set) var currentURL: URL? = nil       // what is being scanned
     @Published private(set) var status: String = ""          // last progress line
+    @Published private(set) var isCancelling = false
     @Published private(set) var queue: [URL] = []            // waiting, for display
     @Published private(set) var recent: [ScanRecord] = []
     /// Called after every scan with the path and how it ended.
     var onFinished: ((URL, ScanOutcome) -> Void)?
     private var pending: [ScanRequest] = []
+    private var currentID: UUID?
     private var observers: [NSObjectProtocol] = []
 
     var isScanning: Bool { current != nil }
@@ -173,13 +184,30 @@ final class ScanManager: ObservableObject {
     /// Marks the request as running at once, so a second call in the same
     /// turn queues instead of starting a parallel scan.
     private func start(_ req: ScanRequest) {
-        current = req.name ?? req.url.lastPathComponent
+        // Register before scheduling the task, so an immediate Cancel cannot
+        // fall into the gap before run() attaches its subprocess.
+        guard ActiveScan.shared.begin(path: req.url.path) else {
+            req.onDone?(false)
+            next()
+            return
+        }
+        let id = UUID()
+        currentID = id
+        current = req.displayName ?? req.name ?? req.url.lastPathComponent
         currentURL = req.url
+        isCancelling = false
         status = "Starting…"
-        Task { await run(req) }
+        Task { await run(req, id: id) }
     }
 
     func cancel() {
+        guard let url = currentURL, !isCancelling else { return }
+        isCancelling = true
+        status = "Cancelling… waiting for the scanner to stop"
+        let dropped = pending.filter { $0.url == url }
+        pending.removeAll { $0.url == url }
+        queue = pending.map(\.url)
+        dropped.forEach { $0.onDone?(false) }
         ActiveScan.shared.interrupt(.user)
     }
 
@@ -191,8 +219,15 @@ final class ScanManager: ObservableObject {
         dropped.forEach { $0.onDone?(false) }
     }
 
-    private func run(_ req: ScanRequest) async {
+    private func run(_ req: ScanRequest, id: UUID) async {
         let url = req.url
+        if isCancelling {
+            ActiveScan.shared.ended()
+            finish(url, name: current ?? url.lastPathComponent, outcome: .cancelled, summary: "cancelled")
+            req.onDone?(false)
+            next()
+            return
+        }
         var chosen = req.name
         if chosen != nil, let key = req.volumeKey, Volume.stableKey(of: url) != key {
             // Another drive is mounted at this path now; the name was not for it.
@@ -200,6 +235,7 @@ final class ScanManager: ObservableObject {
         }
         let name = current ?? url.lastPathComponent
         guard let cli = ReplicantCLI.url else {
+            ActiveScan.shared.ended()
             finish(url, name: name, outcome: .failed, summary: "replicant CLI not found")
             req.onDone?(false)
             next()
@@ -208,6 +244,9 @@ final class ScanManager: ObservableObject {
         let p = Process()
         p.executableURL = cli
         p.arguments = chosen.map { ["scan", "--name", $0, url.path] } ?? ["scan", url.path]
+        if let key = req.profileKey {
+            p.arguments = ["scan", "--profile", "--expect-volume", key, url.path]
+        }
         ReplicantCLI.apply(to: p)
         let errPipe = Pipe(), outPipe = Pipe()
         p.standardError = errPipe
@@ -219,22 +258,16 @@ final class ScanManager: ObservableObject {
             guard !chunk.isEmpty else { return }
             // The CLI has closed every file on the drive (it is writing or
             // uploading the bundle now): an eject need not stop it.
-            if chunk.contains("finished reading ") { ActiveScan.shared.doneReading() }
+            let doneReading = chunk.contains("finished reading ")
             let lines = chunk.replacingOccurrences(of: "\r", with: "\n").split(separator: "\n").map(String.init)
-            if let last = lines.last(where: { !$0.trimmingCharacters(in: .whitespaces).isEmpty }) {
-                Task { @MainActor in self?.status = last }
+            let last = lines.last(where: { !$0.trimmingCharacters(in: .whitespaces).isEmpty })
+            Task { @MainActor in
+                guard let self, self.currentID == id else { return }
+                if doneReading { ActiveScan.shared.doneReading() }
+                if !self.isCancelling, let last { self.status = last }
             }
         }
         // stdout carries only the final result line; read it after exit.
-        guard ActiveScan.shared.begin(path: url.path) else {
-            // The drive started ejecting before the scan could start.
-            current = nil
-            currentURL = nil
-            status = ""
-            req.onDone?(false)
-            next()
-            return
-        }
         let code: Int32 = await withCheckedContinuation { cont in
             p.terminationHandler = { proc in
                 ActiveScan.shared.ended()
@@ -246,7 +279,9 @@ final class ScanManager: ObservableObject {
             } catch {
                 ActiveScan.shared.ended()
                 cont.resume(returning: 127)
-                Task { @MainActor in self.status = "\(error)" }
+                Task { @MainActor in
+                    if self.currentID == id && !self.isCancelling { self.status = "\(error)" }
+                }
             }
         }
         errPipe.fileHandleForReading.readabilityHandler = nil
@@ -302,6 +337,8 @@ final class ScanManager: ObservableObject {
         if recent.count > 10 { recent.removeLast() }
         current = nil
         currentURL = nil
+        currentID = nil
+        isCancelling = false
         status = ""
         onFinished?(url, outcome)
         NotificationCenter.default.post(name: .scanFinished, object: nil)

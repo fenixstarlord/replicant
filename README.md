@@ -81,8 +81,27 @@ first launch on another Mac is right-click → Open.
 
 `make app` builds `dist/Replicant Client.app`, a menu bar app with the `replicant` CLI bundled inside. Drag it to
 Applications and open it. From the drop-down, click a drive to scan it and push it to the server.
-The first time you pick a drive on that Mac, the app asks what the catalog should call it
-(suggesting its current catalog name, or the volume's name); later clicks scan straight away.
+The menu shows **catalog name (mounted volume name)** when they differ, for example
+**EGG09 (1097007720)**. A green checkmark means a scan has successfully reached the catalog.
+First-time drives open a setup dialog for their catalog name, client, group, individual metadata
+extractors, and file fingerprinting. The gear beside a known drive edits those settings for its
+next scan. Clients and groups can be selected or created in the dialog.
+
+Profiles are stored on the server for all drive types, keyed by the scanner's volume identity
+(the tape UUID for LTFS), so another Mac uses the same settings. Update the server alongside the
+app for this feature. A saved profile alone does not mark a drive indexed. Known drives without a
+profile retain the previous defaults until edited. Manual scans, Browse, and automatic scans use
+the profile; queued scans fetch it when they start. Missing tools are marked unavailable on that
+Mac and remain selectable for Macs where they are installed. Tape-mode probe-skipping still
+applies to enabled tools. Cached settings are used with a notice if the server cannot be reached;
+editing settings requires a connection. Profiles never write to the mounted drive.
+
+CLI equivalents: `replicant profiles` lists profiles/client/group choices as JSON;
+`replicant profiles save` accepts a profile as JSON on stdin; `replicant scan --profile <path>`
+loads shared settings. `--extractors=ale,bwf` selects parsers, `--extractors=` disables extraction,
+and `--no-fingerprint` disables fingerprinting; explicit flags override shared settings.
+Server scan jobs also use saved profiles, with their metadata-extraction switch as an override.
+
 Browse… scans a folder or network share instead. Ejecting a drive that is being scanned stops
 the scan first, so the eject goes through, and quitting the app stops any running scan. A drive
 with an automatic interval rule whose scan fails is retried after 5, 10, 20 minutes and so on,
@@ -98,7 +117,9 @@ shows an "Update to vX.Y.Z…" item in the menu, a notification, and a download 
 Drives show under a catalog name. It is the volume's own name until you rename the drive: the
 pencil next to it on the Drives page, the Name field on the drive's page, or `replicant scan --name`.
 A renamed drive keeps its name on later scans; clearing the name goes back to the volume's name.
-Renaming only changes the catalog, never the drive.
+Renaming only changes the catalog, never the drive. Once a shared profile exists, its name and
+web renames take precedence over names in incoming scan bundles. The Drives list shows a green
+storage-usage bar underneath each drive name.
 
 Environment variables:
 

@@ -17,11 +17,16 @@ import (
 	"github.com/fenixstarlord/replicant/internal/extract"
 	"github.com/fenixstarlord/replicant/internal/extract/registry"
 	"github.com/fenixstarlord/replicant/internal/scan"
+	"github.com/fenixstarlord/replicant/internal/scanprofile"
 )
 
 // Options controls a run.
 type Options struct {
-	Fast            bool // filesystem only, no metadata extraction
+	Extractors []string // nil: all; empty: none
+	// Profile resolves shared settings after volume identification, before I/O.
+	Profile         func(context.Context, string) (*scanprofile.Settings, error)
+	ExpectedVolume  string // reject a different drive mounted at a queued path
+	Fast            bool   // filesystem only, no metadata extraction
 	Fingerprint     bool
 	FullHash        bool
 	DescendPackages bool
@@ -45,9 +50,14 @@ type Options struct {
 
 // Progress reports a stage and its counters; Total is 0 when unknown.
 type Progress struct {
-	Stage string // "walk", "hash", "extract"
-	Done  int
-	Total int
+	Stage     string // "walk", "hash", "extract"
+	Done      int
+	Total     int
+	Path      string
+	Extractor string
+	Event     string // tape operation: start, finish, skip; empty for counters
+	Elapsed   time.Duration
+	Detail    string
 }
 
 // Result is everything a run produced.
@@ -104,6 +114,23 @@ func run(ctx context.Context, abs string, opts Options, progress func(Progress))
 		return nil, fmt.Errorf("volume info: %w", err)
 	}
 	res.Volume = vol
+	if opts.ExpectedVolume != "" && opts.ExpectedVolume != vol.Key() {
+		return nil, fmt.Errorf("mounted volume changed; choose the drive again")
+	}
+	if opts.Profile != nil {
+		p, err := opts.Profile(ctx, vol.Key())
+		if err != nil {
+			return nil, fmt.Errorf("scan profile: %w", err)
+		}
+		if p != nil {
+			opts.Fingerprint = p.Fingerprint
+			opts.Extractors = append([]string{}, p.Extractors...)
+		}
+	}
+	if err := (scanprofile.Settings{Extractors: opts.Extractors}).Validate(); err != nil {
+		return nil, err
+	}
+	res.opts = opts
 
 	so := scan.DefaultOptions()
 	so.Fingerprint = opts.Fingerprint
@@ -138,7 +165,7 @@ func run(ctx context.Context, abs string, opts Options, progress func(Progress))
 	res.Entries, res.Clips = clips.Group(entries, clips.Options{KeepFrames: opts.KeepFrames})
 
 	if !opts.Fast {
-		runner := extract.NewRunner(ctx, registry.All(abs, res.Entries, opts.Tools))
+		runner := extract.NewRunner(ctx, registry.Selected(abs, res.Entries, opts.Tools, opts.Extractors))
 		res.Extractors = runner.Statuses()
 		t2 := time.Now()
 		if err := runner.Run(ctx, abs, res.Clips, extract.Options{Workers: opts.ExtractWorkers, ClipTimeout: opts.ClipTimeout},
@@ -175,7 +202,8 @@ func (r *Result) Manifest() bundle.Manifest {
 		Options: bundle.Options{
 			Fast: r.opts.Fast, Fingerprint: r.opts.Fingerprint, FullHash: r.opts.FullHash,
 			DescendPackages: r.opts.DescendPackages, KeepFrames: r.opts.KeepFrames, Skip: skip,
-			Tape: r.Tape != nil,
+			Tape:       r.Tape != nil,
+			Extractors: r.opts.Extractors,
 		},
 		Extractors: ext,
 		Summary:    scan.Summarize(r.Entries),

@@ -65,6 +65,7 @@ type TapeStats struct {
 
 // Options records how the scan was run.
 type Options struct {
+	Extractors      []string `json:"extractors"` // null: legacy all; []: explicitly none
 	Fast            bool     `json:"fast"`
 	Fingerprint     bool     `json:"fingerprint"`
 	FullHash        bool     `json:"full_hash"`

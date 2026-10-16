@@ -11,6 +11,8 @@ import (
 	"github.com/fenixstarlord/replicant/internal/bundle"
 	"github.com/fenixstarlord/replicant/internal/clips"
 	"github.com/fenixstarlord/replicant/internal/extract"
+	"github.com/fenixstarlord/replicant/internal/extract/ale"
+	"github.com/fenixstarlord/replicant/internal/extract/ffprobe"
 	"github.com/fenixstarlord/replicant/internal/extract/registry"
 	"github.com/fenixstarlord/replicant/internal/scan"
 )
@@ -176,8 +178,18 @@ func runTape(ctx context.Context, abs string, so scan.Options, entries []scan.En
 	res.Entries, res.Clips = clips.Group(entries, clips.Options{KeepFrames: opts.KeepFrames})
 	hashing := so.Fingerprint || so.FullHash
 	var runner *extract.Runner
+	var aleIndex *ale.Extractor
 	if !opts.Fast {
-		runner = extract.NewRunner(ctx, registry.All(abs, res.Entries, opts.Tools))
+		extractors := registry.Selected(abs, res.Entries, opts.Tools, opts.Extractors)
+		for _, e := range extractors {
+			if probe, ok := e.(*ffprobe.Extractor); ok {
+				probe.Tape = true
+			}
+			if index, ok := e.(*ale.Extractor); ok && len(res.Clips) > 0 {
+				aleIndex = index
+			}
+		}
+		runner = extract.NewRunner(ctx, extractors)
 		res.Extractors = runner.Statuses()
 	}
 
@@ -204,7 +216,7 @@ func runTape(ctx context.Context, abs string, so scan.Options, entries []scan.En
 	seen := map[string]lookup{}
 	looked, found := 0, 0
 	position := func(rel string) (scan.TapePosition, bool) {
-		if rel == "" {
+		if rel == "" || ctx.Err() != nil {
 			return scan.TapePosition{}, false
 		}
 		if l, ok := seen[rel]; ok {
@@ -218,7 +230,19 @@ func runTape(ctx context.Context, abs string, so scan.Options, entries []scan.En
 		}
 		return p, ok
 	}
+	// ALEs are shared indexes, not clip members. Include their positions even
+	// when fingerprinting is disabled, before the explicit preload pass.
+	if aleIndex != nil {
+		for _, e := range res.Entries {
+			if e.Ext == "ale" && !e.IsDir && !e.IsSymlink && e.Error == "" {
+				position(e.Path)
+			}
+		}
+	}
 	units := planTape(res.Entries, res.Clips, hashing, runner != nil, position)
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	stats.PositionMS = time.Since(t0).Milliseconds()
 	for _, u := range units {
 		for _, f := range u.files {
@@ -243,6 +267,36 @@ func runTape(ctx context.Context, abs string, so scan.Options, entries []scan.En
 		}
 		last, haveLast = p, true
 	}
+	if aleIndex != nil {
+		start := time.Now()
+		err := aleIndex.PrepareInOrder(ctx, func(a, b string) bool {
+			pa, oka := position(a)
+			pb, okb := position(b)
+			return tapeLess(pa, oka, a, pb, okb, b)
+		}, func(p ale.LoadProgress) {
+			event, detail := "start", ""
+			if p.Finished {
+				event = "finish"
+			} else {
+				pos, ok := position(p.Path)
+				visit(pos, ok)
+				if traceTapeRead != nil {
+					traceTapeRead("ale", p.Path)
+				}
+			}
+			if p.Err != nil {
+				detail = p.Err.Error()
+			}
+			report(Progress{
+				Stage: "ale", Done: p.Done, Total: p.Total, Path: p.Path, Extractor: "ale index",
+				Event: event, Elapsed: p.Elapsed, Detail: detail,
+			})
+		})
+		res.ExtractTime += time.Since(start)
+		if err != nil {
+			return err
+		}
+	}
 	extractInput := func(job *extract.ClipJob, input string, p scan.TapePosition, ok bool) bool {
 		t := time.Now()
 		ran := job.RunInput(ctx, input) > 0
@@ -258,13 +312,29 @@ func runTape(ctx context.Context, abs string, so scan.Options, entries []scan.En
 
 	h := scan.TapeHasher{Fingerprint: so.Fingerprint, FullHash: so.FullHash, StreamLimit: opts.StreamLimit}
 	hashed, extracted := 0, 0
+	var clipPath string
+	eopts.Progress = func(p extract.Progress) {
+		input := p.Input
+		if input == "" {
+			input = clipPath
+		}
+		report(Progress{
+			Stage: "extract", Done: extracted, Total: len(res.Clips),
+			Path: input, Extractor: p.Extractor, Event: p.Event, Elapsed: p.Elapsed, Detail: p.Detail,
+		})
+	}
 	for _, u := range units {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
 		var job *extract.ClipJob
 		if u.clip >= 0 && runner != nil {
-			job = runner.StartClip(abs, &res.Clips[u.clip], eopts)
+			clipPath = res.Clips[u.clip].RootPath
+			var err error
+			job, err = runner.StartClip(ctx, abs, &res.Clips[u.clip], eopts)
+			if err != nil {
+				return err
+			}
 			inUnit := make(map[string]bool, len(u.files))
 			for _, f := range u.files {
 				inUnit[res.Entries[f.entry].Path] = true
@@ -295,6 +365,7 @@ func runTape(ctx context.Context, abs string, so scan.Options, entries []scan.En
 				traceTapeRead("hash", e.Path)
 			}
 			t := time.Now()
+			report(Progress{Stage: "hash", Done: hashed, Total: stats.Files, Path: e.Path, Event: "start"})
 			r := h.Hash(ctx, filepath.Join(abs, filepath.FromSlash(e.Path)), e)
 			res.HashTime += time.Since(t)
 			stats.BytesRead += r.Bytes
@@ -307,7 +378,10 @@ func runTape(ctx context.Context, abs string, so scan.Options, entries []scan.En
 				stats.HeadTail++
 			}
 			hashed++
-			report(Progress{Stage: "hash", Done: hashed, Total: stats.Files})
+			report(Progress{
+				Stage: "hash", Done: hashed, Total: stats.Files, Path: e.Path,
+				Event: "finish", Elapsed: time.Since(t), Detail: e.Error,
+			})
 		}
 		if job != nil {
 			t := time.Now()

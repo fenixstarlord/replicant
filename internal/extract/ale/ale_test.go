@@ -1,14 +1,131 @@
 package ale
 
 import (
+	"bytes"
 	"context"
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"github.com/fenixstarlord/replicant/internal/clips"
 	"github.com/fenixstarlord/replicant/internal/scan"
 )
+
+func TestPrepareInOrderPreservesMatchingPrecedence(t *testing.T) {
+	root := t.TempDir()
+	raw, err := os.ReadFile(filepath.Join(fixturesDir(t), fixture))
+	if err != nil {
+		t.Fatal(err)
+	}
+	entries := []scan.Entry{}
+	for _, name := range []string{"a.ale", "z.ale"} {
+		if err := os.WriteFile(filepath.Join(root, name), raw, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		entries = append(entries, scan.Entry{Path: name, Ext: "ale"})
+	}
+	e := NewFromEntries(root, entries)
+	c := &clips.Clip{Files: []string{"A_0001C001_260930_084650_c1BY9.mxf"}}
+	if e.Matches(c) {
+		t.Fatal("Matches must not read files before Prepare")
+	}
+	reads := []string{}
+	err = e.PrepareInOrder(t.Context(), func(a, b string) bool { return a > b }, func(p LoadProgress) {
+		if !p.Finished {
+			reads = append(reads, p.Path)
+		}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(reads, []string{"z.ale", "a.ale"}) {
+		t.Fatalf("reads = %v", reads)
+	}
+	row, ok := e.lookup(c)
+	if !ok || row.File != "a.ale" {
+		t.Fatalf("read order changed duplicate precedence: %v, %v", row.File, ok)
+	}
+	// Matching and extraction must use the cached index, not reopen its files.
+	for _, name := range reads {
+		if err := os.Remove(filepath.Join(root, name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if !e.Matches(c) {
+		t.Fatal("prepared match lost")
+	}
+	r, err := e.Extract(t.Context(), root, c)
+	if err != nil || r.Fields.DurationS == nil {
+		t.Fatalf("cached extraction: %v, %v", r, err)
+	}
+}
+
+func TestPrepareCancellationAndReadErrors(t *testing.T) {
+	for _, cancelAt := range []string{"before open", "after first file", "never"} {
+		t.Run(cancelAt, func(t *testing.T) {
+			root := t.TempDir()
+			raw, err := os.ReadFile(filepath.Join(fixturesDir(t), fixture))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(root, "valid.ale"), raw, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			e := NewFromEntries(root, []scan.Entry{{Path: "missing.ale", Ext: "ale"}, {Path: "valid.ale", Ext: "ale"}})
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			events := []LoadProgress{}
+			err = e.PrepareInOrder(ctx, nil, func(p LoadProgress) {
+				events = append(events, p)
+				if cancelAt == "before open" || (cancelAt == "after first file" && p.Finished) {
+					cancel()
+				}
+			})
+			if cancelAt != "never" {
+				if !errors.Is(err, context.Canceled) || len(events) != 2 {
+					t.Fatalf("cancelled prepare: %v, events %+v", err, events)
+				}
+				if cancelAt == "before open" && !errors.Is(events[1].Err, context.Canceled) {
+					t.Fatalf("opened file after cancellation: %v", events[1].Err)
+				}
+				return
+			}
+			if err != nil || len(events) != 4 || events[1].Err == nil || events[3].Err != nil {
+				t.Fatalf("read-error recovery: %v, events %+v", err, events)
+			}
+			if events[3].Done != 2 || events[3].Total != 2 {
+				t.Errorf("completion counters: %+v", events[3])
+			}
+		})
+	}
+}
+
+type cancelReader struct {
+	r      io.Reader
+	cancel context.CancelFunc
+}
+
+func (r cancelReader) Read(p []byte) (int, error) {
+	n, err := r.r.Read(p)
+	r.cancel() // model cancellation while the underlying read was blocked
+	return n, err
+}
+
+func TestParseStopsWhenBlockedReadReturnsAfterCancel(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	raw, err := os.ReadFile(filepath.Join(fixturesDir(t), fixture))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, rows, err := parseReader(ctx, cancelReader{r: bytes.NewReader(raw), cancel: cancel})
+	if !errors.Is(err, context.Canceled) || len(rows) != 0 {
+		t.Fatalf("continued after cancelled read: %d rows, %v", len(rows), err)
+	}
+}
 
 const fixture = "arri_alexa35_arricore.ale"
 
@@ -77,6 +194,9 @@ func TestExtractorMatchesClipsByFileName(t *testing.T) {
 	root := fixturesDir(t)
 	entries := []scan.Entry{{Path: fixture, Name: fixture, Ext: "ale", Kind: scan.KindSidecar}}
 	e := NewFromEntries(root, entries)
+	if err := e.Prepare(t.Context()); err != nil {
+		t.Fatal(err)
+	}
 	match := &clips.Clip{Kind: clips.KindFile, Name: "A_0001C002_260930_084905_c1BY9", RootPath: "A_0001C002_260930_084905_c1BY9.mxf", Files: []string{"A_0001C002_260930_084905_c1BY9.mxf"}}
 	if !e.Matches(match) {
 		t.Fatal("expected clip to match an ALE row")

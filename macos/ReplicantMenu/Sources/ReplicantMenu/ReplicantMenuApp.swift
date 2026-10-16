@@ -9,6 +9,7 @@ struct ReplicantMenuApp: App {
     @StateObject private var settings: AppSettings
     @StateObject private var toolsCheck = ToolChecker()
     @StateObject private var autoScan: AutoScanner
+    @StateObject private var profiles: DriveProfiles
     @StateObject private var local: LocalServer
     @StateObject private var updates: UpdateChecker
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
@@ -19,7 +20,9 @@ struct ReplicantMenuApp: App {
         _volumes = StateObject(wrappedValue: volumes)
         _scans = StateObject(wrappedValue: scans)
         _settings = StateObject(wrappedValue: settings)
-        _autoScan = StateObject(wrappedValue: AutoScanner(volumes: volumes, scans: scans, settings: settings))
+        let profiles = DriveProfiles(settings: settings, scans: scans, volumes: volumes)
+        _profiles = StateObject(wrappedValue: profiles)
+        _autoScan = StateObject(wrappedValue: AutoScanner(volumes: volumes, scans: scans, settings: settings, profiles: profiles))
         _local = StateObject(wrappedValue: local)
         _updates = StateObject(wrappedValue: updates)
         // The standalone app's main window (AppKit-owned so the menu-bar-only
@@ -29,6 +32,7 @@ struct ReplicantMenuApp: App {
                 .environmentObject(volumes)
                 .environmentObject(scans)
                 .environmentObject(settings)
+                .environmentObject(profiles)
                 .environmentObject(local)
                 .environmentObject(updates))
         }
@@ -36,17 +40,22 @@ struct ReplicantMenuApp: App {
 
     var body: some Scene {
         MenuBarExtra {
-            MenuContent()
-                .environmentObject(volumes)
-                .environmentObject(scans)
-                .environmentObject(settings)
-                .environmentObject(toolsCheck)
-                .environmentObject(autoScan)
-                .environmentObject(local)
-                .environmentObject(updates)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 10) {
+                    MenuContent()
+                        .environmentObject(volumes)
+                        .environmentObject(scans)
+                        .environmentObject(settings)
+                        .environmentObject(toolsCheck)
+                        .environmentObject(autoScan)
+                        .environmentObject(local)
+                        .environmentObject(updates)
+                        .environmentObject(profiles)
+                }.padding(14)
+            }.frame(width: 440, height: 570)
         } label: {
             Image(systemName: scans.isScanning ? "externaldrive.badge.timemachine" : "externaldrive")
         }
-        .menuBarExtraStyle(.menu)
+        .menuBarExtraStyle(.window)
     }
 }

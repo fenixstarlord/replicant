@@ -80,6 +80,8 @@ func (s *Server) routes() {
 
 	m.Handle("POST "+api.PathScans, s.requireAuth(http.HandlerFunc(s.handleIngest)))
 	m.Handle("GET "+api.PathDrives, s.requireAuth(http.HandlerFunc(s.handleDrives)))
+	m.Handle("GET "+api.PathProfiles, s.requireAuth(http.HandlerFunc(s.handleProfiles)))
+	m.Handle("PUT "+api.PathProfiles, s.requireAuth(http.HandlerFunc(s.handleProfileSave)))
 	m.Handle("GET "+api.PathMe, s.requireAuth(http.HandlerFunc(s.handleMe)))
 	m.Handle("POST "+api.PathActivity, s.requireAuth(http.HandlerFunc(s.handleActivityStart)))
 	m.Handle("PUT "+api.PathActivity+"/{id}", s.requireAuth(http.HandlerFunc(s.handleActivityUpdate)))

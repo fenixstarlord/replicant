@@ -334,7 +334,17 @@ context covers the whole command, upload included, so a cancel at any stage exit
   then that file hashed, files up to `--tape-stream-mb` (1024) streamed with
   byte-identical fingerprints, 20 min clip timeout, tape UUID as drive identity. The manifest
   records tape stats and per-extractor timings. Plan items 4-8 and the measurements to take are in
-  `docs/design/tape-mode.md`; nothing has been timed on a real tape yet.
+  `docs/design/tape-mode.md`. **2026-10-16:** a live scan confirmed ffprobe waiting on LTFS
+  seeks for 16 minutes on one MXF. Tape MXFs now skip ffprobe when a successful, already-read
+  ALE/Sony XML supplies duration; otherwise probe with `-seekable 0 -nofind_stream_info`, retaining
+  raw JSON but dropping unreliable duration/frame count/end timecode. Tape hash/extractor starts,
+  completions, skips and errors print immediately, with elapsed-wait updates every 30 s for the
+  menu-bar app too. ALEs are explicitly prepared in physical tape order before the media pass
+  (no I/O in `Matches`), with cancellation checks and actual filename/count progress. Cancel in
+  the app shows “Cancelling…” and escalates from SIGINT to SIGKILL after 3 s, including tool
+  descendants; a scan-generation guard prevents an old deadline stopping the next scan.
+  Process regression checks run with `bash macos/test-cancellation.sh` (Command Line Tools only).
+  Corrected performance still needs a real-tape trial.
 - **Drive names (2026-10-13):** `drives.name` is the catalog name shown everywhere. It follows the
   volume's name until the drive is renamed (`drives.renamed`, migration 0006); `volume_name` keeps
   what the volume reports. Rename on the server (Drives list pencil, `POST /drives/{id}/rename`, or
@@ -342,13 +352,24 @@ context covers the whole command, upload included, so a cancel at any stage exit
   `replicant scan --name` (bundle `manifest.drive_name`; the volume's own name means "follow the
   volume" again). Only a bundle at least as new as the drive's newest scan may change its name or
   volume fields (`upsertDrive`). History rows show the drive's current name. Renaming never touches
-  the drive itself (hard rule 1). The menu bar app asks for a name the first time a drive is picked
-  on that Mac (`DriveNaming.swift`, one dialog per drive, pre-filled from `replicant drive --json`),
-  passes `--name` only when it differs from what the catalog would store, and remembers the drive
-  (UserDefaults `namedVolumes`, by volume UUID or name) only after the named scan succeeded; the
-  name travels in a `ScanRequest` that re-checks the mounted volume before running. Volumes diskutil
-  cannot describe (network shares, FUSE) are named after their mount point, so they no longer all
+  the drive itself (hard rule 1). The naming-only app dialog was replaced by shared profiles
+  (below). Volumes diskutil cannot describe (network shares, FUSE) are named after their mount point, so they no longer all
   share the key `name:|smbfs`; rows stored under that old key are not migrated.
+- **Shared drive profiles (2026-10-16, ADR-004):** migration 0007 adds `drive_profiles`, keyed by
+  `scan.Volume.Key()` independently of ingested drives. Authenticated `GET/PUT /api/drive-profiles`,
+  `replicant profiles [save]`, and `scan --profile [--expect-volume key]` share extractor allowlists
+  and fingerprinting across Macs. `--extractors=` means none; nil retains all legacy extractors.
+  Selection happens before availability checks and ALE loading, in disk and tape mode. Profiles
+  carry pending name/client/group until first ingest; after ingest those fields come from drives,
+  and incoming bundle names cannot override a shared profile. Saves are transactional, with
+  revisions to reject stale edits. CLI caches are server-scoped in the config directory.
+  `DriveProfiles.swift` replaces `DriveNaming.swift` and local `namedVolumes`: first-scan setup,
+  existing/new client/group choices, per-tool checkboxes, fingerprinting, and gear editing.
+  Manual, Browse and automatic scans use the same flow and resolve current settings at scan start.
+  The menu-bar popover shows catalog name (mounted name), plus a checkmark only for an ingested
+  scan. Its catalog cache is server-scoped; mount identities are session-only and cleared on mount
+  changes. LTFS identity-only CLI lookups use virtual attributes without statfs. The server Drives
+  table has a green storage-usage bar below each drive name instead of a Used column.
 - **Partial scans (decided 2026-10-08):** a scan whose root is not the mount point is `is_partial`;
   latest and diffs are tracked per (drive, root); drive aggregates and default browsing prefer the
   latest full scan (`store.LatestScan`). Migration `0002_partial_scans.sql`.
